@@ -1,0 +1,48 @@
+{
+  "name": "@umccr/steps-s3-copy",
+  "version": "0.0.0",
+  "description": "CDK construct for an AWS Steps machine that copies objects",
+  "homepage": "https://github.com/umccr/steps-s3-copy",
+  "license": "MIT",
+  "author": {
+    "name": "Andrew Patterson",
+    "email": "andrew.patterson@umccr.org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umccr/steps-s3-copy.git"
+  },
+  "main": "out/steps-s3-copy-construct.js",
+  "types": "out/steps-s3-copy-construct.d.ts",
+  "scripts": {
+    "build": "jsii",
+    "build:watch": "jsii -w",
+    "package": "jsii-pacmak"
+  },
+  "keywords": [
+    "jsii",
+    "cdk",
+    "s3",
+    "steps",
+    "copy"
+  ],
+  "jsii": {
+    "outdir": "dist",
+    "targets": {},
+    "tsc": {
+      "outDir": "out",
+      "rootDir": "src"
+    }
+  },
+  "peerDependencies": {
+    "aws-cdk-lib": "^2.141.0",
+    "constructs": "^10.3.0"
+  },
+  "devDependencies": {
+    "aws-cdk-lib": "2.141.0",
+    "constructs": "10.3.0",
+    "jsii": "5.4.31",
+    "jsii-pacmak": "1.102.0",
+    "publib": "0.2.870"
+  }
+}

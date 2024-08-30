@@ -1,0 +1,40 @@
+name: Release Package
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  publish-to-npm-registry:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: pnpm/action-setup@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "pnpm"
+
+      - run: pnpm install
+
+      # first set the versions of our package to the release version
+
+      - run: pnpm version ${{github.ref_name}}
+        working-directory: packages/aws-copy-out-sharer
+
+      # build and package
+
+      - run: pnpm run build
+
+      - run: pnpm run package
+
+      # if all the builds have completed - we can publish the package
+
+      - run: pnpm exec publib-npm
+        working-directory: packages/aws-copy-out-sharer
+        env:
+          NPM_TOKEN: ${{secrets.NPM_PUBLISH_TOKEN}}
+          NPM_ACCESS_LEVEL: public

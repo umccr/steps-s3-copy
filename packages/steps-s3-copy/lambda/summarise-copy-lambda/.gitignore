@@ -1,0 +1,3 @@
+
+# this lambda is a straight JS - no typescript so we need to include the JS
+!*.js
