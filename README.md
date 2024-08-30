@@ -1,14 +1,8 @@
-# Elsa Data AWS Copy Out
+# Steps S3 Copy
 
-A service that can be installed into an Elsa Data environment
-and which enables parallel file copying out into a
+A service that can be installed (either directly or as a CDK
+construct) and which enables parallel file copying into a
 destination bucket in the same region.
-
-NOTE: this is a general purpose "S3 file copy" tool - so might
-be useful outside of Elsa Data. It can certainly be invoked
-directly as a Steps function independent of Elsa Data (all
-the Elsa Data does is sets up the input CSVs and then invokes
-the Steps function itself).
 
 ## Development
 
@@ -31,7 +25,11 @@ Edit the packages and deploy to dev
 pnpm run deploy
 ```
 
-## Testing
+## Testing (WIP)
+
+See `dev-testsuite`.
+
+(previously see below)
 
 Because this service is very dependent on the behaviour of AWS Steps
 (using distributed maps) - it was too complex to set up a "local" test
