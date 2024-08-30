@@ -1,0 +1,31 @@
+name: Build
+
+on:
+  push:
+
+jobs:
+  build-jsii:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: pnpm/action-setup@v2
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "pnpm"
+
+      - run: pnpm install
+
+      - name: Setup Rclone
+        uses: animmouse/setup-rclone@v1
+
+      - run: ./test-go-direct.sh
+        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
+
+      - run: ./test-docker-direct.sh
+        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
+#      - run: pnpm run build
+#      - run: pnpm run package

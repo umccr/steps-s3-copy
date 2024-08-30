@@ -1,0 +1,24 @@
+{
+  "name": "manual",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Manual CDK deployment for development",
+  "scripts": {
+    "deploy": "pnpm -w run build && cdk deploy",
+    "destroy": "pnpm -w run build && cdk destroy",
+    "test": "ts-node --prefer-ts-exts tests/test.ts StepsS3Copy"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudformation": "3.629.0",
+    "@aws-sdk/client-s3": "3.629.0",
+    "@aws-sdk/client-sfn": "3.629.0",
+    "aws-cdk": "2.141.0",
+    "aws-cdk-lib": "2.141.0",
+    "constructs": "10.3.0",
+    "steps-s3-copy": "link:../packages/steps-s3-copy"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-sso-oidc": "3.629.0",
+    "@aws-sdk/client-sts": "3.629.0"
+  }
+}
