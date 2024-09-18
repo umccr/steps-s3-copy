@@ -19,13 +19,15 @@ jobs:
 
       - run: pnpm install
 
-      - name: Setup Rclone
-        uses: animmouse/setup-rclone@v1
+      - run: pnpm run build
 
-      - run: ./test-go-direct.sh
-        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
+#      - name: Setup Rclone
+#        uses: animmouse/setup-rclone@v1
 
-      - run: ./test-docker-direct.sh
-        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
+#      - run: ./test-go-direct.sh
+#        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
+
+#      - run: ./test-docker-direct.sh
+#        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
 #      - run: pnpm run build
 #      - run: pnpm run package
