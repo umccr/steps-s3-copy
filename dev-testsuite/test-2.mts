@@ -54,35 +54,36 @@ export async function test2(
     uniqueTestId,
   );
 
-  const LARGE_SIZE = 256 * 1024;
+  const REAL_LARGE_SIZE = 256 * 1024 * 1024;
+  const FAKE_LARGE_SIZE = 256 * 1024;
   const SMALL_SIZE = 1024;
 
   // a complex folder structure that is realistic
   const sourceObjects: Record<string, TestObjectParams> = {
     ["production/analysis_data/SBJ12345/wgs_tumor_normal/2024082738bf62ad/L2401304_L2401303_dragen_somatic/MDX654321_normal.bam"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/analysis_data/SBJ12345/wgs_tumor_normal/2024082738bf62ad/L2401304_L2401303_dragen_somatic/MDX654326_tumor.bam"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/analysis_data/SBJ12345/wgs_tumor_normal/2024082738bf62ad/L2401304_L2401303_dragen_somatic/MDX654321_normal.bam.bai"]:
       { sizeInBytes: SMALL_SIZE },
     ["production/analysis_data/SBJ12345/wgs_tumor_normal/2024082738bf62ad/L2401304_L2401303_dragen_somatic/MDX654326_tumor.bam.bai"]:
       { sizeInBytes: SMALL_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654321_L2401303_S4_L002_R1_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: REAL_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654321_L2401303_S4_L002_R2_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: REAL_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654321_L2401303_S4_L003_R1_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654321_L2401303_S4_L003_R2_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654326_L2401304_S5_L002_R1_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654326_L2401304_S5_L002_R2_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654326_L2401304_S5_L003_R1_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/primary_data/240823_A98765_4321_ABCDEFGHIJ/20240827933c0a00/WGS_TsqNano/MDX654326_L2401304_S5_L003_R2_001.fastq.gz"]:
-      { sizeInBytes: LARGE_SIZE },
+      { sizeInBytes: FAKE_LARGE_SIZE },
     ["production/analysis_data/SBJ12345/umccrise/2024082790265f5d/L2401304__L2401303/SBJ12345__MDX654326/SBJ12345__MDX654326-normal.cpsr.html"]:
       { sizeInBytes: SMALL_SIZE },
     ["production/analysis_data/SBJ12345/umccrise/2024082790265f5d/L2401304__L2401303/SBJ12345__MDX654326/SBJ12345__MDX654326_cancer_report.html"]:

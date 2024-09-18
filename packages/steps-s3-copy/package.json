@@ -1,12 +1,12 @@
 {
   "name": "@umccr/steps-s3-copy",
   "version": "0.0.0",
-  "description": "CDK construct for an AWS Steps machine that copies objects",
+  "description": "CDK construct for an AWS Steps machine that copies S3 objects",
   "homepage": "https://github.com/umccr/steps-s3-copy",
   "license": "MIT",
   "author": {
-    "name": "Andrew Patterson",
-    "email": "andrew.patterson@umccr.org"
+    "name": "University of Melbourne Centre for Cancer Research",
+    "organization": true
   },
   "repository": {
     "type": "git",
