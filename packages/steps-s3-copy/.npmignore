@@ -1,0 +1,19 @@
+
+# exclude typescript source and config (only in the src folder - don't exclude lambda TS files)
+src/**
+tsconfig.json
+
+# excludes node_modules that might exist locally in our lambda (these will be rebuilt by the CDK
+# when the packages are used)
+lambda/**/node_modules
+
+# Include javascript files and typescript declarations
+!*.js
+!*.d.ts
+
+# Exclude jsii directory that things are _packed_ into
+dist
+
+# Include .jsii and .jsii.gz
+!.jsii
+!.jsii.gz
