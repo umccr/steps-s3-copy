@@ -41,7 +41,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         entry: join(root, "summarise-copy-lambda.ts"),
         depsLockFilePath: join(root, "package-lock.json"),
         runtime: Runtime.NODEJS_20_X,
-        architecture: Architecture.ARM_64,
+        architecture: Architecture.X86_64,
         handler: "handler",
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
@@ -50,7 +50,6 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           forceDockerBundling: true,
           // and these are the modules we need to install
           nodeModules: ["csv-stringify"],
-          platform: "arm",
         },
         environment: {
           WORKING_BUCKET: props.workingBucket,
