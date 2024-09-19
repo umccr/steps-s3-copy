@@ -2,7 +2,7 @@ import { Construct } from "constructs";
 import { Role } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { JsonPath } from "aws-cdk-lib/aws-stepfunctions";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { join } from "node:path";
@@ -31,24 +31,26 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
   ) {
     super(scope, id);
 
+    const root = join(__dirname, "..", "..", "lambda", "summarise-copy-lambda");
+
     const summariseCopyLambda = new NodejsFunction(
       this,
       "SummariseCopyFunction",
       {
         role: props.writerRole,
-        entry: join(
-          __dirname,
-          "..",
-          "..",
-          "lambda",
-          "summarise-copy-lambda",
-          "summarise-copy-lambda.ts",
-        ),
+        entry: join(root, "summarise-copy-lambda.ts"),
+        depsLockFilePath: join(root, "package-lock.json"),
         runtime: Runtime.NODEJS_20_X,
+        architecture: Architecture.ARM_64,
         handler: "handler",
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
           minify: false,
+          // because we install node_modules we want to force the installation in a lambda compatible env
+          forceDockerBundling: true,
+          // and these are the modules we need to install
+          nodeModules: ["csv-stringify"],
+          platform: "arm",
         },
         environment: {
           WORKING_BUCKET: props.workingBucket,
@@ -58,40 +60,6 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         timeout: Duration.seconds(30),
       },
     );
-
-    /*    summariseCopyLambda.addToRolePolicy(
-      new PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: ["s3:PutObject"],
-        resources: ["*"],
-        // yes - that's right - we want to give this lambda the ability to attempt the writes anywhere
-        // EXCEPT where we are deployed
-        // (under the assumption that buckets outside our account must be giving us explicit write permission,
-        //  whilst within our account we get implicit access - in this case we don't want that ability)
-        conditions: props.allowWriteToThisAccount
-          ? undefined
-          : {
-              StringNotEquals: {
-                "s3:ResourceAccount": [Stack.of(this).account],
-              },
-            },
-      }),
-    );
-
-    // we need to be able to read the results created by Steps that it placed
-    // in the working folder
-    summariseCopyLambda.addToRolePolicy(
-      new PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: ["s3:*"],
-        resources: ["*"],
-        //[
-        //`arn:aws:s3:::${props.workingBucket}/${
-        //  props.workingBucketPrefixKey ?? ""
-        //}*`,
-        //],
-      }),
-    ); */
 
     this.invocableLambda = new LambdaInvoke(this, `Summarise Copy Results`, {
       lambdaFunction: summariseCopyLambda,

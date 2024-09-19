@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "The root package of a mono repo for Steps S3 copy",
-  "packageManager": "pnpm@9.7.0",
+  "packageManager": "pnpm@9.10.0",
   "scripts": {
     "build": "pnpm --stream --filter \"./packages/**\" run build",
     "watch": "pnpm --stream --filter \"./packages/**\" run build:watch",
@@ -19,7 +19,7 @@
   "devDependencies": {
     "@tsconfig/node18": "18.2.4",
     "@types/node": "18.19.44",
-    "esbuild": "0.23.0",
+    "esbuild": "0.23.1",
     "prettier": "3.3.3",
     "ts-node": "10.9.2",
     "typescript": "5.5.4"
