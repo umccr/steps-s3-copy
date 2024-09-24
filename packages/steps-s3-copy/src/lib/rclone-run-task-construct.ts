@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Role} from "aws-cdk-lib/aws-iam";
+import { Role } from "aws-cdk-lib/aws-iam";
 import { IntegrationPattern, JsonPath } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration, Stack } from "aws-cdk-lib";
 import {
@@ -50,16 +50,17 @@ export class RcloneRunTaskConstruct extends Construct {
         // FARGATE_SPOT is only available for X86
         cpuArchitecture: CpuArchitecture.X86_64,
       },
+      // ephemeralStorageGiB: 200,
       cpu: 256,
       // there is a warning in the rclone documentation about problems with mem < 1GB - but I think that
-      // is mainly for large syncs... we do individual/small file copies so 512 should be fine
+      // is mainly for large multi-file syncs... we do individual/small file copies so 512 should be fine
       memoryLimitMiB: 512,
-      taskRole: props.writerRole
+      taskRole: props.writerRole,
     });
 
     // Tags.of(taskDefinition).add("test", "tag");
 
-/*    // we need to give the rclone task the ability to do the copy out in S3
+    /*    // we need to give the rclone task the ability to do the copy out in S3
     // TODO can we limit this to reading from our designated buckets and writing out
     taskDefinition.taskRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"),
@@ -132,7 +133,7 @@ export class RcloneRunTaskConstruct extends Construct {
       integrationPattern: IntegrationPattern.WAIT_FOR_TASK_TOKEN,
       cluster: props.fargateCluster,
       taskDefinition: taskDefinition,
-      launchTarget: new EcsFargateSpotOnlyLaunchTarget({
+      launchTarget: new EcsFargateNotSpotLaunchTarget({
         platformVersion: FargatePlatformVersion.VERSION1_4,
       }),
       subnets: {
@@ -168,12 +169,9 @@ export class RcloneRunTaskConstruct extends Construct {
   }
 }
 
-class EcsFargateSpotOnlyLaunchTarget implements IEcsLaunchTarget {
+/*class EcsFargateSpotOnlyLaunchTarget implements IEcsLaunchTarget {
   constructor(private readonly options?: EcsFargateLaunchTargetOptions) {}
 
-  /**
-   * Called when the Fargate launch type configured on RunTask
-   */
   public bind(
     _task: EcsRunTask,
     launchTargetOptions: LaunchTargetBindOptions,
@@ -194,6 +192,39 @@ class EcsFargateSpotOnlyLaunchTarget implements IEcsLaunchTarget {
             CapacityProvider: "FARGATE",
             Weight: 0
           }
+        ],
+        // naughty - this is really nothing to do with LaunchType but this is a way
+        // we can set properties in the Steps Run Task ASL
+        // in this case we want to be able to track compute used so we propagate
+        // through the tags from the task definition (which will come from the Stack/Construct)
+        PropagateTags: "TASK_DEFINITION",
+      },
+    };
+  }
+} */
+
+class EcsFargateNotSpotLaunchTarget implements IEcsLaunchTarget {
+  constructor(private readonly options?: EcsFargateLaunchTargetOptions) {}
+
+  /**
+   * Called when the Fargate launch type configured on RunTask
+   */
+  public bind(
+    _task: EcsRunTask,
+    launchTargetOptions: LaunchTargetBindOptions,
+  ): EcsLaunchTargetConfig {
+    if (!launchTargetOptions.taskDefinition.isFargateCompatible) {
+      throw new Error("Supplied TaskDefinition is not compatible with Fargate");
+    }
+
+    return {
+      parameters: {
+        PlatformVersion: this.options?.platformVersion,
+        CapacityProviderStrategy: [
+          {
+            CapacityProvider: "FARGATE",
+            Weight: 1000,
+          },
         ],
         // naughty - this is really nothing to do with LaunchType but this is a way
         // we can set properties in the Steps Run Task ASL
