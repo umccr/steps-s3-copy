@@ -1,4 +1,4 @@
-FROM golang:1.22.6-alpine as builder
+FROM public.ecr.aws/docker/library/golang:1.22.6-alpine as builder
 
 # git is needed for go mod download to work
 RUN apk add --no-cache git
