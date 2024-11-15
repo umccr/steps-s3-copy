@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/golang:1.22.6-alpine as builder
+FROM public.ecr.aws/docker/library/golang:1.22.6-alpine AS builder
 
 # git is needed for go mod download to work
 RUN apk add --no-cache git
@@ -16,7 +16,7 @@ ADD *.go ./
 RUN env GOOS=linux CGO_ENABLED=0 GOARCH=amd64 go build rclone-batch.go
 
 
-FROM rclone/rclone:1.67.0
+FROM rclone/rclone:1.68.1
 
 # if we want signals to propogate through to the app we need a lightweight initd
 RUN apk add --no-cache tini
@@ -26,6 +26,6 @@ WORKDIR /data
 
 COPY --from=builder /build/rclone-batch ./
 
-ENV RB_RCLONE_BINARY "/usr/local/bin/rclone"
+ENV RB_RCLONE_BINARY="/usr/local/bin/rclone"
 
 ENTRYPOINT ["/sbin/tini", "-vv", "--", "/data/rclone-batch"]

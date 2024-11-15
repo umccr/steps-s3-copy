@@ -24,7 +24,6 @@ type TestObjectParams = {
 
 const MiB = 1024 * 1024;
 
-
 /**
  * Execute a test on the given state machine, copying newly created objects from
  * sourceBucket to destinationBucket, and using workingBucket for working artifacts.
@@ -60,7 +59,7 @@ export async function test1(
   );
 
   // 3 files in standard storage (no thawing)
-/*  const sourceObjects: Record<string, TestObjectParams> = {
+  const sourceObjects: Record<string, TestObjectParams> = {
     [`1.bin`]: {
       sizeInBytes: 256 * 124,
     },
@@ -81,21 +80,21 @@ export async function test1(
       partSizeInBytes: 5 * 1024 * 1024,
       checksumAlgorithm: "SHA1",
     },
-  }; */
+  };
 
-  const sourceObjects: Record<string, TestObjectParams> = {
+  /*const sourceObjects: Record<string, TestObjectParams> = {
     //[`many-parts.bin`]: {
     //  // 1010 parts (above the 1000 part boundary) of 5 MiB and then some "extra" to test that edge case as well
     //  sizeInBytes: (5 * MiB * 1010) + 4111,
     //  partSizeInBytes: 5 * MiB,
     //},
-    [`many-parts-with-crc32.bin`]: {
-      // 1010 parts (above the 1000 part boundary) of 5 MiB and then some "extra" to test that edge case as well
-      sizeInBytes: (5 * MiB * 1010) + 4111,
-      partSizeInBytes: 5 * MiB,
-      checksumAlgorithm: "CRC32"
-    },
-    /*[`uneven-parts.bin`]: {
+    // [`many-parts-with-crc32.bin`]: {
+    //  // 1010 parts (above the 1000 part boundary) of 5 MiB and then some "extra" to test that edge case as well
+    //  sizeInBytes: (5 * MiB * 1010) + 4111,
+    //  partSizeInBytes: 5 * MiB,
+    //  checksumAlgorithm: "CRC32"
+    //},
+    [`uneven-parts.bin`]: {
       sizeInBytes: 45 * MiB,
       partSizeInBytes: 6 * MiB,
     },
@@ -112,7 +111,7 @@ export async function test1(
     [`skip-part-numbers.bin`]: {
       sizeInBytes: 45 * MiB,
       partSizeInBytes: 6 * MiB,
-    }, */
+    },
     // You cannot skip part numbers if using checksums
     // [`skip-part-numbers-with-crc32.bin`]: {
     //  sizeInBytes: 45 * MiB,
@@ -123,7 +122,7 @@ export async function test1(
     //  sizeInBytes: 5000 * MiB,
     //  partSizeInBytes: undefined
     //},
-  };
+  }; */
 
   const testObjects: Record<string, TestObject> = {};
 
@@ -140,8 +139,7 @@ export async function test1(
     );
   }
 
-  if (uniqueTestId === "")
-    return;
+  if (uniqueTestId === "") return;
 
   await makeObjectDictionaryCsv(workingBucket, testFolderObjectsTsvAbsolute, {
     [sourceBucket]: Object.keys(sourceObjects).map(

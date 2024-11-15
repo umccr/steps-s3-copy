@@ -3,8 +3,8 @@ import {
   DescribeStacksCommand,
 } from "@aws-sdk/client-cloudformation";
 import { test1 } from "./test-1.mjs";
-import {test2} from "./test-2.mjs";
-import {randomBytes} from "node:crypto";
+import { test2 } from "./test-2.mjs";
+import { randomBytes } from "node:crypto";
 
 const cloudFormationClient = new CloudFormationClient({});
 
@@ -140,17 +140,26 @@ async function doTest3(stateMachineArn: string) {
         (o) => o.OutputKey === "DestinationBucket",
       );
 
-      if (smOutput && smOutput.OutputValue && sourceOutput && sourceOutput.OutputValue && workingOutput && workingOutput.OutputValue && destinationOutput && destinationOutput.OutputValue) {
+      if (
+        smOutput &&
+        smOutput.OutputValue &&
+        sourceOutput &&
+        sourceOutput.OutputValue &&
+        workingOutput &&
+        workingOutput.OutputValue &&
+        destinationOutput &&
+        destinationOutput.OutputValue
+      ) {
         console.log(`Steps Arn = ${smOutput.OutputValue}`);
 
         const allTestPromises = [
-          /*test1(
+          test1(
             randomBytes(8).toString("hex"),
             smOutput.OutputValue!,
             sourceOutput.OutputValue!,
             workingOutput.OutputValue!,
             destinationOutput.OutputValue!,
-          ),*/
+          ),
           /*test1(
               "",
               smOutput.OutputValue,
@@ -158,13 +167,13 @@ async function doTest3(stateMachineArn: string) {
               workingOutput.OutputValue,
               destinationOutput.OutputValue,
           ),*/
-          test2(
+          /*test2(
               randomBytes(8).toString("hex"),
               smOutput.OutputValue,
               sourceOutput.OutputValue,
               workingOutput.OutputValue,
               "org-umccr-demo-data-copy-demo" //destinationOutput.OutputValue,
-          ),
+          ),*/
         ];
 
         const allTestResults = await Promise.allSettled(allTestPromises);

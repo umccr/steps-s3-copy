@@ -45,7 +45,10 @@ class StepsS3CopyStack extends Stack {
         },
       ],
       removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true
+      // whilst we don't want to keep any objects and can feel free to delete
+      // these buckets, given the lifecycle rules they will generally be empty anyway
+      // (setting autoDeleteObjects adds extra lambda/roles that clog everything up)
+      autoDeleteObjects: false,
     });
 
     const workingBucket = new Bucket(this, "Working", {
@@ -58,7 +61,10 @@ class StepsS3CopyStack extends Stack {
         },
       ],
       removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true
+      // whilst we don't want to keep any objects and can feel free to delete
+      // these buckets, given the lifecycle rules they will generally be empty anyway
+      // (setting autoDeleteObjects adds extra lambda/roles that clog everything up)
+      autoDeleteObjects: false,
     });
 
     const destinationBucket = new Bucket(this, "Destination", {
@@ -71,7 +77,10 @@ class StepsS3CopyStack extends Stack {
         },
       ],
       removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true
+      // whilst we don't want to keep any objects and can feel free to delete
+      // these buckets, given the lifecycle rules they will generally be empty anyway
+      // (setting autoDeleteObjects adds extra lambda/roles that clog everything up)
+      autoDeleteObjects: false,
     });
 
     const stepsS3Copy = new StepsS3CopyConstruct(this, "StepsS3Copy", {
@@ -80,7 +89,7 @@ class StepsS3CopyStack extends Stack {
       workingBucket: workingBucket.bucketName,
       workingBucketPrefixKey: WORKING_BUCKET_PREFIX,
       aggressiveTimes: true,
-      writerRoleName: "umccr-wehi-data-sharing-role",
+      writerRoleName: "steps-s3-copy-role",
       allowWriteToInstalledAccount: true,
     });
 
