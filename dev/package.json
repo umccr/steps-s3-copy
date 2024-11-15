@@ -2,11 +2,10 @@
   "name": "manual",
   "private": true,
   "version": "0.0.0",
-  "description": "Manual CDK deployment for development",
+  "description": "Manual CDK deployment for development at UMCCR",
   "scripts": {
     "deploy": "pnpm -w run build && cdk deploy",
-    "destroy": "pnpm -w run build && cdk destroy",
-    "test": "ts-node --prefer-ts-exts tests/test.ts StepsS3Copy"
+    "destroy": "pnpm -w run build && cdk destroy"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "3.629.0",

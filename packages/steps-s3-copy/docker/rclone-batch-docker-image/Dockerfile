@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/golang:1.22.6-alpine as builder
+FROM public.ecr.aws/docker/library/golang:1.22.6-alpine AS builder
 
 # git is needed for go mod download to work
 RUN apk add --no-cache git
@@ -26,6 +26,6 @@ WORKDIR /data
 
 COPY --from=builder /build/rclone-batch ./
 
-ENV RB_RCLONE_BINARY "/usr/local/bin/rclone"
+ENV RB_RCLONE_BINARY="/usr/local/bin/rclone"
 
 ENTRYPOINT ["/sbin/tini", "-vv", "--", "/data/rclone-batch"]
