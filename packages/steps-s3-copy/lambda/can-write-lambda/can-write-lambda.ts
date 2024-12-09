@@ -36,6 +36,9 @@ export async function handler(event: InvokeEvent) {
       Bucket: event.destinationBucket,
       Key: `${event.destinationPrefixKey}${event.destinationStartCopyRelativeKey}`,
       Body: "A file created by copy out to ensure correct permissions and to indicate that start of the copy process",
+      // we need PutTagging permission to be right - or else rclone will fail when copying our sometimes
+      // tagged source files
+      Tagging: "testtag=ok",
     });
 
     await client.send(putCommand);
