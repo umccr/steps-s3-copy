@@ -55,8 +55,10 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           WORKING_BUCKET: props.workingBucket,
           WORKING_BUCKET_PREFIX_KEY: props.workingBucketPrefixKey,
         },
-        // this seems like plenty of seconds to do a few API calls to S3
-        timeout: Duration.seconds(30),
+        // in practice we hit the limits when using default values here - so we have set these to very generous
+        // amounts
+        timeout: Duration.minutes(5),
+        memorySize: 4096,
       },
     );
 
