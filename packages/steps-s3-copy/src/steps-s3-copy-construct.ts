@@ -53,7 +53,11 @@ export class StepsS3CopyConstruct extends Construct {
     writerRole.addToPolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
-        actions: ["s3:PutObject"],
+        actions: [
+          "s3:PutObject",
+          "s3:PutObjectTagging",
+          "s3:PutObjectVersionTagging",
+        ],
         resources: ["*"],
         // yes - that's right - we want to give this lambda the ability to attempt the writes anywhere
         // EXCEPT where we are deployed
