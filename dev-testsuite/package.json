@@ -8,16 +8,16 @@
   },
   "type": "module",
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "3.629.0",
-    "@aws-sdk/client-s3": "3.629.0",
-    "@aws-sdk/client-sfn": "3.629.0",
-    "@smithy/util-waiter": "3.1.2",
+    "@aws-sdk/client-cloudformation": "3.721.0",
+    "@aws-sdk/client-s3": "3.721.0",
+    "@aws-sdk/client-sfn": "3.721.0",
+    "@smithy/util-waiter": "3.2.0",
     "crc": "4.3.2",
-    "p-limit": "^6.1.0"
+    "p-limit": "6.2.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-sso-oidc": "3.629.0",
-    "@aws-sdk/client-sts": "3.629.0",
-    "tsx": "4.17.0"
+    "@aws-sdk/client-sso-oidc": "3.721.0",
+    "@aws-sdk/client-sts": "3.721.0",
+    "tsx": "4.19.2"
   }
 }

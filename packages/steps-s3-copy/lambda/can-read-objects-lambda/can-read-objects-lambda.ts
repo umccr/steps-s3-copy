@@ -2,6 +2,8 @@ import {
   HeadObjectCommand,
   RestoreObjectCommand,
   S3Client,
+  Tier,
+  S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { IsThawingError } from "./errors";
 
@@ -13,41 +15,32 @@ interface ThawObjectsEvent {
 
   BatchInput: {
     glacierFlexibleRetrievalThawDays: number;
-    glacierFlexibleRetrievalThawSpeed: string;
+    glacierFlexibleRetrievalThawSpeed: Tier;
 
     glacierDeepArchiveThawDays: number;
-    glacierDeepArchiveThawSpeed: string;
+    glacierDeepArchiveThawSpeed: Tier;
 
     intelligentTieringArchiveThawDays: number;
-    intelligentTieringArchiveThawSpeed: string;
+    intelligentTieringArchiveThawSpeed: Tier;
 
     intelligentTieringDeepArchiveThawDays: number;
-    intelligentTieringDeepArchiveThawSpeed: string;
+    intelligentTieringDeepArchiveThawSpeed: Tier;
   };
 }
 
 /**
- * A function to initiate restore/monitor any S3 objects that are in storage
+ * A function to check for the existence of all objects and that they
+ * are in the right region. Will initiate restore for any S3 objects that are in storage
  * classes that do not allow immediate access.
- *
- * Note that restoring objects is the *sole* purpose of this lambda - so even
- * though it could detect invalid objects / permissions errors etc - that is
- * not what it is going to do.
  *
  * It attempts to find any objects that need thawing and initiates a restore.
  * And it detects if any of in the process of thawing. In those cases it
- * throws an Error. In *all other cases* it passes on data for the Fargate
- * rclone step (even if there were exceptions it gobbled up).
- *
- * We do this because rclone has better mechanism for detecting errors and
- * we don't want to redo the work here. Also this means error reporting
- * out of the overall Steps orchestration will be consistent for "missing files"
- * etc.
+ * throws an IsThawingError which should be retried by the outer Steps.
  *
  * @param event
  */
 export async function handler(event: ThawObjectsEvent) {
-  console.log("thawObjects()");
+  console.log("canReadObjects()");
   console.log(JSON.stringify(event, null, 2));
 
   const client = new S3Client({});
@@ -58,6 +51,7 @@ export async function handler(event: ThawObjectsEvent) {
   for (const o of event.Items || []) {
     try {
       // need to find out if the object is in a "needs restore" or "currently restoring" or "restored" category
+      // and also if the bucket is in the correct region
       const headCommand = new HeadObjectCommand({
         Bucket: o.bucket,
         Key: o.key,
@@ -85,7 +79,7 @@ export async function handler(event: ThawObjectsEvent) {
       ) {
         // some sensible defaults - that we retain if any of the expected parameter values is not present
         let days: number = 1;
-        let tier: string = "Bulk";
+        let tier: Tier = "Bulk";
 
         if (headResult.StorageClass == "GLACIER") {
           days = event.BatchInput.glacierFlexibleRetrievalThawDays ?? days;
@@ -132,7 +126,17 @@ export async function handler(event: ThawObjectsEvent) {
     } catch (e: any) {
       // we actually gobble up any errors here (with just a print)
       // see the top of this method for details
-      console.error(e);
+
+      if (e instanceof S3ServiceException) {
+        console.error(`S3 error for ${o.bucket} ${o.key}`);
+        console.error(e.message);
+        console.error(e.$fault);
+        console.error(e.$response);
+        console.error(e.$metadata);
+      } else {
+        console.error(`Generic error for ${o.bucket} ${o.key}`);
+        console.error(e);
+      }
     }
   }
 

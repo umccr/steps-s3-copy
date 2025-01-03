@@ -30,7 +30,7 @@ type TestObjectParams = {
  * @param workingBucket the working bucket to use
  * @param destinationBucket the destination bucket in which to find copied test objects
  */
-export async function test2(
+export async function testRealistic(
   uniqueTestId: string,
   stateMachineArn: string,
   sourceBucket: string,
@@ -203,7 +203,8 @@ export async function test2(
         sourceFilesCsvKey: testFolderObjectsTsvRelative,
         destinationBucket: destinationBucket,
         // the complex cases we expect to invoke per subject - so put in a folder for each subject
-        destinationPrefixKey: path.join(testFolderDest, "EXTERNAL_SAMPLE_7654") + "/",
+        destinationPrefixKey:
+          path.join(testFolderDest, "EXTERNAL_SAMPLE_7654") + "/",
         maxItemsPerBatch: 20,
       }),
     }),
