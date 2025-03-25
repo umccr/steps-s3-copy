@@ -1,4 +1,4 @@
-import { ChecksumAlgorithm, S3Client, StorageClass } from "@aws-sdk/client-s3";
+import { ChecksumAlgorithm, StorageClass } from "@aws-sdk/client-s3";
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { TEST_BUCKET_WORKING_PREFIX } from "./constants.mjs";
 import {
@@ -7,9 +7,11 @@ import {
   makeObjectDictionaryCsv,
   TestObject,
 } from "./test-util.mjs";
-import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
-import { assertDestinations } from "./lib/assert-destinations.mjs";
 import path from "node:path/posix";
+import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
+import { WaiterState } from "@smithy/util-waiter";
+
+const TEST_NAME = "realistic";
 
 const sfnClient = new SFNClient({});
 
@@ -37,9 +39,7 @@ export async function testRealistic(
   workingBucket: string,
   destinationBucket: string,
 ) {
-  console.log(
-    `Test 2 (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
-  );
+  console.log(`Test "${TEST_NAME}" (${uniqueTestId})`);
 
   const {
     testFolderSrc,
@@ -210,15 +210,13 @@ export async function testRealistic(
     }),
   );
 
-  const executionResult = await waitUntilStateMachineFinishes(
-    { client: sfnClient, maxWaitTime: 600 },
-    {
-      executionArn: executionStartResult.executionArn,
-    },
+  return await triggerAndReturnErrorReport(
+    TEST_NAME,
+    uniqueTestId,
+    executionStartResult.executionArn!,
+    600,
+    destinationBucket,
+    testObjects,
+    WaiterState.SUCCESS,
   );
-
-  // console.log(executionResult);
-  // await assertDestinations(uniqueTestId, destinationBucket, testObjects);
-
-  return 0;
 }

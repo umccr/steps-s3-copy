@@ -2,6 +2,8 @@ import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { TEST_BUCKET_WORKING_PREFIX } from "./constants.mjs";
 import { getPaths, makeObjectDictionaryCsv } from "./test-util.mjs";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
+import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
+import { WaiterState } from "@smithy/util-waiter";
 
 const sfnClient = new SFNClient({});
 
@@ -24,9 +26,7 @@ export async function testErrorMissingObject(
   workingBucket: string,
   destinationBucket: string,
 ) {
-  console.log(
-    `Test "${TEST_NAME}" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
-  );
+  console.log(`Test "${TEST_NAME}" (${uniqueTestId})`);
 
   const {
     testFolderSrc,
@@ -58,17 +58,14 @@ export async function testErrorMissingObject(
     }),
   );
 
-  const executionResult = await waitUntilStateMachineFinishes(
-    { client: sfnClient, maxWaitTime: 360 },
-    {
-      executionArn: executionStartResult.executionArn,
-    },
-  );
-
-  return {
-    testName: TEST_NAME,
+  return await triggerAndReturnErrorReport(
+    TEST_NAME,
+    uniqueTestId,
+    executionStartResult.executionArn!,
+    180,
+    destinationBucket,
+    {},
     // TODO: we expect this one to fail - we need to dig deeper in the errors though to make sure our error is correct!
-    testSuccess: executionResult.state == "FAILURE",
-    testData: executionResult,
-  };
+    WaiterState.FAILURE,
+  );
 }

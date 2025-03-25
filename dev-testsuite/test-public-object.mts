@@ -40,9 +40,7 @@ export async function testPublicObject(
   workingBucket: string,
   destinationBucket: string,
 ) {
-  console.log(
-    `Test "public object" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
-  );
+  console.log(`Test "${TEST_NAME}" (${uniqueTestId})`);
 
   const {
     testFolderSrc,

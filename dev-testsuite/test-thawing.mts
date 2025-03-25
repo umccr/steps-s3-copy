@@ -11,6 +11,8 @@ import {
 } from "./test-util.mjs";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import { assertDestinations } from "./lib/assert-destinations.mjs";
+import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
+import { WaiterState } from "@smithy/util-waiter";
 
 const TEST_NAME = "thawing";
 
@@ -40,9 +42,7 @@ export async function testThawing(
   workingBucket: string,
   destinationBucket: string,
 ) {
-  console.log(
-    `Test "${TEST_NAME}" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
-  );
+  console.log(`Test "${TEST_NAME}" (${uniqueTestId})`);
 
   const {
     testFolderSrc,
@@ -121,26 +121,16 @@ export async function testThawing(
     }),
   );
 
-  const executionResult = await waitUntilStateMachineFinishes(
-    // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
-    // of one minute of wait - and if the objects are in fact not thawed straight away - two minutes!
-    // so give ourselves 3 minutes before we abort
-    { client: sfnClient, maxWaitTime: 180 },
-    {
-      executionArn: executionStartResult.executionArn,
-    },
-  );
-
-  const objectResults = await assertDestinations(
+  // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
+  // of one minute of wait - and if the objects are in fact not thawed straight away - more minutes!
+  // so give ourselves 5 minutes before we abort
+  return await triggerAndReturnErrorReport(
+    TEST_NAME,
     uniqueTestId,
+    executionStartResult.executionArn!,
+    300,
     destinationBucket,
     testObjects,
+    WaiterState.SUCCESS,
   );
-
-  return {
-    testName: TEST_NAME,
-    testSuccess: executionResult.state == "SUCCESS",
-    testExecutionResult: executionResult,
-    testObjectResults: objectResults,
-  };
 }

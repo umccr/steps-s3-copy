@@ -8,6 +8,7 @@ import { randomBytes } from "node:crypto";
 import { testThawing } from "./test-thawing.mjs";
 import { testErrorMissingObject } from "./test-error-missing-object.mjs";
 import { testPublicObject } from "./test-public-object.mjs";
+import { TEST_BUCKET_WORKING_PREFIX } from "./constants.mjs";
 
 const cloudFormationClient = new CloudFormationClient({});
 
@@ -73,6 +74,13 @@ const cloudFormationClient = new CloudFormationClient({});
   }
 
   console.log(`Steps Arn = ${smOutput.OutputValue}`);
+  console.log(
+    `Working S3 Location = ${workingOutput.OutputValue!}/${TEST_BUCKET_WORKING_PREFIX}`,
+  );
+  console.log(`Source S3 Bucket = ${sourceOutput.OutputValue!}`);
+  console.log(
+    `Destination S3 Bucket = ${destinationOutput.OutputValue!}/<test id>/`,
+  );
 
   const asyncTest = async (func: any) =>
     await func(
@@ -84,9 +92,9 @@ const cloudFormationClient = new CloudFormationClient({});
     );
 
   const allTestResults = await Promise.allSettled([
-    // asyncTest(testPartsChecksums),
+    asyncTest(testPartsChecksums),
     asyncTest(testThawing),
-    // asyncTest(testErrorMissingObject),
+    asyncTest(testErrorMissingObject),
     // asyncTest(testPublicObject),
   ]);
 

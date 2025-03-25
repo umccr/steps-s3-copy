@@ -1,16 +1,14 @@
-import { S3Client, StorageClass } from "@aws-sdk/client-s3";
+import { ChecksumAlgorithm, S3Client, StorageClass } from "@aws-sdk/client-s3";
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { TEST_BUCKET_WORKING_PREFIX } from "./constants.mjs";
 import {
   createTestObject,
   getPaths,
   makeObjectDictionaryCsv,
-  makeTestObject,
   TestObject,
 } from "./test-util.mjs";
-import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
-import { assertDestinations } from "./lib/assert-destinations.mjs";
-import { ChecksumAlgorithm } from "@aws-sdk/client-s3";
+import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
+import { WaiterState } from "@smithy/util-waiter";
 
 const TEST_NAME = "parts checksums";
 
@@ -43,9 +41,7 @@ export async function testPartsChecksums(
   workingBucket: string,
   destinationBucket: string,
 ) {
-  console.log(
-    `Test "${TEST_NAME}" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
-  );
+  console.log(`Test "${TEST_NAME}" (${uniqueTestId})`);
 
   const {
     testFolderSrc,
@@ -162,23 +158,13 @@ export async function testPartsChecksums(
     }),
   );
 
-  const executionResult = await waitUntilStateMachineFinishes(
-    { client: sfnClient, maxWaitTime: 60 },
-    {
-      executionArn: executionStartResult.executionArn,
-    },
-  );
-
-  const objectResults = await assertDestinations(
+  return await triggerAndReturnErrorReport(
+    TEST_NAME,
     uniqueTestId,
+    executionStartResult.executionArn!,
+    180,
     destinationBucket,
     testObjects,
+    WaiterState.SUCCESS,
   );
-
-  return {
-    testName: TEST_NAME,
-    testSuccess: executionResult.state == "SUCCESS",
-    testExecutionResult: executionResult,
-    testObjectResults: objectResults,
-  };
 }
