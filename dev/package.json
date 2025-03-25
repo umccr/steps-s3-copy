@@ -3,21 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "description": "Manual CDK deployment for development at UMCCR",
-  "scripts": {
-    "deploy": "pnpm -w run build && cdk deploy",
-    "destroy": "pnpm -w run build && cdk destroy"
-  },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "3.629.0",
-    "@aws-sdk/client-s3": "3.629.0",
-    "@aws-sdk/client-sfn": "3.629.0",
-    "aws-cdk": "2.159.1",
-    "aws-cdk-lib": "2.159.1",
-    "constructs": "10.3.0",
+    "aws-cdk-lib": "2.185.0",
+    "constructs": "10.4.2",
     "steps-s3-copy": "link:../packages/steps-s3-copy"
   },
   "devDependencies": {
-    "@aws-sdk/client-sso-oidc": "3.629.0",
-    "@aws-sdk/client-sts": "3.629.0"
+    "aws-cdk": "2.1005.0"
   }
 }

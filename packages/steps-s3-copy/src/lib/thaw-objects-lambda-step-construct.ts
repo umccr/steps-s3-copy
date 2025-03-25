@@ -29,21 +29,22 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       entry: join(
         __dirname,
         "..",
-          "..",
+        "..",
         "lambda",
-        "thaw-objects-lambda",
-        "thaw-objects-lambda.ts",
+        "can-read-objects-lambda",
+        "can-read-objects-lambda.ts",
       ),
-      runtime: Runtime.NODEJS_20_X,
+      runtime: Runtime.NODEJS_22_X,
       handler: "handler",
       bundling: {
         // for a small method it is sometimes easier if it can be viewed
         // in the AWS console un-minified
         minify: false,
       },
-      // we can theoretically need to loop through 1000s of objects
+      // we can theoretically need to loop through 1000s of objects - and those object Heads etc may
+      // be doing back-off/retries because of all the concurrent activity
       // so we give ourselves plenty of time
-      timeout: Duration.seconds(60 * 5),
+      timeout: Duration.minutes(5),
     });
 
     thawObjectsLambda.addToRolePolicy(

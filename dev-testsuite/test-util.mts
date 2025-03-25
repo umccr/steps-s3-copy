@@ -8,18 +8,22 @@ import {
   StorageClass,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
-import { createRandomBuffer } from "./create-random-buffer.mjs";
+import { createRandomBuffer } from "./lib/create-random-buffer.mjs";
 import { calcMultipleHashes, Checksums } from "./calc-multiple-hashes.mjs";
 import { ChecksumAlgorithm } from "@aws-sdk/client-s3";
-import { BufferSplit } from "./buffer-split.mjs";
+import { BufferSplit } from "./lib/buffer-split.mjs";
 import pLimit from "p-limit";
 
 const s3Client = new S3Client({
-    // requestHandler: {
-    //    requestTimeout: 3_000,
-    //    httpsAgent: { maxSockets: 5 },
-    // },
+  // requestHandler: {
+  //    requestTimeout: 3_000,
+  //    httpsAgent: { maxSockets: 5 },
+  // },
 });
+
+export const GiB = 1024 * 1024 * 1024;
+export const MiB = 1024 * 1024;
+export const KiB = 1024;
 
 /**
  * The test object encompasses an object we are going to create
@@ -200,12 +204,10 @@ async function multiPartUpload(
   checksumAlgorithm?: ChecksumAlgorithm,
   storageClass?: StorageClass,
 ) {
-  if (bufferSplit.partSize < 5 * 1024 * 1024)
+  if (bufferSplit.partSize < 5 * MiB)
     throw new Error("Part size must be >= 5MiB");
 
   let uploadId;
-
-  console.log(checksumAlgorithm);
 
   try {
     const multipartUpload = await s3Client.send(
@@ -233,14 +235,14 @@ async function multiPartUpload(
 
       // hack for making a single test sample with uneven parts
       if (key.includes("uneven")) {
-          if (part == 2) {
-              // make part 2 one byte shorter
-              partActualSize = partActualSize - 1;
-          } else if (part == 3) {
-              // make part 3 one byte larger and start where 2 ended
-              partStart = partStart - 1;
-              partActualSize = partActualSize + 1;
-          }
+        if (part == 2) {
+          // make part 2 one byte shorter
+          partActualSize = partActualSize - 1;
+        } else if (part == 3) {
+          // make part 3 one byte larger and start where 2 ended
+          partStart = partStart - 1;
+          partActualSize = partActualSize + 1;
+        }
       }
 
       const partBuffer = bufferSplit.buffer.subarray(
@@ -248,39 +250,45 @@ async function multiPartUpload(
         partStart + partActualSize,
       );
 
-      const partActualNumber = key.includes("skip") ? (part > 3 ? part + 10 : part) : part;
+      const partActualNumber = key.includes("skip")
+        ? part > 3
+          ? part + 10
+          : part
+        : part;
 
       uploadPromises.push(
-        limit(() => s3Client
-          .send(
-            new UploadPartCommand({
-              Bucket: bucket,
-              Key: key,
-              UploadId: uploadId,
-              Body: partBuffer,
-              PartNumber: partActualNumber,
-              ChecksumAlgorithm: checksumAlgorithm,
-            }),
-          )
-          .then((d) => {
-              console.log(`Finished part ${partActualNumber}`);
+        limit(() =>
+          s3Client
+            .send(
+              new UploadPartCommand({
+                Bucket: bucket,
+                Key: key,
+                UploadId: uploadId,
+                Body: partBuffer,
+                PartNumber: partActualNumber,
+                ChecksumAlgorithm: checksumAlgorithm,
+              }),
+            )
+            .then((d) => {
+              // console.log(`Finished part ${partActualNumber}`);
 
-            // only one of these Checksums can be present in the data returned
-            // from UploadPart, but we copy them all
-            return {
-              ETag: d.ETag,
-              ChecksumCRC32: d.ChecksumCRC32,
-              ChecksumCRC32C: d.ChecksumCRC32C,
-              ChecksumSHA1: d.ChecksumSHA1,
-              ChecksumSHA256: d.ChecksumSHA256,
-              PartNumber: partActualNumber,
-            } as CopyPartResult;
-          })),
+              // only one of these Checksums can be present in the data returned
+              // from UploadPart, but we copy them all
+              return {
+                ETag: d.ETag,
+                ChecksumCRC32: d.ChecksumCRC32,
+                ChecksumCRC32C: d.ChecksumCRC32C,
+                ChecksumSHA1: d.ChecksumSHA1,
+                ChecksumSHA256: d.ChecksumSHA256,
+                PartNumber: partActualNumber,
+              } as CopyPartResult;
+            }),
+        ),
       );
     }
 
     const uploadResults = await Promise.all(uploadPromises);
-    console.log(uploadResults);
+    // console.log(uploadResults);
 
     return await s3Client.send(
       new CompleteMultipartUploadCommand({

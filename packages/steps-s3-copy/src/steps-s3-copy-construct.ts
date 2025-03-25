@@ -188,6 +188,7 @@ export class StepsS3CopyConstruct extends Construct {
     const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
       workingBucket: props.workingBucket,
       workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+      aggressiveTimes: props.aggressiveTimes,
     });
 
     const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(

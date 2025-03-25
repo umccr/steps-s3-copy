@@ -26,7 +26,8 @@ export class BufferSplit {
     public readonly buffer: Buffer,
     private readonly possiblePartSize?: number,
   ) {
-    if (possiblePartSize === 0) throw new Error("You cannot use a part size of zero");
+    if (possiblePartSize === 0)
+      throw new Error("You cannot use a part size of zero");
 
     if (possiblePartSize) {
       this.partCount = Math.ceil(buffer.length / possiblePartSize);
