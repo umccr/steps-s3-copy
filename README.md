@@ -21,26 +21,25 @@ pnpm install
 Edit the packages and deploy to dev
 
 ```shell
-(in the dev folder)
-pnpm run deploy
+pnpm run dev-deploy
+```
+
+To remove entirely
+
+```shell
+pnpm run dev-destroy
 ```
 
 ## Testing (WIP)
 
-See `dev-testsuite`.
+There is a basic test suite that exercises some functionality though the
+output leaves a lot to be desired. This is definitely work in progress.
 
-(previously see below)
+NOTE: this test suite runs against _the deployed_ stack in AWS.
 
-Because this service is very dependent on the behaviour of AWS Steps
-(using distributed maps) - it was too complex to set up a "local" test
-that would actually test much of the pieces likely to fail.
-
-Instead, development is done and the CDK project is deployed to a "dev" account (noting
-that this sets the minimum dev cadence for trying changes
-to minutes rather than seconds).
-
-There is then a test script - that creates samples objects - and launches
-test invocations.
+```shell
+pnpm run dev-test
+```
 
 ## Input
 
@@ -63,7 +62,6 @@ tasks are SPOT interrupted - then the next invocation will skip already transfer
 at least one is copied) - so it is probably safe and cheapest to leave the items per batch at 10
 and be prepared to perhaps re-execute the copy.
 
-
 ## Learnings
 
 Some learnings from actual copies.
@@ -77,26 +75,23 @@ have fixed the Throttling. We were still seeing capacity issues.
 
 The final copy needed to have a concurrency down to 25 to safely not have any issues.
 
-
-
 ## S3 Learnings
 
 Creating S3 checksums using S3 Batch (Copy) (as recommended by AWS) does not work for any
 objects greater than 5GiB (5368709120). This is the upper limit of the CopyObject
 call that is made by S3 Batch.
 
-S3 objects can be constructed with inconsistent part sizes when making a 
+S3 objects can be constructed with inconsistent part sizes when making a
 Multipart Upload.
 
 GetObjectAttributes is the only way to retrieve details about multi part uploads - but
 it does not return any details if the objects are not created with "new" checksums.
 Objects created with just ETags do not return the parts as an array.
 
+Task definition size Each supported Region: 64 Kilobytes No The maximum size, in KiB, of a task definition. The task definition
+accepts the command line arguments when the copier is launched (or values passed in via environment variables) - so sets the
+maximum launch size (unless we were to pivot to other services like dynamo)
 
-
-
-
-
-
-
-
+These names are the object keys. The name for a key is a sequence of Unicode characters whose UTF-8 encoding is at most 1024 bytes long.
+The following are some of the rules: The bucket name can be between 3 and 63 characters long, and
+can contain only lower-case characters, numbers, periods, and dashes. Each label in the bucket name must start with a lowercase letter or number.

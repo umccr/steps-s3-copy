@@ -3,9 +3,6 @@
   "private": true,
   "version": "0.0.0",
   "description": "A test suite that runs on a dev deployed version of Steps S3 Copy",
-  "scripts": {
-    "test": "tsx test.mts StepsS3Copy"
-  },
   "type": "module",
   "dependencies": {
     "@aws-sdk/client-cloudformation": "3.721.0",
@@ -18,6 +15,6 @@
   "devDependencies": {
     "@aws-sdk/client-sso-oidc": "3.721.0",
     "@aws-sdk/client-sts": "3.721.0",
-    "tsx": "4.19.2"
+    "tsx": "4.19.3"
   }
 }

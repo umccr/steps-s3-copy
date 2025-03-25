@@ -7,8 +7,8 @@ import {
   makeObjectDictionaryCsv,
   TestObject,
 } from "./test-util.mjs";
-import { waitUntilStateMachineFinishes } from "./steps-waiter.mjs";
-import { assertDestinations } from "./test-assert.mjs";
+import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
+import { assertDestinations } from "./lib/assert-destinations.mjs";
 import path from "node:path/posix";
 
 const sfnClient = new SFNClient({});

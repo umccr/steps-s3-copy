@@ -8,9 +8,11 @@ import {
   makeTestObject,
   TestObject,
 } from "./test-util.mjs";
-import { waitUntilStateMachineFinishes } from "./steps-waiter.mjs";
-import { assertDestinations } from "./test-assert.mjs";
+import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
+import { assertDestinations } from "./lib/assert-destinations.mjs";
 import { ChecksumAlgorithm } from "@aws-sdk/client-s3";
+
+const TEST_NAME = "parts checksums";
 
 const s3Client = new S3Client({});
 const sfnClient = new SFNClient({});
@@ -34,7 +36,7 @@ const MiB = 1024 * 1024;
  * @param workingBucket the working bucket to use
  * @param destinationBucket the destination bucket in which to find copied test objects
  */
-export async function test1(
+export async function testPartsChecksums(
   uniqueTestId: string,
   stateMachineArn: string,
   sourceBucket: string,
@@ -42,7 +44,7 @@ export async function test1(
   destinationBucket: string,
 ) {
   console.log(
-    `Test 1 (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
+    `Test "${TEST_NAME}" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
   );
 
   const {
@@ -167,9 +169,16 @@ export async function test1(
     },
   );
 
-  console.log(executionResult);
+  const objectResults = await assertDestinations(
+    uniqueTestId,
+    destinationBucket,
+    testObjects,
+  );
 
-  await assertDestinations(uniqueTestId, destinationBucket, testObjects);
-
-  return 0;
+  return {
+    testName: TEST_NAME,
+    testSuccess: executionResult.state == "SUCCESS",
+    testExecutionResult: executionResult,
+    testObjectResults: objectResults,
+  };
 }

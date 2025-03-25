@@ -8,10 +8,10 @@ import {
   StorageClass,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
-import { createRandomBuffer } from "./create-random-buffer.mjs";
+import { createRandomBuffer } from "./lib/create-random-buffer.mjs";
 import { calcMultipleHashes, Checksums } from "./calc-multiple-hashes.mjs";
 import { ChecksumAlgorithm } from "@aws-sdk/client-s3";
-import { BufferSplit } from "./buffer-split.mjs";
+import { BufferSplit } from "./lib/buffer-split.mjs";
 import pLimit from "p-limit";
 
 const s3Client = new S3Client({
@@ -209,8 +209,6 @@ async function multiPartUpload(
 
   let uploadId;
 
-  console.log(checksumAlgorithm);
-
   try {
     const multipartUpload = await s3Client.send(
       new CreateMultipartUploadCommand({
@@ -272,7 +270,7 @@ async function multiPartUpload(
               }),
             )
             .then((d) => {
-              console.log(`Finished part ${partActualNumber}`);
+              // console.log(`Finished part ${partActualNumber}`);
 
               // only one of these Checksums can be present in the data returned
               // from UploadPart, but we copy them all
@@ -290,7 +288,7 @@ async function multiPartUpload(
     }
 
     const uploadResults = await Promise.all(uploadPromises);
-    console.log(uploadResults);
+    // console.log(uploadResults);
 
     return await s3Client.send(
       new CompleteMultipartUploadCommand({

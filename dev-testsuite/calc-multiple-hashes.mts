@@ -1,8 +1,7 @@
 import { createHash as createHashCrypto, Hash } from "node:crypto";
-import { createHash as createHashCrc } from "./crc-hash.mjs";
+import { createHash as createHashCrc } from "./lib/crc-hash.mjs";
 import { BinaryToTextEncoding } from "crypto";
-import { BufferSplit} from "./buffer-split.mjs";
-import {pipeline} from "node:stream/promises";
+import { BufferSplit } from "./lib/buffer-split.mjs";
 
 export type Checksums = {
   crc32: string;
@@ -18,7 +17,7 @@ export type HashesReport = {
 
   // checksums as this would be represented in AWS
   aws: Checksums;
-}
+};
 
 /**
  * For a given buffer and desired part size - calculate the checksums that would occur
@@ -28,10 +27,7 @@ export type HashesReport = {
  *
  * @param bufferSplit
  */
-export function calcMultipleHashes(
-  bufferSplit: BufferSplit,
-): HashesReport {
-
+export function calcMultipleHashes(bufferSplit: BufferSplit): HashesReport {
   return {
     total: {
       crc32: "",
@@ -44,8 +40,7 @@ export function calcMultipleHashes(
       md5: "",
       sha1: "",
       sha256: "",
-    }
-
+    },
   };
 
   const crc32Total = createHashCrc("crc32").update(bufferSplit.buffer);
@@ -64,7 +59,7 @@ export function calcMultipleHashes(
     md5: md5Total.copy().digest("hex"),
     sha1: sha1Total.copy().digest("hex"),
     sha256: sha256Total.copy().digest("hex"),
-  }
+  };
 
   // single part upload
   if (bufferSplit.isSinglePart) {
@@ -76,7 +71,7 @@ export function calcMultipleHashes(
         sha1: sha1Total.copy().digest("base64"),
         sha256: sha256Total.copy().digest("base64"),
       },
-    }
+    };
   }
 
   // not actually a multipart - return the single hash
@@ -112,7 +107,10 @@ export function calcMultipleHashes(
       part === bufferSplit.partCount
         ? bufferSplit.partLast
         : bufferSplit.partSize;
-    const partBuffer = bufferSplit.buffer.subarray(partStart, partStart + partActualSize);
+    const partBuffer = bufferSplit.buffer.subarray(
+      partStart,
+      partStart + partActualSize,
+    );
 
     etagHashes.push(createHashCrypto("md5").update(partBuffer));
     crc32Hashes.push(createHashCrc("crc32").update(partBuffer));
@@ -145,7 +143,7 @@ export function calcMultipleHashes(
 
   const x = calcMultipleHashes(emptyBuffer, 64);
 
-  console.assert(x.single.md5 === "d41d8cd98f00b204e9800998ecf8427e");
+  console.assert(x.single.md5 === "d41d8cd98f00b204e9800998ecf8427e"); // pragma: allowlist secret
   console.assert(x.single.crc32 === "0000000");
   // when uploaded = AAAAAA==
   // sha1 = 2jmj7l5rSw0yVb/vlWAYkK/YBwk=

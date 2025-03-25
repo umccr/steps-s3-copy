@@ -8,7 +8,10 @@
     "build": "pnpm --stream --filter \"./packages/**\" run build",
     "watch": "pnpm --stream --filter \"./packages/**\" run build:watch",
     "package": "pnpm --stream --filter \"./packages/**\" run package",
-    "clean": "git clean -fXd"
+    "clean": "git clean -fXd",
+    "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
+    "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy",
+    "dev-test": "cd dev-testsuite && pnpx tsx test.mts StepsS3Copy"
   },
   "keywords": [],
   "author": {
@@ -20,8 +23,7 @@
     "@tsconfig/node18": "18.2.4",
     "@types/node": "18.19.44",
     "esbuild": "0.23.1",
-    "prettier": "3.3.3",
-    "ts-node": "10.9.2",
-    "typescript": "5.5.4"
+    "prettier": "3.5.3",
+    "typescript": "5.8.2"
   }
 }

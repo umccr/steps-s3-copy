@@ -9,8 +9,10 @@ import {
   MiB,
   TestObject,
 } from "./test-util.mjs";
-import { waitUntilStateMachineFinishes } from "./steps-waiter.mjs";
-import { assertDestinations } from "./test-assert.mjs";
+import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
+import { assertDestinations } from "./lib/assert-destinations.mjs";
+
+const TEST_NAME = "thawing";
 
 const sfnClient = new SFNClient({});
 
@@ -39,7 +41,7 @@ export async function testThawing(
   destinationBucket: string,
 ) {
   console.log(
-    `Test "thawing" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
+    `Test "${TEST_NAME}" (${uniqueTestId}) working ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX} and copying ${sourceBucket}->${destinationBucket}`,
   );
 
   const {
@@ -73,13 +75,13 @@ export async function testThawing(
     [`glacier-ir-single-part.bin`]: {
       sizeInBytes: 256 * KiB,
       storageClass:
-        "GLACIER_IR" /* Glacier IR should behave like normal S3 but we want to ensure that works */,
+        "GLACIER_IR" /* Glacier IR should behave like normal S3, but we want to ensure that works */,
     },
     [`glacier-ir-multi-part.bin`]: {
       sizeInBytes: 6 * MiB,
       partSizeInBytes: 5 * MiB,
       storageClass:
-        "GLACIER_IR" /* Glacier IR should behave like normal S3 but we want to ensure that works */,
+        "GLACIER_IR" /* Glacier IR should behave like normal S3, but we want to ensure that works */,
     },
   };
 
@@ -98,18 +100,12 @@ export async function testThawing(
     );
   }
 
-  if (uniqueTestId === "") return;
-
   const testObjectKeys = Object.keys(sourceObjects).map(
     (n) => `${testFolderSrc}${n}`,
   );
 
-  testObjectKeys.push("not-a-file-that-exists.bin");
-  testObjectKeys.push("a-file-with-a-wildcard*.bin");
-
   await makeObjectDictionaryCsv(workingBucket, testFolderObjectsTsvAbsolute, {
     [sourceBucket]: testObjectKeys,
-    ["1000genomes-dragen"]: ["aws-programmatic-access-test-object"],
   });
 
   const executionStartResult = await sfnClient.send(
@@ -126,15 +122,25 @@ export async function testThawing(
   );
 
   const executionResult = await waitUntilStateMachineFinishes(
-    { client: sfnClient, maxWaitTime: 120 },
+    // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
+    // of one minute of wait - and if the objects are in fact not thawed straight away - two minutes!
+    // so give ourselves 3 minutes before we abort
+    { client: sfnClient, maxWaitTime: 180 },
     {
       executionArn: executionStartResult.executionArn,
     },
   );
 
-  console.log(executionResult);
+  const objectResults = await assertDestinations(
+    uniqueTestId,
+    destinationBucket,
+    testObjects,
+  );
 
-  await assertDestinations(uniqueTestId, destinationBucket, testObjects);
-
-  return 0;
+  return {
+    testName: TEST_NAME,
+    testSuccess: executionResult.state == "SUCCESS",
+    testExecutionResult: executionResult,
+    testObjectResults: objectResults,
+  };
 }

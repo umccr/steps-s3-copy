@@ -137,6 +137,8 @@ export async function handler(event: ThawObjectsEvent) {
         console.error(`Generic error for ${o.bucket} ${o.key}`);
         console.error(e);
       }
+
+      throw e;
     }
   }
 

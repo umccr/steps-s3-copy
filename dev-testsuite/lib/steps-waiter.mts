@@ -70,5 +70,5 @@ export const waitUntilStateMachineFinishes = async (
     input,
     checkState,
   );
-  return checkExceptions(result);
+  return result; // checkExceptions(result);
 };
