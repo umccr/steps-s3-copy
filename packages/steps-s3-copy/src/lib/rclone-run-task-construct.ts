@@ -1,6 +1,10 @@
 import { Construct } from "constructs";
 import { Role } from "aws-cdk-lib/aws-iam";
-import { IntegrationPattern, JsonPath } from "aws-cdk-lib/aws-stepfunctions";
+import {
+  IntegrationPattern,
+  JsonPath,
+  Timeout,
+} from "aws-cdk-lib/aws-stepfunctions";
 import { Duration, Stack } from "aws-cdk-lib";
 import {
   AssetImage,
@@ -23,10 +27,17 @@ import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { SubnetType } from "aws-cdk-lib/aws-ec2";
 
 type Props = {
-  fargateCluster: ICluster;
-  vpcSubnetSelection: SubnetType;
+  readonly fargateCluster: ICluster;
+  readonly vpcSubnetSelection: SubnetType;
 
-  writerRole: Role;
+  readonly writerRole: Role;
+
+  /**
+   * If present and true, will set some of our default timings to those that
+   * are more likely in a dev/test scenario rather than production. i.e. timeouts
+   * of hours not days etc.
+   */
+  readonly aggressiveTimes?: boolean;
 
   /**
    * If true, will allow the run task to copy to a bucket that is
@@ -42,6 +53,16 @@ type Props = {
 export class RcloneRunTaskConstruct extends Construct {
   public readonly ecsRunTask: EcsRunTask;
 
+  // how long we will wait before aborting if no heartbeat received
+  // (note: the actual heartbeat interval is _less_ than this)
+  private readonly HEARTBEAT_TIMEOUT_SECONDS = 30;
+
+  // how long we set as the absolute upper limit for an rclone execution
+  // (note: this really is just an absolute safeguard against something somehow
+  //  running forever - though there are other timeouts like the overall Steps timeout that
+  //  presumably will kick-in before this)
+  private readonly RCLONE_TIMEOUT_HOURS = 48;
+
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
@@ -50,7 +71,6 @@ export class RcloneRunTaskConstruct extends Construct {
         // FARGATE_SPOT is only available for X86
         cpuArchitecture: CpuArchitecture.X86_64,
       },
-      // ephemeralStorageGiB: 200,
       cpu: 256,
       // there is a warning in the rclone documentation about problems with mem < 1GB - but I think that
       // is mainly for large multi-file syncs... we do individual/small file copies so 512 should be fine
@@ -139,12 +159,13 @@ export class RcloneRunTaskConstruct extends Construct {
       subnets: {
         subnetType: props.vpcSubnetSelection,
       },
-      //resultSelector: {
-      // "rclone.$": JsonPath.objectAt("$"),
-      // "capacityProviderName.$": JsonPath.stringAt("$.CapacityProviderName"),
-      //"stoppedAt.$": JsonPath.numberAt("$.StoppedAt"),
-      //"stoppedReason.$": JsonPath.stringAt("$.StoppedReason"),
-      // },
+      // max length for the overall copy - so think big - this might be 64 invocations of
+      // copying a 100 GiB BAM file say...
+      taskTimeout: Timeout.duration(Duration.hours(this.RCLONE_TIMEOUT_HOURS)),
+      // how many seconds we can go without hearing from the rclone task
+      heartbeatTimeout: Timeout.duration(
+        Duration.seconds(this.HEARTBEAT_TIMEOUT_SECONDS),
+      ),
       resultPath: "$.rcloneResult",
       containerOverrides: [
         {
@@ -161,6 +182,11 @@ export class RcloneRunTaskConstruct extends Construct {
             {
               name: "RB_TASK_TOKEN",
               value: JsonPath.stringAt("$$.Task.Token"),
+            },
+            {
+              name: "RB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL",
+              // we want to attempt to do the heartbeat some factor more often than the actual timeout
+              value: Math.floor(this.HEARTBEAT_TIMEOUT_SECONDS / 3).toString(),
             },
           ],
         },
