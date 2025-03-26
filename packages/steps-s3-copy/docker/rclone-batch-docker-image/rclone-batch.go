@@ -4,21 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	"github.com/aws/aws-sdk-go-v2/service/sfn"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
-	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sfn"
 )
 
 // NOTE: we use a prefix of RB (rclone-batch) just so we don't accidentally clash with a real
@@ -26,40 +23,8 @@ import (
 
 const rcloneBinaryEnvName = "RB_RCLONE_BINARY"
 const destinationEnvName = "RB_DESTINATION"
-
-// some temporary code with the ability to source from GDS
-
-const ICA_BASE_URL = "https://aps2.platform.illumina.com/v1"
-
-type GdsFilesResponse struct {
-	Items []struct {
-		ID             string    `json:"id,omitempty"`
-		Name           string    `json:"name,omitempty"`
-		VolumeID       string    `json:"volumeId,omitempty"`
-		ParentFolderID string    `json:"parentFolderId,omitempty"`
-		VolumeName     string    `json:"volumeName,omitempty"`
-		Type           string    `json:"type,omitempty"`
-		TenantID       string    `json:"tenantId,omitempty"`
-		SubTenantID    string    `json:"subTenantId,omitempty"`
-		Path           string    `json:"path,omitempty"`
-		TimeCreated    time.Time `json:"timeCreated"`
-		CreatedBy      string    `json:"createdBy,omitempty"`
-		TimeModified   time.Time `json:"timeModified"`
-		ModifiedBy     string    `json:"modifiedBy,omitempty"`
-		Urn            string    `json:"urn,omitempty"`
-		SizeInBytes    int64     `json:"sizeInBytes"`
-		IsUploaded     bool      `json:"isUploaded"`
-		ArchiveStatus  string    `json:"archiveStatus,omitempty"`
-		StorageTier    string    `json:"storageTier,omitempty"`
-		ETag           string    `json:"eTag,omitempty"`
-		Format         string    `json:"format,omitempty"`
-		FormatEdam     string    `json:"formatEdam,omitempty"`
-		Status         string    `json:"status,omitempty"`
-		PresignedURL   string    `json:"presignedUrl,omitempty"`
-	} `json:"items"`
-	ItemCount      int    `json:"itemCount"`
-	FirstPageToken string `json:"firstPageToken,omitempty"`
-}
+const taskTokenEnvName = "RB_TASK_TOKEN"
+const taskTokenHeartbeatSecondsIntervalEnvName = "RB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL"
 
 // our parent ECS task (when a SPOT instance) can be sent a TERM signal - we then have a hard
 // limit of 120 seconds before the process is hard killed
@@ -117,16 +82,41 @@ func main() {
 	}
 
 	// a task token that ECS/Steps can pass us so we can return data
-	taskToken, taskTokenOk := os.LookupEnv("RB_TASK_TOKEN")
+	// in practice this is always included when run by AWS - but we leave the option of it not being present
+	// so we can run things locally/test
+	taskToken, taskTokenOk := os.LookupEnv(taskTokenEnvName)
 
-	// now that we know whether we want to use the task token - we will definitely need AWS config to work
-	// - so no need starting copying if we will fail at the end
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	// get the AWS config if it exists
+	awsConfig, awsConfigErr := config.LoadDefaultConfig(context.TODO())
+
+	var heartbeatWorker *HeartbeatWorker
 
 	if taskTokenOk {
-		if err != nil {
-			log.Fatalf("Unable to load AWS config, %v", err)
+		// if a task token was passed in, we now know that we need to regularly
+		// make AWS calls to signal the parent
+
+		// fail early if there was no AWS config
+		if awsConfigErr != nil {
+			log.Fatalf("Unable to load AWS config, %v", awsConfigErr)
 		}
+
+		taskTokenHeartbeatIntervalString, taskTokenHeartbeatIntervalOk := os.LookupEnv(taskTokenHeartbeatSecondsIntervalEnvName)
+
+		if !taskTokenHeartbeatIntervalOk {
+			log.Fatalf("No environment variable %s telling us the interval for heartbeats", taskTokenHeartbeatSecondsIntervalEnvName)
+		}
+
+		taskTokenHeartbeatInterval, taskTokenHeartbeatIntervalErr := strconv.Atoi(taskTokenHeartbeatIntervalString)
+
+		if taskTokenHeartbeatIntervalErr != nil {
+			log.Fatalf("Environment variable %s needs to be a string representing a number of integer seconds but was %s", taskTokenHeartbeatSecondsIntervalEnvName, taskTokenHeartbeatIntervalString)
+		}
+
+		// make a background worker doing heart beats
+		heartbeatWorker = NewHeartbeatWorker(time.Duration(taskTokenHeartbeatInterval)*time.Second, sfn.NewFromConfig(awsConfig), taskToken)
+
+		// and start it
+		go heartbeatWorker.Run()
 	}
 
 	// special environment variables that we can use for some debug/testing
@@ -137,7 +127,7 @@ func main() {
 	results := make([]any, len(os.Args)-1)
 	var resultErrorCount int64 = 0
 
-	signalChannel := make(chan os.Signal)
+	signalChannel := make(chan os.Signal, 1)
 
 	// set as soon as we receive a SIGTERM - so that we will then just quickly skip the rest of the files
 	interrupted := false
@@ -163,68 +153,13 @@ func main() {
 			"--bwlimit", If(debugBandwidthOk, debugBandwidth, "0"),
 		)
 
-		// umccr specific workaround to make GDS available
-		if strings.HasPrefix(source, "s3:production") || strings.HasPrefix(source, "s3:development") {
-			secretsSvc := secretsmanager.NewFromConfig(cfg)
-
-			secretResp, secretErr := secretsSvc.GetSecretValue(context.TODO(), &secretsmanager.GetSecretValueInput{
-				SecretId: aws.String("IcaSecretsPortal"),
-			})
-
-			if secretErr != nil {   // pragma: allowlist secret
-				log.Fatalf("Unable to get IcaSecretsPortal secret: %v", secretErr)
-			}
-
-			secret := aws.ToString(secretResp.SecretString) // pragma: allowlist secret
-
-			r := regexp.MustCompile(`s3:(?P<Volume>[^/]+)(?P<Path>.+)`)
-			p := r.FindStringSubmatch(source)
-
-			url := fmt.Sprintf("%s/files?include=PresignedUrl&volume.name=%s&path=%s", ICA_BASE_URL, p[1], p[2])
-
-			log.Println(url)
-
-			client := http.Client{}
-			req, err := http.NewRequest("GET", url, nil)
-			if err != nil {
-				log.Fatalf("Unable to create request: %v", err)
-			}
-			req.Header = http.Header{
-				"Host":          {"www.host.com"},
-				"Content-Type":  {"application/json"},
-				"Authorization": {fmt.Sprintf("Bearer %s", secret)},
-			}
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Fatalf("Unable to send request: %v", err)
-			}
-
-			defer resp.Body.Close()
-
-			body, err := io.ReadAll(resp.Body)
-
-			filesObject := GdsFilesResponse{}
-
-			if err := json.Unmarshal(body, &filesObject); err != nil {
-				log.Fatalf("Unable to unmarshal response: %v", err)
-			}
-
-			source = filesObject.Items[0].PresignedURL
-			copyArgs = append(copyArgs,
-				"--auto-filename",
-				"--disable-http2",
-				"copyurl",
-				source,
-				destination)
-		} else {
-			copyArgs = append(copyArgs,
-				// because we are transferring between S3 - which has a consistent idea of checksums
-				// at src and destination we enable this options
-				"--checksum",
-				"copy",
-				source,
-				destination)
-		}
+		copyArgs = append(copyArgs,
+			// because we are transferring between S3 - which has a consistent idea of checksums
+			// at src and destination we enable this options
+			"--checksum",
+			"copy",
+			source,
+			destination)
 
 		if !interrupted {
 			// the constructed command to execute to do the copy
@@ -370,10 +305,10 @@ func main() {
 	// we have now attempted to copy every file and generated a stats dictionary in results[]
 
 	// we need to report this back as JSON though
-	resultsJson, err := json.MarshalIndent(results, "", "  ")
+	resultsJson, resultsJsonErr := json.MarshalIndent(results, "", "  ")
 
-	if err != nil {
-		log.Fatalf("Could not marshall the rclone outputs to JSON", err)
+	if resultsJsonErr != nil {
+		log.Fatalf("Could not marshall the rclone outputs to JSON with message %s", resultsJsonErr)
 	}
 
 	resultsString := string(resultsJson)
@@ -381,7 +316,10 @@ func main() {
 	// the normal mechanism by which we will send back results to our caller is
 	// Steps SendTask - which sends back JSON
 	if taskTokenOk {
-		sfnSvc := sfn.NewFromConfig(cfg)
+		// we can signal we no longer want heartbeats as we are about to finish up
+		heartbeatWorker.Shutdown()
+
+		sfnSvc := sfn.NewFromConfig(awsConfig)
 
 		// output
 		// The JSON output of the task. Length constraints apply to the payload size, and are expressed as bytes in UTF-8 encoding.
@@ -402,9 +340,80 @@ func main() {
 		//}
 
 	} else {
-		// if no task token was given then we just print the results
+		// if no AWS task token was given then we just print the results
+		// (this is likely to be some sort of dev/test)
 		fmt.Println(resultsString)
 	}
 
 	os.Exit(int(resultErrorCount))
+}
+
+// BASED ON
+// https://www.ardanlabs.com/blog/2013/09/timer-routines-and-graceful-shutdowns.html
+// https://bbengfort.github.io/2016/06/background-work-goroutines-timer/
+
+// Worker will do its Action once every interval, making up for lost time that
+// happened during the Action by only waiting the time left in the interval.
+type HeartbeatWorker struct {
+	SfnClient       *sfn.Client   // The client we need to do heart beat
+	TaskToken       string        // The task token to ping as a heart beat
+	Stopped         bool          // A flag determining the state of the worker
+	ShutdownChannel chan string   // A channel to communicate to the routine
+	Interval        time.Duration // The interval with which to run the Action
+	period          time.Duration // The actual period of the wait
+}
+
+// NewHeartbeatWorker creates a new worker and instantiates all the data structures required.
+func NewHeartbeatWorker(interval time.Duration, sfnClient *sfn.Client, taskToken string) *HeartbeatWorker {
+	return &HeartbeatWorker{
+		SfnClient:       sfnClient,
+		TaskToken:       taskToken,
+		Stopped:         false,
+		ShutdownChannel: make(chan string),
+		Interval:        interval,
+		period:          interval,
+	}
+}
+
+// Run starts the worker and listens for a shutdown call.
+func (w *HeartbeatWorker) Run() {
+
+	log.Println("Heartbeat worker started")
+
+	// Loop that runs forever
+	for {
+		select {
+		case <-time.After(w.period):
+			// do nothing.
+		case <-w.ShutdownChannel:
+			w.ShutdownChannel <- "Down"
+			// this is our exit path out of the infinite for loop
+			return
+		}
+
+		started := time.Now()
+		w.Action()
+		finished := time.Now()
+
+		duration := finished.Sub(started)
+		w.period = w.Interval - duration
+	}
+}
+
+// Shutdown is a graceful shutdown mechanism
+func (w *HeartbeatWorker) Shutdown() {
+	w.Stopped = true
+
+	w.ShutdownChannel <- "Down"
+	<-w.ShutdownChannel
+
+	close(w.ShutdownChannel)
+}
+
+// Tell the parent caller ECS that we are alive and/or still-alive
+func (w *HeartbeatWorker) Action() {
+	w.SfnClient.SendTaskHeartbeat(context.TODO(), &sfn.SendTaskHeartbeatInput{
+		TaskToken: aws.String(w.TaskToken),
+	})
+	log.Println("Heartbeat sent")
 }

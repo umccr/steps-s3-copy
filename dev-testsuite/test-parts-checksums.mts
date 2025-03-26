@@ -137,8 +137,6 @@ export async function testPartsChecksums(
     );
   }
 
-  if (uniqueTestId === "") return;
-
   await makeObjectDictionaryCsv(workingBucket, testFolderObjectsTsvAbsolute, {
     [sourceBucket]: Object.keys(sourceObjects).map(
       (n) => `${testFolderSrc}${n}`,

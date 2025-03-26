@@ -85,14 +85,6 @@ export class StepsS3CopyConstruct extends Construct {
       ),
     );
 
-    // allow fetching of secrets for GDS
-    writerRole.addToPolicy(
-      new PolicyStatement({
-        resources: ["*"],
-        actions: ["secretsmanager:GetSecretValue"],
-      }),
-    );
-
     // allow sending of state messages to signify task aborts etc
     writerRole.addToPolicy(
       new PolicyStatement({
