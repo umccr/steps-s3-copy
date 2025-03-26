@@ -186,14 +186,20 @@ export async function testRealistic(
     );
   }
 
-  // use top-level folder copying
   await makeObjectDictionaryCsv(workingBucket, testFolderObjectsTsvAbsolute, {
-    [sourceBucket]: [
-      `${testFolderSrc}production/primary_data/240823_A98765_4321_ABCDEFGHIJ`,
-      `${testFolderSrc}production/analysis_data/SBJ12345/wgs_tumor_normal`,
-      `${testFolderSrc}production/analysis_data/SBJ12345/umccrise`,
-    ],
+    [sourceBucket]: Object.keys(sourceObjects).map(
+      (n) => `${testFolderSrc}${n}`,
+    ),
   });
+
+  // TODO: top-level folder copying
+  //await makeObjectDictionaryCsv(workingBucket, testFolderObjectsTsvAbsolute, {
+  //  [sourceBucket]: [
+  //    `${testFolderSrc}production/primary_data/240823_A98765_4321_ABCDEFGHIJ*`,
+  //    `${testFolderSrc}production/analysis_data/SBJ12345/wgs_tumor_normal*`,
+  //    `${testFolderSrc}production/analysis_data/SBJ12345/umccrise*`,
+  //  ],
+  //});
 
   const executionStartResult = await sfnClient.send(
     new StartExecutionCommand({
@@ -205,7 +211,7 @@ export async function testRealistic(
         // the complex cases we expect to invoke per subject - so put in a folder for each subject
         destinationPrefixKey:
           path.join(testFolderDest, "EXTERNAL_SAMPLE_7654") + "/",
-        maxItemsPerBatch: 20,
+        maxItemsPerBatch: 16,
       }),
     }),
   );

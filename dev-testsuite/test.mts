@@ -95,6 +95,7 @@ const cloudFormationClient = new CloudFormationClient({});
     asyncTest(testPartsChecksums),
     asyncTest(testThawing),
     asyncTest(testErrorMissingObject),
+    asyncTest(testRealistic),
     // asyncTest(testPublicObject),
   ]);
 

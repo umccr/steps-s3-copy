@@ -305,10 +305,10 @@ func main() {
 	// we have now attempted to copy every file and generated a stats dictionary in results[]
 
 	// we need to report this back as JSON though
-	resultsJson, awsConfigErr := json.MarshalIndent(results, "", "  ")
+	resultsJson, resultsJsonErr := json.MarshalIndent(results, "", "  ")
 
-	if awsConfigErr != nil {
-		log.Fatalf("Could not marshall the rclone outputs to JSON", awsConfigErr)
+	if resultsJsonErr != nil {
+		log.Fatalf("Could not marshall the rclone outputs to JSON with message %s", resultsJsonErr)
 	}
 
 	resultsString := string(resultsJson)
@@ -340,7 +340,8 @@ func main() {
 		//}
 
 	} else {
-		// if no task token was given then we just print the results
+		// if no AWS task token was given then we just print the results
+		// (this is likely to be some sort of dev/test)
 		fmt.Println(resultsString)
 	}
 
