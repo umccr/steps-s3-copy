@@ -1,9 +1,12 @@
 import { Construct } from "constructs";
 import { JitterType, JsonPath } from "aws-cdk-lib/aws-stepfunctions";
-import { S3CsvDistributedMap } from "./s3-csv-distributed-map";
 import { RcloneRunTaskConstruct } from "./rclone-run-task-construct";
 import { IVpc, SubnetType } from "aws-cdk-lib/aws-ec2";
-import { Cluster } from "aws-cdk-lib/aws-ecs";
+import {
+  Cluster,
+  ContainerDefinition,
+  TaskDefinition,
+} from "aws-cdk-lib/aws-ecs";
 import {
   DESTINATION_BUCKET_FIELD_NAME,
   DESTINATION_PREFIX_KEY_FIELD_NAME,
@@ -11,7 +14,8 @@ import {
   SOURCE_FILES_CSV_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
 import { Duration } from "aws-cdk-lib";
-import {Role} from "aws-cdk-lib/aws-iam";
+import { Role } from "aws-cdk-lib/aws-iam";
+import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 
 type Props = {
   vpc: IVpc;
@@ -21,10 +25,15 @@ type Props = {
 
   workingBucket: string;
   workingBucketPrefixKey: string;
+
+  inputPath: string;
+
+  taskDefinition: TaskDefinition;
+  containerDefinition: ContainerDefinition;
 };
 
 export class RcloneMapConstruct extends Construct {
-  public readonly distributedMap: S3CsvDistributedMap;
+  public readonly distributedMap: S3JsonlDistributedMap;
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
@@ -36,11 +45,13 @@ export class RcloneMapConstruct extends Construct {
 
     const rcloneRunTask = new RcloneRunTaskConstruct(
       this,
-      "RcloneFargateTask",
+      id + "RcloneFargateTask",
       {
         writerRole: props.writerRole,
         fargateCluster: cluster,
         vpcSubnetSelection: props.vpcSubnetSelection,
+        taskDefinition: props.taskDefinition,
+        containerDefinition: props.containerDefinition,
       },
     ).ecsRunTask;
 
@@ -54,10 +65,8 @@ export class RcloneMapConstruct extends Construct {
       maxDelay: Duration.minutes(5),
     });
 
-    // these names are internal only - but we pull out as a const to make sure
-    // they are consistent
-    const bucketColumnName = "b";
-    const keyColumnName = "k";
+    const bucketColumnName = "sourceBucket";
+    const keyColumnName = "sourceKey";
 
     // {
     //   "BatchInput": {
@@ -65,24 +74,20 @@ export class RcloneMapConstruct extends Construct {
     //   },
     //   "Items": [
     //     {
-    //       "rcloneSource": "s3:bucket/1.fastq.gz"
+    //       "rcloneSource": "s3:sourceBucket/1.fastq.gz"
     //     },
     //     {
-    //       "rcloneSource": "s3:bucket/2.fastq.gz"
+    //       "rcloneSource": "s3:sourceBucket/2.fastq.gz"
     //     },
     // }
 
-    this.distributedMap = new S3CsvDistributedMap(this, "RcloneMap", {
+    this.distributedMap = new S3JsonlDistributedMap(this, id + "RcloneMap", {
       toleratedFailurePercentage: 25,
-      batchMaxItemsPath: `$.${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
-      itemReaderCsvHeaders: [bucketColumnName, keyColumnName],
+      batchMaxItemsPath: `$${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
+      inputPath: props.inputPath,
       itemReader: {
-        Bucket: props.workingBucket,
-        "Key.$": JsonPath.format(
-          "{}{}",
-          props.workingBucketPrefixKey,
-          JsonPath.stringAt(`$.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
-        ),
+        "Bucket.$": `$.bucket`,
+        "Key.$": `$.key`,
       },
       itemSelector: {
         "rcloneSource.$": JsonPath.format(
@@ -95,8 +100,8 @@ export class RcloneMapConstruct extends Construct {
       batchInput: {
         "rcloneDestination.$": JsonPath.format(
           "s3:{}/{}",
-          JsonPath.stringAt(`$.${DESTINATION_BUCKET_FIELD_NAME}`),
-          JsonPath.stringAt(`$.${DESTINATION_PREFIX_KEY_FIELD_NAME}`),
+          JsonPath.stringAt(`$${DESTINATION_BUCKET_FIELD_NAME}`),
+          JsonPath.stringAt(`$${DESTINATION_PREFIX_KEY_FIELD_NAME}`),
         ),
       },
       iterator: rcloneRunTask,
@@ -105,13 +110,13 @@ export class RcloneMapConstruct extends Construct {
         "Prefix.$": JsonPath.format(
           "{}{}",
           props.workingBucketPrefixKey,
-          JsonPath.stringAt(`$.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
+          JsonPath.stringAt(`$${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
         ),
       },
-      resultSelector: {
-        "manifestAbsoluteKey.$": "$.ResultWriterDetails.Key",
-      },
-      resultPath: `$.rcloneResults`,
+      //resultSelector: {
+      //  "manifestAbsoluteKey.$": "$.ResultWriterDetails.Key",
+      //},
+      //resultPath: `$.rcloneResults`,
     });
   }
 }

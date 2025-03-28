@@ -39,8 +39,8 @@ const checkState = async (
     // Name Fault Details
     // ExecutionDoesNotExist client The specified execution does not exist.
     // InvalidArn client The provided Amazon Resource Name (ARN) is not valid.
-    // KmsAccessDeniedException client Either your KMS key policy or API caller does not have the required permissions.
-    // KmsInvalidStateException client The KMS key is not in valid state, for example: Disabled or Deleted.
+    // KmsAccessDeniedException client Either your KMS sourceKey policy or API caller does not have the required permissions.
+    // KmsInvalidStateException client The KMS sourceKey is not in valid state, for example: Disabled or Deleted.
     // KmsThrottlingException client Received when KMS returns ThrottlingException for a KMS call that Step Functions makes on behalf of the caller.
     // SFNServiceException Base exception class for all service exceptions from SFN service.
     reason = exception;

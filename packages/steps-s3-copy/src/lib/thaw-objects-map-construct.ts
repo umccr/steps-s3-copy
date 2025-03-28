@@ -4,8 +4,11 @@ import { S3CsvDistributedMap } from "./s3-csv-distributed-map";
 import { ThawObjectsLambdaStepConstruct } from "./thaw-objects-lambda-step-construct";
 import { Duration } from "aws-cdk-lib";
 import { SOURCE_FILES_CSV_KEY_FIELD_NAME } from "../steps-s3-copy-input";
+import { IRole } from "aws-cdk-lib/aws-iam";
 
 type Props = {
+  readonly writerRole: IRole;
+
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
 
@@ -21,7 +24,9 @@ export class ThawObjectsMapConstruct extends Construct {
     const thawObjectsLambdaStep = new ThawObjectsLambdaStepConstruct(
       this,
       "LambdaStep",
-      {},
+      {
+        writerRole: props.writerRole,
+      },
     );
 
     // for real deep glacier - we need to support retries up to 48 hours

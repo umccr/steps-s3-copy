@@ -23,7 +23,7 @@ export async function handler(event: InvokeEvent) {
   if (event.destinationPrefixKey)
     if (!event.destinationPrefixKey.endsWith("/"))
       throw new DestinationPrefixKeyNoTrailingSlashError(
-        "The destination prefix key must either be an empty string or a string with a trailing slash",
+        "The destination prefix sourceKey must either be an empty string or a string with a trailing slash",
       );
 
   // we are being super specific here - more so than our normal client creation
@@ -45,7 +45,7 @@ export async function handler(event: InvokeEvent) {
   } catch (e: any) {
     if (e.Code === "PermanentRedirect")
       throw new WrongRegionError(
-        "S3 Put failed because bucket was in the wrong region",
+        "S3 Put failed because sourceBucket was in the wrong region",
       );
 
     if (e.Code === "AccessDenied")

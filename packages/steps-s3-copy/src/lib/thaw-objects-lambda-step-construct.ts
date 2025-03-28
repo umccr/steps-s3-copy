@@ -1,13 +1,14 @@
 import { Construct } from "constructs";
-import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { Effect, IRole, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
-import { JsonPath } from "aws-cdk-lib/aws-stepfunctions";
+import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { join } from "path";
+import { join } from "node:path";
 
-type Props = {};
+type Props = {
+  readonly writerRole: IRole;
+};
 
 /**
  * A construct for a Steps function that tests if a set
@@ -26,6 +27,8 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
     super(scope, id);
 
     const thawObjectsLambda = new NodejsFunction(this, "ThawObjectsFunction", {
+      // our pre-made role will have the ability to read objects
+      role: _props.writerRole,
       entry: join(
         __dirname,
         "..",
@@ -35,6 +38,7 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
         "can-read-objects-lambda.ts",
       ),
       runtime: Runtime.NODEJS_22_X,
+      architecture: Architecture.ARM_64,
       handler: "handler",
       bundling: {
         // for a small method it is sometimes easier if it can be viewed
@@ -60,7 +64,7 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       `Are The Objects Available To Copy?`,
       {
         lambdaFunction: thawObjectsLambda,
-        resultPath: JsonPath.DISCARD,
+        // resultPath: JsonPath.DISCARD,
       },
     );
   }

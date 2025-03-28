@@ -1,0 +1,12 @@
+{
+  "name": "coordinate-copy-lambda",
+  "private": true,
+  "version": "1.0.0",
+  "main": "coordinate-copy-lambda.ts",
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.775.0",
+    "@aws-sdk/lib-storage": "3.775.0",
+    "@types/aws-lambda": "8.10.148",
+    "nodejs-polars": "0.18.0"
+  }
+}

@@ -15,7 +15,7 @@ const app = new App();
 
 const description = "A steps orchestration for S3 object copying";
 
-// our working bucket can perform in a sub-folder so we do that to test that
+// our working sourceBucket can perform in a sub-folder so we do that to test that
 // functionality out
 const WORKING_BUCKET_PREFIX = "a-working-folder/";
 
@@ -34,7 +34,7 @@ class StepsS3CopyStack extends Stack {
     // we constantly create temporary files here as part of the test suite
     // and we want them to autoexpire
     // if you want to set up permanent demonstrations/tests for copying
-    // then need to do that in another bucket
+    // then need to do that in another sourceBucket
     const sourceBucket = new Bucket(this, "Source", {
       versioned: false,
       lifecycleRules: [

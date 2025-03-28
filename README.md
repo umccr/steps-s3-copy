@@ -45,9 +45,9 @@ pnpm run dev-test
 
 ```json
 {
-  "sourceFilesCsvBucket": "bucket-with-csv",
-  "sourceFilesCsvKey": "key-of-source-files.csv",
-  "destinationBucket": "a-target-bucket-in-same-region-but-not-same-account",
+  "sourceFilesCsvBucket": "sourceBucket-with-csv",
+  "sourceFilesCsvKey": "sourceKey-of-source-files.csv",
+  "destinationBucket": "a-target-sourceBucket-in-same-region-but-not-same-account",
   "maxItemsPerBatch": 10
 }
 ```

@@ -30,9 +30,9 @@ const MiB = 1024 * 1024;
  *
  * @param uniqueTestId a unique string for this particular test invocation
  * @param stateMachineArn the state machine under test
- * @param sourceBucket the bucket in which to place test objects
- * @param workingBucket the working bucket to use
- * @param destinationBucket the destination bucket in which to find copied test objects
+ * @param sourceBucket the sourceBucket in which to place test objects
+ * @param workingBucket the working sourceBucket to use
+ * @param destinationBucket the destination sourceBucket in which to find copied test objects
  */
 export async function testPartsChecksums(
   uniqueTestId: string,
