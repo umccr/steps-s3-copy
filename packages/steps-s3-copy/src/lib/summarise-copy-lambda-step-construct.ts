@@ -3,7 +3,6 @@ import { Role } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
-import { JsonPath } from "aws-cdk-lib/aws-stepfunctions";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { join } from "node:path";
 
@@ -18,7 +17,7 @@ type SummariseCopyLambdaStepProps = {
  * A construct for a Steps orchestration that collates
  * the distributed map results from a steps execution
  * (SUCCEEDED_0.json etc) into a text file
- * that is then written to the destination bucket to show what
+ * that is then written to the destination sourceBucket to show what
  * was copied.
  */
 export class SummariseCopyLambdaStepConstruct extends Construct {
@@ -64,7 +63,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
 
     this.invocableLambda = new LambdaInvoke(this, `Summarise Copy Results`, {
       lambdaFunction: summariseCopyLambda,
-      resultPath: JsonPath.DISCARD,
+      // resultPath: JsonPath.DISCARD,
     });
   }
 }

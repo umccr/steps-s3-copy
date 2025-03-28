@@ -27,7 +27,7 @@ export const KiB = 1024;
 
 /**
  * The test object encompasses an object we are going to create
- * in a bucket and then copy.
+ * in a sourceBucket and then copy.
  */
 export type TestObject = {
   sourceBucket: string;
@@ -63,8 +63,8 @@ export function getPaths(
  * Put a dictionary of objects as a two column CSV into an S3 object.
  *
  * @param csvBucket
- * @param csvAbsoluteKey the key of the CSV in the working folder
- * @param objects a dictionary of buckets->key[]
+ * @param csvAbsoluteKey the sourceKey of the CSV in the working folder
+ * @param objects a dictionary of buckets->sourceKey[]
  */
 export async function makeObjectDictionaryCsv(
   csvBucket: string,
@@ -73,9 +73,9 @@ export async function makeObjectDictionaryCsv(
 ) {
   let content = "";
 
-  // for each bucket
+  // for each sourceBucket
   for (const b of Object.keys(objects)) {
-    // for each key
+    // for each sourceKey
     for (const k of objects[b]) content += `${b},"${k}"\n`;
   }
 
@@ -93,8 +93,8 @@ export async function makeObjectDictionaryCsv(
  * Makes an S3 object of a certain size and storage class - and
  * filled with basically blank data
  *
- * @param bucket the bucket of the object
- * @param key the key of the object
+ * @param bucket the sourceBucket of the object
+ * @param key the sourceKey of the object
  * @param sizeInBytes the size in bytes of the object to make
  * @param storageClass the storage class for the object, defaults to STANDARD
  * @param forceContentByte force a content byte if the default needs to be overridden
@@ -128,8 +128,8 @@ export async function makeTestObject(
 /**
  * Creates an AWS S3 object for test copying purposes.
  *
- * @param bucket the bucket to place the object in
- * @param key the key of the object
+ * @param bucket the sourceBucket to place the object in
+ * @param key the sourceKey of the object
  * @param sizeInBytes the size in bytes of the object
  * @param contentSeed a single numeric seed that will define the random content
  * @param independentTotalMd5 an MD5 previously derived from this content through an independent check
@@ -322,7 +322,7 @@ async function multiPartUpload(
 
 /*
 (async () => {
-  const bucket = "steps-s3-copy-testing";
+  const sourceBucket = "steps-s3-copy-testing";
 
   const empty = makeBlob(0, 0);
 
@@ -341,7 +341,7 @@ async function multiPartUpload(
 
   calcHashes(small, 5 * 1024 * 1024);
 
-  await multiPartUpload(bucket, "small.bin", small, 5*1024*1024);
+  await multiPartUpload(sourceBucket, "small.bin", small, 5*1024*1024);
 
 
   // make a "large" blob that is multiple 5 MiB parts AND is an uneven number of bytes (there may be edge cases
@@ -350,10 +350,10 @@ async function multiPartUpload(
   calcHashes(large, 6 * 1024 * 1024);
 
 
-  await multiPartUpload(bucket, "large.bin", large, 6*1024*1024);
+  await multiPartUpload(sourceBucket, "large.bin", large, 6*1024*1024);
 
   const r = await s3Client.send(new GetObjectAttributesCommand({
-    Bucket: bucket,
+    Bucket: sourceBucket,
     Key: "large.bin",
     ObjectAttributes: [
       "ETag", "Checksum", "ObjectParts", "ObjectSize", "StorageClass"

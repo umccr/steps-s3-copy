@@ -15,10 +15,9 @@ import {
 } from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 
-export interface S3CsvDistributedMapProps {
+export interface S3JsonlDistributedMapProps {
   readonly iterator: State;
   readonly toleratedFailurePercentage: number;
-  readonly itemReaderCsvHeaders: string[];
   readonly itemReader: {
     readonly Bucket?: JsonPath | string;
     readonly "Bucket.$"?: string;
@@ -40,23 +39,27 @@ export interface S3CsvDistributedMapProps {
   readonly maxConcurrency?: number;
   readonly maxConcurrencyPath?: JsonPath | string;
 
+  readonly inputPath?: JsonPath | string;
+
   readonly resultPath?: JsonPath | string;
   readonly resultSelector?: Readonly<Record<string, JsonPath | string>>;
+
+  readonly assign?: Readonly<Record<string, JsonPath | string>>;
 
   readonly label?: string;
 }
 
-export class S3CsvDistributedMap
+export class S3JsonlDistributedMap
   extends State
   implements IChainable, INextable
 {
   public readonly endStates: INextable[];
-  private readonly props: S3CsvDistributedMapProps;
+  private readonly props: S3JsonlDistributedMapProps;
 
   private readonly graph: StateGraph;
   private readonly policy: Policy;
 
-  constructor(scope: Construct, id: string, props: S3CsvDistributedMapProps) {
+  constructor(scope: Construct, id: string, props: S3JsonlDistributedMapProps) {
     super(scope, id, {});
     this.props = props;
 
@@ -134,9 +137,7 @@ export class S3CsvDistributedMap
       ItemReader: {
         Resource: "arn:aws:states:::s3:getObject",
         ReaderConfig: {
-          InputType: "CSV",
-          CSVHeaderLocation: "GIVEN",
-          CSVHeaders: this.props.itemReaderCsvHeaders,
+          InputType: "JSONL",
         },
         Parameters: this.props.itemReader,
       },
@@ -155,8 +156,14 @@ export class S3CsvDistributedMap
         ? {
             Resource: "arn:aws:states:::s3:putObject",
             Parameters: this.props.resultWriter,
+            WriterConfig: {
+              Transformation: "FLATTEN",
+              OutputType: "JSONL",
+            },
           }
         : undefined,
+      Assign: this.props.assign,
+      InputPath: this.props.inputPath,
       ResultPath: this.props.resultPath,
       ResultSelector: this.props.resultSelector,
     };

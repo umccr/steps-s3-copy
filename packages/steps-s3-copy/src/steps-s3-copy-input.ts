@@ -14,6 +14,9 @@ export type StepsS3CopyInput = {
   destinationBucket: string;
   destinationPrefixKey: string;
 
+  workingBucket: string;
+  workingPrefixKey: string;
+
   destinationStartCopyRelativeKey: string;
   destinationEndCopyRelativeKey: string;
 };

@@ -51,7 +51,7 @@ export async function handler(event: ThawObjectsEvent) {
   for (const o of event.Items || []) {
     try {
       // need to find out if the object is in a "needs restore" or "currently restoring" or "restored" category
-      // and also if the bucket is in the correct region
+      // and also if the sourceBucket is in the correct region
       const headCommand = new HeadObjectCommand({
         Bucket: o.bucket,
         Key: o.key,
