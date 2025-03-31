@@ -21,7 +21,7 @@
   "license": "MIT",
   "devDependencies": {
     "@tsconfig/node18": "18.2.4",
-    "@types/node": "18.19.44",
+    "@types/node": "22.13.14",
     "esbuild": "0.23.1",
     "prettier": "3.5.3",
     "typescript": "5.8.2"

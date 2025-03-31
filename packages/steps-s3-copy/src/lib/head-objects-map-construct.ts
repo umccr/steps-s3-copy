@@ -7,13 +7,10 @@ import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { join } from "node:path";
-import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Runtime, Function } from "aws-cdk-lib/aws-lambda";
 
 type Props = {
   readonly writerRole: IRole;
-
-  readonly workingBucket: string;
-  readonly workingBucketPrefixKey: string;
 
   readonly aggressiveTimes?: boolean;
 };
@@ -24,11 +21,12 @@ type Props = {
  */
 export class HeadObjectsMapConstruct extends Construct {
   public readonly distributedMap: S3JsonlDistributedMap;
+  public readonly lambdaStep: HeadObjectsLambdaStepConstruct;
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const headObjectsLambdaStep = new HeadObjectsLambdaStepConstruct(
+    this.lambdaStep = new HeadObjectsLambdaStepConstruct(
       this,
       "LambdaStep",
       props,
@@ -39,20 +37,24 @@ export class HeadObjectsMapConstruct extends Construct {
       toleratedFailurePercentage: 0,
       batchMaxItems: 128,
       itemReader: {
-        Bucket: props.workingBucket,
+        "Bucket.$": "$invokeSettings.workingBucket",
         "Key.$": JsonPath.format(
           "{}{}",
-          props.workingBucketPrefixKey,
-          JsonPath.stringAt(`$.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
+          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
+          JsonPath.stringAt(
+            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+          ),
         ),
       },
-      iterator: headObjectsLambdaStep.invocableLambda,
+      iterator: this.lambdaStep.invocableLambda,
       resultWriter: {
-        Bucket: props.workingBucket,
+        "Bucket.$": "$invokeSettings.workingBucket",
         "Prefix.$": JsonPath.format(
           "{}{}",
-          props.workingBucketPrefixKey,
-          JsonPath.stringAt(`$.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
+          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
+          JsonPath.stringAt(
+            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+          ),
         ),
       },
       assign: {
@@ -70,12 +72,13 @@ export class HeadObjectsMapConstruct extends Construct {
  */
 export class HeadObjectsLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
+  public readonly lambda: Function;
 
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
 
-    const headObjectsLambda = new NodejsFunction(this, "HeadObjectsFunction", {
-      // our pre-made role will have the ability to read objects
+    this.lambda = new NodejsFunction(this, "HeadObjectsFunction", {
+      // our pre-made role will have the ability to read source objects
       role: _props.writerRole,
       entry: join(
         __dirname,
@@ -103,8 +106,8 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
       this,
       `Head Objects and Expand Wildcards`,
       {
-        lambdaFunction: headObjectsLambda,
-        outputPath: "$.Payload",
+        lambdaFunction: this.lambda,
+        payloadResponseOnly: true,
       },
     );
   }

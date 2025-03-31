@@ -4,24 +4,16 @@ import {
   DestinationPrefixKeyNoTrailingSlashError,
   WrongRegionError,
 } from "./errors";
+import type {
+  CanWriteLambdaInvokeEvent,
+  CanWriteLambdaResult,
+} from "../common/can-write-lambda-types";
 
-// see the main src/copy-out-state-machine-input.ts for matching fields
-
-interface InvokeEvent {
-  requiredRegion: string;
-
-  destinationBucket: string;
-
-  destinationPrefixKey: string;
-
-  destinationStartCopyRelativeKey: string;
-}
-
-export async function handler(event: InvokeEvent) {
+export async function handler(event: CanWriteLambdaInvokeEvent) {
   console.log(JSON.stringify(event, null, 2));
 
-  if (event.destinationPrefixKey)
-    if (!event.destinationPrefixKey.endsWith("/"))
+  if (event.invokeArguments.destinationPrefixKey)
+    if (!event.invokeArguments.destinationPrefixKey.endsWith("/"))
       throw new DestinationPrefixKeyNoTrailingSlashError(
         "The destination prefix sourceKey must either be an empty string or a string with a trailing slash",
       );
@@ -29,12 +21,14 @@ export async function handler(event: InvokeEvent) {
   // we are being super specific here - more so than our normal client creation
   // the "required region" is where we are going
   // to make our client - in order to ensure we get 301 Redirects for buckets outside our location
-  const client = new S3Client({ region: event.requiredRegion });
+  const client = new S3Client({
+    region: event.invokeArguments.destinationRequiredRegion,
+  });
 
   try {
     const putCommand = new PutObjectCommand({
-      Bucket: event.destinationBucket,
-      Key: `${event.destinationPrefixKey}${event.destinationStartCopyRelativeKey}`,
+      Bucket: event.invokeArguments.destinationBucket,
+      Key: `${event.invokeArguments.destinationPrefixKey}${event.invokeArguments.destinationStartCopyRelativeKey}`,
       Body: "A file created by copy out to ensure correct permissions and to indicate that start of the copy process",
       // we need PutTagging permission to be right - or else rclone will fail when copying our sometimes
       // tagged source files
@@ -45,7 +39,7 @@ export async function handler(event: InvokeEvent) {
   } catch (e: any) {
     if (e.Code === "PermanentRedirect")
       throw new WrongRegionError(
-        "S3 Put failed because sourceBucket was in the wrong region",
+        "S3 Put failed because destinationBucket was in the wrong region",
       );
 
     if (e.Code === "AccessDenied")
@@ -53,4 +47,8 @@ export async function handler(event: InvokeEvent) {
 
     throw e;
   }
+
+  const result: CanWriteLambdaResult = {};
+
+  return result;
 }

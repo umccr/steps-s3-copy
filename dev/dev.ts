@@ -96,6 +96,12 @@ class StepsS3CopyStack extends Stack {
     new CfnOutput(this, "StateMachineArn", {
       value: stepsS3Copy.stateMachine.stateMachineArn,
     });
+    new CfnOutput(this, "StateMachineRoleArn", {
+      value: stepsS3Copy.stateMachine.role.roleArn,
+    });
+    new CfnOutput(this, "StateMachineCanWriteLambdaAslStateName", {
+      value: stepsS3Copy.canWriteLambdaAslStateName,
+    });
     new CfnOutput(this, "SourceBucket", {
       value: sourceBucket.bucketName,
     });

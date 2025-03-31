@@ -1,16 +1,14 @@
 import { Construct } from "constructs";
-import { Role } from "aws-cdk-lib/aws-iam";
+import { IRole } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { Runtime, Function } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { join } from "node:path";
-import { JsonPath } from "aws-cdk-lib/aws-stepfunctions";
+import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type Props = {
-  readonly writerRole: Role;
-
-  readonly requiredRegion: string;
+  readonly writerRole: IRole;
 };
 
 /**
@@ -20,6 +18,8 @@ type Props = {
  */
 export class CanWriteLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
+  public readonly lambda: Function;
+  public readonly stateName: string;
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
@@ -32,7 +32,9 @@ export class CanWriteLambdaStepConstruct extends Construct {
       "can-write-lambda",
     );
 
-    const canWriteLambda = new NodejsFunction(this, "CanWriteFunction", {
+    this.stateName = `Can Write To Destination Bucket?`;
+
+    this.lambda = new NodejsFunction(this, "CanWriteFunction", {
       role: props.writerRole,
       entry: join(lambdaFolder, "can-write-lambda.ts"),
       runtime: Runtime.NODEJS_22_X,
@@ -44,13 +46,14 @@ export class CanWriteLambdaStepConstruct extends Construct {
       timeout: Duration.seconds(30),
     });
 
-    this.invocableLambda = new LambdaInvoke(
-      this,
-      `Can Write To Destination Bucket?`,
-      {
-        lambdaFunction: canWriteLambda,
-        resultPath: JsonPath.DISCARD,
-      },
-    );
+    this.invocableLambda = new LambdaInvoke(this, this.stateName, {
+      lambdaFunction: this.lambda,
+      queryLanguage: QueryLanguage.JSONATA,
+      payload: TaskInput.fromObject({
+        invokeArguments: "{% $invokeArguments %}",
+        invokeSettings: "{% $invokeSettings %}",
+      }),
+      payloadResponseOnly: true,
+    });
   }
 }

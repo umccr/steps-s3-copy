@@ -14,14 +14,14 @@ import {
   SOURCE_FILES_CSV_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
 import { Duration } from "aws-cdk-lib";
-import { Role } from "aws-cdk-lib/aws-iam";
+import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 
 type Props = {
   vpc: IVpc;
   vpcSubnetSelection: SubnetType;
 
-  writerRole: Role;
+  writerRole: IRole;
 
   workingBucket: string;
   workingBucketPrefixKey: string;
@@ -83,7 +83,7 @@ export class RcloneMapConstruct extends Construct {
 
     this.distributedMap = new S3JsonlDistributedMap(this, id + "RcloneMap", {
       toleratedFailurePercentage: 25,
-      batchMaxItemsPath: `$${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
+      batchMaxItemsPath: `$invokeArguments.${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
       inputPath: props.inputPath,
       itemReader: {
         "Bucket.$": `$.bucket`,
@@ -100,17 +100,23 @@ export class RcloneMapConstruct extends Construct {
       batchInput: {
         "rcloneDestination.$": JsonPath.format(
           "s3:{}/{}",
-          JsonPath.stringAt(`$${DESTINATION_BUCKET_FIELD_NAME}`),
-          JsonPath.stringAt(`$${DESTINATION_PREFIX_KEY_FIELD_NAME}`),
+          JsonPath.stringAt(
+            `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
+          ),
+          JsonPath.stringAt(
+            `$invokeArguments.${DESTINATION_PREFIX_KEY_FIELD_NAME}`,
+          ),
         ),
       },
       iterator: rcloneRunTask,
       resultWriter: {
-        Bucket: props.workingBucket,
+        Bucket: "$invokeArguments.workingBucket",
         "Prefix.$": JsonPath.format(
           "{}{}",
-          props.workingBucketPrefixKey,
-          JsonPath.stringAt(`$${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
+          JsonPath.stringAt("$invokeArguments.workingBucketPrefixKey"),
+          JsonPath.stringAt(
+            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+          ),
         ),
       },
       //resultSelector: {

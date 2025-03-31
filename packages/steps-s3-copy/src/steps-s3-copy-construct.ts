@@ -2,6 +2,7 @@ import { Construct } from "constructs";
 import {
   CompositePrincipal,
   Effect,
+  IRole,
   ManagedPolicy,
   PolicyStatement,
   Role,
@@ -21,7 +22,10 @@ import {
 import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
 import { ThawObjectsMapConstruct } from "./lib/thaw-objects-map-construct";
-import { StepsS3CopyInput } from "./steps-s3-copy-input";
+import {
+  StepsS3CopyInvokeArguments,
+  StepsS3CopyInvokeSettings,
+} from "./steps-s3-copy-input";
 import { RcloneMapConstruct } from "./lib/rclone-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
@@ -45,7 +49,13 @@ export { SubnetType } from "aws-cdk-lib/aws-ec2";
  * large objects from one bucket to another.
  */
 export class StepsS3CopyConstruct extends Construct {
+  // we have a variety of constructs which we want to be able to test externally (deploying the CDK
+  // and then using TestState) - but we don't particularly want to expose the actual objects. So
+  // we store them private readonly and have some get() accessors for the value we want to use for testing.
   private readonly _stateMachine: StateMachine;
+  private readonly _workingRole: IRole;
+  private readonly _canWriteLambdaStep: CanWriteLambdaStepConstruct;
+  private readonly _headObjectsMap: HeadObjectsMapConstruct;
 
   constructor(scope: Construct, id: string, props: StepsS3CopyConstructProps) {
     super(scope, id);
@@ -64,63 +74,9 @@ export class StepsS3CopyConstruct extends Construct {
     // we build a single role that is shared between the statemachine and the lambda workers
     // we have some use cases where external parties want to trust a single named role and this
     // allows that scenario
-    const writerRole = new Role(this, "WriterRole", {
-      roleName: props.writerRoleName ?? undefined,
-      assumedBy: new CompositePrincipal(
-        new ServicePrincipal("ecs-tasks.amazonaws.com"),
-        new ServicePrincipal("lambda.amazonaws.com"),
-      ),
-    });
-
-    // TODO: because we have given S3FUllAccess this policy is essentially ignored
-    // we need to use this in conjunction with a tightened equiv for the "copier"
-    writerRole.addToPolicy(
-      new PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: [
-          "s3:PutObject",
-          "s3:PutObjectTagging",
-          "s3:PutObjectVersionTagging",
-        ],
-        resources: ["*"],
-        // yes - that's right - we want to give this lambda the ability to attempt the writes anywhere
-        // EXCEPT where we are deployed
-        // (under the assumption that buckets outside our account must be giving us explicit write permission,
-        //  whilst within our account we get implicit access - in this case we don't want that ability)
-        conditions: props.allowWriteToInstalledAccount
-          ? undefined
-          : {
-              StringNotEquals: {
-                "s3:ResourceAccount": [Stack.of(this).account],
-              },
-            },
-      }),
-    );
-
-    // we need to give the rclone task the ability to do the copy out in S3
-    // TODO can we limit this to reading from our designated buckets and writing out
-    // NOTES: we need
-    // Get, Restore, Tagging?
-    writerRole.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"),
-    );
-
-    writerRole.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName(
-        "service-role/AWSLambdaBasicExecutionRole",
-      ),
-    );
-
-    // allow sending of state messages to signify task aborts etc
-    writerRole.addToPolicy(
-      new PolicyStatement({
-        resources: ["*"],
-        actions: [
-          "states:SendTaskSuccess",
-          "states:SendTaskFailure",
-          "states:SendTaskHeartbeat",
-        ],
-      }),
+    this._workingRole = this.createWorkingRole(
+      props.writerRoleName,
+      props.allowWriteToInstalledAccount,
     );
 
     const taskDefinition = new FargateTaskDefinition(this, "RcloneTd", {
@@ -132,7 +88,7 @@ export class StepsS3CopyConstruct extends Construct {
       // there is a warning in the rclone documentation about problems with mem < 1GB - but I think that
       // is mainly for large multi-file syncs... we do individual/small file copies so 512 should be fine
       memoryLimitMiB: 512,
-      taskRole: writerRole,
+      taskRole: this._workingRole,
     });
 
     const containerDefinition = taskDefinition.addContainer("RcloneContainer", {
@@ -170,26 +126,41 @@ export class StepsS3CopyConstruct extends Construct {
     const fail = new Fail(this, "Fail Wrong Bucket Region");
 
     // jsonata representing all input values to the state machine but with defaults for absent fields
-    const defaultsJsonata: { [K in keyof StepsS3CopyInput]: string } = {
+    const jsonataInvokeArgumentsWithDefaults: {
+      [K in keyof StepsS3CopyInvokeArguments]: string;
+    } = {
+      // out of the box - the copy requires both source and destination buckets to be in the
+      // same region as the deployed software. This minimises the chance of large egress
+      // fees
+      // the expected region can be altered in the input to the copy
+      // specifying an empty string for either of these will allow *any* region
+      sourceRequiredRegion: `{% [ $states.input.sourceRequiredRegion, "${
+        Stack.of(this).region
+      }" ][0] %}`,
+      destinationRequiredRegion: `{% [ $states.input.destinationRequiredRegion, "${
+        Stack.of(this).region
+      }" ][0] %}`,
+
       maxItemsPerBatch:
         "{% [ $number($states.input.maxItemsPerBatch), 8 ][0] %}",
       copyConcurrency:
         "{% [ $number($states.input.copyConcurrency), 80 ][0] %}",
-      requiredRegion: `{% [ $states.input.requiredRegion, "${
-        Stack.of(this).region
-      }" ][0] %}`,
 
-      sourceFilesCsvKey: "{% $states.input.sourceFilesCsvKey %}",
-      destinationBucket: "{% $states.input.destinationBucket %}",
+      sourceFilesCsvKey: `{% $exists($states.input.sourceFilesCsvKey) ? $states.input.sourceFilesCsvKey : $error("Missing sourceFilesCsvKey") %}`,
+      destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
       // by default, we just copy into the top level of the destination sourceBucket
       destinationPrefixKey: `{% [ $states.input.destinationPrefixKey, "" ][0] %}`,
-
-      workingBucket: props.workingBucket,
-      workingPrefixKey: props.workingBucketPrefixKey ?? "",
 
       // these are the default objects that will be created in the destination prefix area
       destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "STARTED_COPY.txt" ][0] %}`,
       destinationEndCopyRelativeKey: `{% [ $states.input.destinationEndCopyRelativeKey, "ENDED_COPY.csv" ][0] %}`,
+    };
+    const jsonataInvokeSettings: {
+      [K in keyof StepsS3CopyInvokeSettings]: string;
+    } = {
+      workingBucket: props.workingBucket,
+      // note: if undefined we instead use an empty string to mean "no leading prefix" in the working bucket
+      workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
     };
 
     const assignInputsAndApplyDefaults = new Pass(
@@ -199,20 +170,22 @@ export class StepsS3CopyConstruct extends Construct {
         queryLanguage: QueryLanguage.JSONATA,
         // assign our inputs into the states machine state - whilst also providing
         // defaults
-        assign: defaultsJsonata,
+        assign: {
+          invokeArguments: jsonataInvokeArgumentsWithDefaults,
+          invokeSettings: jsonataInvokeSettings,
+        },
       },
     );
 
-    const canWriteLambdaStep = new CanWriteLambdaStepConstruct(
+    this._canWriteLambdaStep = new CanWriteLambdaStepConstruct(
       this,
       "CanWrite",
       {
-        writerRole: writerRole,
-        requiredRegion: Stack.of(this).region,
+        writerRole: this._workingRole,
       },
     );
 
-    const canWriteStep = canWriteLambdaStep.invocableLambda;
+    const canWriteStep = this._canWriteLambdaStep.invocableLambda;
 
     // when choosing times remember
     // AWS Step Functions has a hard quota of 25,000 entries in the execution event history
@@ -242,10 +215,8 @@ export class StepsS3CopyConstruct extends Construct {
 
     canWriteStep.addCatch(fail, { errors: ["WrongRegionError"] });
 
-    const headObjectsMap = new HeadObjectsMapConstruct(this, "HeadObjects", {
-      writerRole: writerRole,
-      workingBucket: props.workingBucket,
-      workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+    this._headObjectsMap = new HeadObjectsMapConstruct(this, "HeadObjects", {
+      writerRole: this._workingRole,
       aggressiveTimes: props.aggressiveTimes,
     });
 
@@ -253,7 +224,7 @@ export class StepsS3CopyConstruct extends Construct {
       this,
       "CoordinateCopy",
       {
-        writerRole: writerRole,
+        writerRole: this._workingRole,
         workingBucket: props.workingBucket,
         workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       },
@@ -262,7 +233,7 @@ export class StepsS3CopyConstruct extends Construct {
     const smallRcloneMap = new RcloneMapConstruct(this, "Small", {
       vpc: props.vpc,
       vpcSubnetSelection: props.vpcSubnetSelection,
-      writerRole: writerRole,
+      writerRole: this._workingRole,
       workingBucket: props.workingBucket,
       workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       inputPath: "$coordinateCopyResults.small",
@@ -273,7 +244,7 @@ export class StepsS3CopyConstruct extends Construct {
     const largeRcloneMap = new RcloneMapConstruct(this, "Large", {
       vpc: props.vpc,
       vpcSubnetSelection: props.vpcSubnetSelection,
-      writerRole: writerRole,
+      writerRole: this._workingRole,
       workingBucket: props.workingBucket,
       workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       inputPath: "$coordinateCopyResults.large",
@@ -282,7 +253,7 @@ export class StepsS3CopyConstruct extends Construct {
     });
 
     const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
-      writerRole: writerRole,
+      writerRole: this._workingRole,
       workingBucket: props.workingBucket,
       workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       aggressiveTimes: props.aggressiveTimes,
@@ -292,7 +263,7 @@ export class StepsS3CopyConstruct extends Construct {
       this,
       "SummariseCopy",
       {
-        writerRole: writerRole,
+        writerRole: this._workingRole,
         workingBucket: props.workingBucket,
         workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       },
@@ -306,7 +277,7 @@ export class StepsS3CopyConstruct extends Construct {
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
         .next(canWriteStep)
-        .next(headObjectsMap.distributedMap)
+        .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
         .next(rclones)
         //.next(thawObjectsMap.distributedMap)
@@ -326,7 +297,9 @@ export class StepsS3CopyConstruct extends Construct {
       timeout: props.aggressiveTimes ? Duration.days(7) : Duration.days(30),
     });
 
-    headObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    this._headObjectsMap.distributedMap.grantNestedPermissions(
+      this._stateMachine,
+    );
     thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
     smallRcloneMap.distributedMap.grantNestedPermissions(this._stateMachine);
     largeRcloneMap.distributedMap.grantNestedPermissions(this._stateMachine);
@@ -354,7 +327,97 @@ export class StepsS3CopyConstruct extends Construct {
     );
   }
 
-  public get stateMachine() {
+  public get stateMachine(): StateMachine {
     return this._stateMachine;
+  }
+
+  public get canWriteLambdaAslStateName(): string {
+    return this._canWriteLambdaStep.stateName;
+  }
+
+  public get headObjectsLambdaAslStateName(): string {
+    return this._canWriteLambdaStep.lambda.functionArn;
+  }
+
+  public get workerRoleArn(): string {
+    return this._workingRole.roleArn;
+  }
+
+  /**
+   * Create a role that is responsible for most of the "work" done by this steps orchestration. That is, the
+   * role needs to be able to write into destination buckets, read from source buckets and do other
+   * activities performed by the lambdas. IT IS NOT THE ROLE of the actual steps orchestration
+   * state machine itself.
+   *
+   * @param forcedRoleName
+   * @param allowWriteIntoInstalledAccount
+   */
+  public createWorkingRole(
+    forcedRoleName: string | undefined,
+    allowWriteIntoInstalledAccount: boolean | undefined,
+  ): IRole {
+    const writerRole = new Role(this, "WriterRole", {
+      roleName: forcedRoleName,
+      // note: this role is used by *all* the "work" bits of the orchestration - so both ECS tasks and lambdas
+      // AND for using the TestState API where we simulate stages of the state machine
+      assumedBy: new CompositePrincipal(
+        new ServicePrincipal("ecs-tasks.amazonaws.com"),
+        new ServicePrincipal("lambda.amazonaws.com"),
+      ),
+    });
+
+    // the role is assigned to lambdas - so they need enough permissions to execture
+    writerRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AWSLambdaBasicExecutionRole",
+      ),
+    );
+
+    // TODO: because we have given S3FUllAccess this policy is essentially ignored
+    // we need to use this in conjunction with a tightened equiv for the "copier"
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+          "s3:PutObject",
+          "s3:PutObjectTagging",
+          "s3:PutObjectVersionTagging",
+        ],
+        resources: ["*"],
+        // yes - that's right - we want to give this lambda the ability to attempt the writes anywhere
+        // EXCEPT where we are deployed
+        // (under the assumption that buckets outside our account must be giving us explicit write permission,
+        //  whilst within our account we get implicit access - in this case we don't want that ability)
+        conditions: allowWriteIntoInstalledAccount
+          ? undefined
+          : {
+              StringNotEquals: {
+                "s3:ResourceAccount": [Stack.of(this).account],
+              },
+            },
+      }),
+    );
+
+    // we need to give the rclone task the ability to do the copy out in S3
+    // TODO can we limit this to reading from our designated buckets and writing out
+    // NOTES: we need
+    // Get, Restore, Tagging?
+    writerRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"),
+    );
+
+    // allow sending of state messages to signify task aborts etc
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        resources: ["*"],
+        actions: [
+          "states:SendTaskSuccess",
+          "states:SendTaskFailure",
+          "states:SendTaskHeartbeat",
+        ],
+      }),
+    );
+
+    return writerRole;
   }
 }

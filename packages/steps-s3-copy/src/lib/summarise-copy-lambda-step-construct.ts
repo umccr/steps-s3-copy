@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Role } from "aws-cdk-lib/aws-iam";
+import { IRole } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
@@ -7,7 +7,7 @@ import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { join } from "node:path";
 
 type SummariseCopyLambdaStepProps = {
-  writerRole: Role;
+  writerRole: IRole;
 
   workingBucket: string;
   workingBucketPrefixKey: string;
@@ -30,16 +30,22 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
   ) {
     super(scope, id);
 
-    const root = join(__dirname, "..", "..", "lambda", "summarise-copy-lambda");
+    const lambdaRoot = join(
+      __dirname,
+      "..",
+      "..",
+      "lambda",
+      "summarise-copy-lambda",
+    );
 
     const summariseCopyLambda = new NodejsFunction(
       this,
       "SummariseCopyFunction",
       {
         role: props.writerRole,
-        entry: join(root, "summarise-copy-lambda.ts"),
-        depsLockFilePath: join(root, "package-lock.json"),
-        runtime: Runtime.NODEJS_20_X,
+        entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
+        depsLockFilePath: join(lambdaRoot, "package-lock.json"),
+        runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.X86_64,
         handler: "handler",
         bundling: {

@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { Role } from "aws-cdk-lib/aws-iam";
+import { IRole } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { JsonPath, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type Props = {
-  readonly writerRole: Role;
+  readonly writerRole: IRole;
 
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
