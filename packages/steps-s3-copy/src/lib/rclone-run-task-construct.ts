@@ -83,6 +83,7 @@ export class RcloneRunTaskConstruct extends Construct {
       heartbeatTimeout: Timeout.duration(
         Duration.seconds(this.HEARTBEAT_TIMEOUT_SECONDS),
       ),
+
       // resultPath: "$.rcloneResult",
       containerOverrides: [
         {

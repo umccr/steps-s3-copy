@@ -1,21 +1,18 @@
-import { StorageClass, ChecksumAlgorithm } from "@aws-sdk/client-s3";
+import { ChecksumAlgorithm, S3Client, StorageClass } from "@aws-sdk/client-s3";
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { TEST_BUCKET_WORKING_PREFIX } from "./constants.mjs";
 import {
   createTestObject,
   getPaths,
-  KiB,
   makeObjectDictionaryCsv,
-  MiB,
   TestObject,
-} from "./test-util.mjs";
-import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
-import { assertDestinations } from "./lib/assert-destinations.mjs";
+} from "./util.mjs";
 import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
 import { WaiterState } from "@smithy/util-waiter";
 
-const TEST_NAME = "thawing";
+const TEST_NAME = "parts checksums";
 
+const s3Client = new S3Client({});
 const sfnClient = new SFNClient({});
 
 type TestObjectParams = {
@@ -24,6 +21,8 @@ type TestObjectParams = {
   checksumAlgorithm?: ChecksumAlgorithm;
   storageClass?: StorageClass;
 };
+
+const MiB = 1024 * 1024;
 
 /**
  * Execute a test on the given state machine, copying newly created objects from
@@ -35,7 +34,7 @@ type TestObjectParams = {
  * @param workingBucket the working sourceBucket to use
  * @param destinationBucket the destination sourceBucket in which to find copied test objects
  */
-export async function testThawing(
+export async function testPartsChecksums(
   uniqueTestId: string,
   stateMachineArn: string,
   sourceBucket: string,
@@ -57,33 +56,71 @@ export async function testThawing(
     uniqueTestId,
   );
 
+  // 3 files in standard storage (no thawing)
   const sourceObjects: Record<string, TestObjectParams> = {
-    [`glacier-single-part.bin`]: {
-      sizeInBytes: 256 * KiB,
-      storageClass:
-        "GLACIER" /* this is now Glacier Flexible Retrieval - the enum name is still the original name */,
+    [`1.bin`]: {
+      sizeInBytes: 256 * 124,
     },
-    [`glacier-multi-part.bin`]: {
-      sizeInBytes: 6 * MiB,
-      partSizeInBytes: 5 * MiB,
-      storageClass:
-        "GLACIER" /* this is now Glacier Flexible Retrieval - the enum name is still the original name */,
+    [`2.bin`]: {
+      sizeInBytes: 256 * 124,
+      // noting that this min part size of 5MiB means that this
+      // is still only a single part - but will be uploaded via multipart upload
+      partSizeInBytes: 5 * 1024 * 1024,
     },
-    [`standard-single-part.bin`]: {
-      sizeInBytes: 256 * KiB,
+    [`3.bin`]: {
+      sizeInBytes: 256 * 124,
+      checksumAlgorithm: "CRC32",
     },
-    [`glacier-ir-single-part.bin`]: {
-      sizeInBytes: 256 * KiB,
-      storageClass:
-        "GLACIER_IR" /* Glacier IR should behave like normal S3, but we want to ensure that works */,
-    },
-    [`glacier-ir-multi-part.bin`]: {
-      sizeInBytes: 6 * MiB,
-      partSizeInBytes: 5 * MiB,
-      storageClass:
-        "GLACIER_IR" /* Glacier IR should behave like normal S3, but we want to ensure that works */,
+    [`4.bin`]: {
+      sizeInBytes: 256 * 124,
+      // noting that this min part size of 5MiB means that this
+      // is still only a single part - but will be uploaded via multipart upload
+      partSizeInBytes: 5 * 1024 * 1024,
+      checksumAlgorithm: "SHA1",
     },
   };
+
+  /*const sourceObjects: Record<string, TestObjectParams> = {
+    //[`many-parts.bin`]: {
+    //  // 1010 parts (above the 1000 part boundary) of 5 MiB and then some "extra" to test that edge case as well
+    //  sizeInBytes: (5 * MiB * 1010) + 4111,
+    //  partSizeInBytes: 5 * MiB,
+    //},
+    // [`many-parts-with-crc32.bin`]: {
+    //  // 1010 parts (above the 1000 part boundary) of 5 MiB and then some "extra" to test that edge case as well
+    //  sizeInBytes: (5 * MiB * 1010) + 4111,
+    //  partSizeInBytes: 5 * MiB,
+    //  checksumAlgorithm: "CRC32"
+    //},
+    [`uneven-parts.bin`]: {
+      sizeInBytes: 45 * MiB,
+      partSizeInBytes: 6 * MiB,
+    },
+    [`uneven-parts-with-crc32.bin`]: {
+      sizeInBytes: 45 * MiB,
+      partSizeInBytes: 6 * MiB,
+      checksumAlgorithm: "CRC32"
+    },
+    [`uneven-parts-with-sha1.bin`]: {
+      sizeInBytes: 45 * MiB,
+      partSizeInBytes: 6 * MiB,
+      checksumAlgorithm: "SHA1"
+    },
+    [`skip-part-numbers.bin`]: {
+      sizeInBytes: 45 * MiB,
+      partSizeInBytes: 6 * MiB,
+    },
+    // You cannot skip part numbers if using checksums
+    // [`skip-part-numbers-with-crc32.bin`]: {
+    //  sizeInBytes: 45 * MiB,
+    //  partSizeInBytes: 6 * MiB,
+    //  checksumAlgorithm: "CRC32"
+    //},
+    //[`largest-single-part.bin`]: {
+    //  sizeInBytes: 5000 * MiB,
+    //  partSizeInBytes: undefined
+    //},
+  }; */
 
   const testObjects: Record<string, TestObject> = {};
 
@@ -100,12 +137,10 @@ export async function testThawing(
     );
   }
 
-  const testObjectKeys = Object.keys(sourceObjects).map(
-    (n) => `${testFolderSrc}${n}`,
-  );
-
   await makeObjectDictionaryCsv(workingBucket, testFolderObjectsTsvAbsolute, {
-    [sourceBucket]: testObjectKeys,
+    [sourceBucket]: Object.keys(sourceObjects).map(
+      (n) => `${testFolderSrc}${n}`,
+    ),
   });
 
   const executionStartResult = await sfnClient.send(
@@ -121,14 +156,11 @@ export async function testThawing(
     }),
   );
 
-  // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
-  // of one minute of wait - and if the objects are in fact not thawed straight away - more minutes!
-  // so give ourselves 5 minutes before we abort
   return await triggerAndReturnErrorReport(
     TEST_NAME,
     uniqueTestId,
     executionStartResult.executionArn!,
-    300,
+    180,
     destinationBucket,
     testObjects,
     WaiterState.SUCCESS,

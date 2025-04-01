@@ -6,7 +6,7 @@ import {
   getPaths,
   makeObjectDictionaryCsv,
   TestObject,
-} from "./test-util.mjs";
+} from "./util.mjs";
 import path from "node:path/posix";
 import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
 import { WaiterState } from "@smithy/util-waiter";

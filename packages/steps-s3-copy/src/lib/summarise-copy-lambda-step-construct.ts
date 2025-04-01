@@ -5,12 +5,10 @@ import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { join } from "node:path";
+import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type SummariseCopyLambdaStepProps = {
   writerRole: IRole;
-
-  workingBucket: string;
-  workingBucketPrefixKey: string;
 };
 
 /**
@@ -56,10 +54,6 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           // and these are the modules we need to install
           nodeModules: ["csv-stringify"],
         },
-        environment: {
-          WORKING_BUCKET: props.workingBucket,
-          WORKING_BUCKET_PREFIX_KEY: props.workingBucketPrefixKey,
-        },
         // in practice we hit the limits when using default values here - so we have set these to very generous
         // amounts
         timeout: Duration.minutes(5),
@@ -69,7 +63,14 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
 
     this.invocableLambda = new LambdaInvoke(this, `Summarise Copy Results`, {
       lambdaFunction: summariseCopyLambda,
-      // resultPath: JsonPath.DISCARD,
+      queryLanguage: QueryLanguage.JSONATA,
+      payload: TaskInput.fromObject({
+        invokeArguments: "{% $invokeArguments %}",
+        invokeSettings: "{% $invokeSettings %}",
+        rcloneResultsSmall: "{% $rcloneResultsSmall %}",
+        rcloneResultsLarge: "{% $rcloneResultsLarge %}",
+      }),
+      payloadResponseOnly: true,
     });
   }
 }

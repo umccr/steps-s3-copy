@@ -23,10 +23,8 @@ type Props = {
 
   writerRole: IRole;
 
-  workingBucket: string;
-  workingBucketPrefixKey: string;
-
   inputPath: string;
+  assign: Readonly<Record<string, string | JsonPath>> | undefined;
 
   taskDefinition: TaskDefinition;
   containerDefinition: ContainerDefinition;
@@ -81,6 +79,30 @@ export class RcloneMapConstruct extends Construct {
     //     },
     // }
 
+    /*const dm = new DistributedMap(this, id + "RcloneMap", {
+      toleratedFailurePercentage: 25,
+      itemBatcher: new ItemBatcher({
+        maxItemsPerBatchPath: `$invokeArguments.${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
+        batchInput: {
+          "rcloneDestination.$": JsonPath.format(
+              "s3:{}/{}",
+              JsonPath.stringAt(
+                  `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
+              ),
+              JsonPath.stringAt(
+                  `$invokeArguments.${DESTINATION_PREFIX_KEY_FIELD_NAME}`,
+              ),
+          ),
+        }
+      }),
+      itemReader: new ItemRe({
+
+      })
+
+
+
+    }) */
+
     this.distributedMap = new S3JsonlDistributedMap(this, id + "RcloneMap", {
       toleratedFailurePercentage: 25,
       batchMaxItemsPath: `$invokeArguments.${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
@@ -109,20 +131,18 @@ export class RcloneMapConstruct extends Construct {
         ),
       },
       iterator: rcloneRunTask,
+      // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
-        Bucket: "$invokeArguments.workingBucket",
+        "Bucket.$": "$invokeSettings.workingBucket",
         "Prefix.$": JsonPath.format(
           "{}{}",
-          JsonPath.stringAt("$invokeArguments.workingBucketPrefixKey"),
+          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
           JsonPath.stringAt(
             `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
           ),
         ),
       },
-      //resultSelector: {
-      //  "manifestAbsoluteKey.$": "$.ResultWriterDetails.Key",
-      //},
-      //resultPath: `$.rcloneResults`,
+      assign: props.assign,
     });
   }
 }

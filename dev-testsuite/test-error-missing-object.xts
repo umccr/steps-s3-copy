@@ -1,6 +1,6 @@
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
 import { TEST_BUCKET_WORKING_PREFIX } from "./constants.mjs";
-import { getPaths, makeObjectDictionaryCsv } from "./test-util.mjs";
+import { getPaths, makeObjectDictionaryCsv } from "./util.mjs";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import { triggerAndReturnErrorReport } from "./lib/error-reporter.js";
 import { WaiterState } from "@smithy/util-waiter";

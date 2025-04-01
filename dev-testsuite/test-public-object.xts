@@ -8,7 +8,7 @@ import {
   makeObjectDictionaryCsv,
   MiB,
   TestObject,
-} from "./test-util.mjs";
+} from "./util.mjs";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import { assertDestinations } from "./lib/assert-destinations.mjs";
 

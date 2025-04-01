@@ -234,9 +234,8 @@ export class StepsS3CopyConstruct extends Construct {
       vpc: props.vpc,
       vpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
-      workingBucket: props.workingBucket,
-      workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       inputPath: "$coordinateCopyResults.small",
+      assign: undefined,
       taskDefinition: taskDefinition,
       containerDefinition: containerDefinition,
     });
@@ -245,9 +244,8 @@ export class StepsS3CopyConstruct extends Construct {
       vpc: props.vpc,
       vpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
-      workingBucket: props.workingBucket,
-      workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       inputPath: "$coordinateCopyResults.large",
+      assign: undefined,
       taskDefinition: taskDefinition,
       containerDefinition: containerDefinition,
     });
@@ -264,15 +262,22 @@ export class StepsS3CopyConstruct extends Construct {
       "SummariseCopy",
       {
         writerRole: this._workingRole,
-        workingBucket: props.workingBucket,
-        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       },
     );
 
-    const rclones = new Parallel(this, "RcloneParallel", {}).branch(
-      largeRcloneMap.distributedMap,
-      smallRcloneMap.distributedMap,
-    );
+    const rclones = new Parallel(this, "RcloneParallel", {
+      queryLanguage: QueryLanguage.JSONATA,
+      assign: {
+        rcloneResultsLarge: {
+          manifestBucket: "{% $states.result[0].ResultWriterDetails.Bucket %}",
+          manifestKey: "{% $states.result[0].ResultWriterDetails.Key %}",
+        },
+        rcloneResultsSmall: {
+          manifestBucket: "{% $states.result[1].ResultWriterDetails.Bucket %}",
+          manifestKey: "{% $states.result[1].ResultWriterDetails.Key %}",
+        },
+      },
+    }).branch(largeRcloneMap.distributedMap, smallRcloneMap.distributedMap);
 
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
