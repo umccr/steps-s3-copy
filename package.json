@@ -11,8 +11,8 @@
     "clean": "git clean -fXd",
     "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
     "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy",
-    "dev-test-unit": "cd dev-testsuite && pnpx tsx --test --test-skip-pattern=\"/.*e2e.*/i\"",
-    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test --test-name-pattern=\"/.*e2e.*/i\""
+    "dev-test-step": "cd dev-testsuite && pnpx tsx --test --test-concurrency=1 test-step-*.ts",
+    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts"
   },
   "keywords": [],
   "author": {

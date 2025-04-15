@@ -7,9 +7,13 @@ import { chdir } from "node:process";
 import path = require("node:path/posix");
 
 interface InvokeEvent {
-  // results from previous stage
+  // the manifest bucket and key are definitions of where in S3
+  // results from the previous DistributedMaps operations have gone
+  // in this particular case - this is a result that documents HEAD level details
+  // of every object we want to copy
   manifestBucket: string;
   manifestAbsoluteKey: string;
+
   workingBucket: string;
 }
 
@@ -99,7 +103,8 @@ export async function handler(event: InvokeEvent) {
     const getSuccessContent = await getSuccessResult.Body.transformToString();
 
     const df = pl.readJSON(getSuccessContent, {
-      inferSchemaLength: 5,
+      // we infer the schema from the entire table
+      inferSchemaLength: null,
       format: "lines",
     });
 

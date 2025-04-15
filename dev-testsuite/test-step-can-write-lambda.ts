@@ -13,7 +13,7 @@ suite("can write lambda", async () => {
   });
 
   test("basic", async (t) => {
-    const testResult1 = await sfnClient.send(
+    const testStateResult = await sfnClient.send(
       new TestStateCommand({
         definition: state.smCanWriteLambdaAslStateString,
         roleArn: state.smRoleArn,

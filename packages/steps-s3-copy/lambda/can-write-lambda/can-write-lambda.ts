@@ -10,7 +10,8 @@ import type {
 } from "../common/can-write-lambda-types";
 
 export async function handler(event: CanWriteLambdaInvokeEvent) {
-  console.log(JSON.stringify(event, null, 2));
+  console.log("canWrite()");
+  console.debug(JSON.stringify(event, null, 2));
 
   if (event.invokeArguments.destinationPrefixKey)
     if (!event.invokeArguments.destinationPrefixKey.endsWith("/"))

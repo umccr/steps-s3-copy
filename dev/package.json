@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "description": "Manual CDK deployment for development at UMCCR",
   "dependencies": {
-    "aws-cdk-lib": "2.185.0",
+    "aws-cdk-lib": "2.189.0",
     "constructs": "10.4.2",
     "steps-s3-copy": "link:../packages/steps-s3-copy"
   },
   "devDependencies": {
-    "aws-cdk": "2.1005.0"
+    "aws-cdk": "2.1007.0"
   }
 }

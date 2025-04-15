@@ -73,6 +73,7 @@ export class HeadObjectsMapConstruct extends Construct {
 export class HeadObjectsLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
   public readonly lambda: Function;
+  public readonly stateName: string = `Head Objects and Expand Wildcards`;
 
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
@@ -102,13 +103,9 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
       timeout: Duration.minutes(15),
     });
 
-    this.invocableLambda = new LambdaInvoke(
-      this,
-      `Head Objects and Expand Wildcards`,
-      {
-        lambdaFunction: this.lambda,
-        payloadResponseOnly: true,
-      },
-    );
+    this.invocableLambda = new LambdaInvoke(this, this.stateName, {
+      lambdaFunction: this.lambda,
+      payloadResponseOnly: true,
+    });
   }
 }

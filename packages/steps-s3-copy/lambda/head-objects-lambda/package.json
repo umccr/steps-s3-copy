@@ -1,9 +1,14 @@
 {
-  "name": "can-read-objects-lambda",
+  "name": "head-objects-lambda",
   "version": "1.0.0",
-  "main": "",
+  "scripts": {
+    "test": "tsx --test"
+  },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.721.0",
-    "@types/aws-lambda": "8.10.147"
+    "@aws-sdk/client-s3": "3.787.0",
+    "@types/aws-lambda": "8.10.149"
+  },
+  "devDependencies": {
+    "tsx": "4.19.3"
   }
 }

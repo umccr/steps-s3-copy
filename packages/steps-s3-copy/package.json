@@ -35,15 +35,15 @@
     }
   },
   "peerDependencies": {
-    "aws-cdk-lib": "^2.185.0",
+    "aws-cdk-lib": "^2.189.0",
     "constructs": "^10.4.2"
   },
   "devDependencies": {
-    "aws-cdk-lib": "2.185.0",
+    "aws-cdk-lib": "2.189.0",
     "constructs": "10.4.2",
-    "jsii": "5.8.2",
-    "jsii-pacmak": "1.110.0",
-    "jsii-rosetta": "5.8.1",
-    "publib": "0.2.960"
+    "jsii": "5.8.5",
+    "jsii-pacmak": "1.111.0",
+    "jsii-rosetta": "5.8.4",
+    "publib": "0.2.968"
   }
 }

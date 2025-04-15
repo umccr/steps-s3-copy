@@ -341,7 +341,7 @@ export class StepsS3CopyConstruct extends Construct {
   }
 
   public get headObjectsLambdaAslStateName(): string {
-    return this._canWriteLambdaStep.lambda.functionArn;
+    return this._headObjectsMap.lambdaStep.stateName;
   }
 
   public get workerRoleArn(): string {

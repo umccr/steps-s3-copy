@@ -14,6 +14,7 @@ export type TestSetupState = {
   smArn: string;
   smRoleArn: string;
   smCanWriteLambdaAslStateString: string;
+  smHeadObjectsLambdaAslStateString: string;
 
   sourceBucket: string;
   workingBucket: string;
@@ -82,6 +83,10 @@ export async function testSetup(): Promise<TestSetupState> {
     stack,
     "StateMachineCanWriteLambdaAslStateName",
   );
+  const smHeadObjectsLambdaAslStateName = getMandatoryStackOutputValue(
+    stack,
+    "StateMachineHeadObjectsLambdaAslStateName",
+  );
   const sourceBucket = getMandatoryStackOutputValue(stack, "SourceBucket");
   const workingBucket = getMandatoryStackOutputValue(stack, "WorkingBucket");
   const destinationBucket = getMandatoryStackOutputValue(
@@ -96,6 +101,12 @@ export async function testSetup(): Promise<TestSetupState> {
   // console.log(`Source S3 Bucket = ${sourceBucket}`);
   // console.log(`Destination S3 Bucket = ${destinationBucket}/<test id>/`);
 
+  // the AWS provided Steps test framework processes _ACTUAL_ states definitions - which we don't have
+  // on hand because we are using CDK constructs. ALSO, what we really want to test sometimes is the
+  // interaction of the Steps state with the lambdas they execute.
+
+  // SO - what we have done here is set it up so we TEST THE DEPLOYED STATE MACHINE - by parsing
+  // its definitions
   const smDefinition = await sfnClient.send(
     new DescribeStateMachineCommand({
       stateMachineArn: smArn,
@@ -106,21 +117,40 @@ export async function testSetup(): Promise<TestSetupState> {
   const smDefinitionJson = JSON.parse(smDefinition.definition!);
 
   let smCanWriteLambdaAslStateString;
+  let smHeadObjectsLambdaAslStateString;
 
-  for (const [k, v] of Object.entries(smDefinitionJson["States"])) {
-    if (k === smCanWriteLambdaAslStateName) {
-      smCanWriteLambdaAslStateString = JSON.stringify(v);
+  const searchForState = (root: any) => {
+    if (!root) return;
+
+    for (const [k, v] of Object.entries(root)) {
+      if (typeof v === "object") searchForState(v);
+
+      if (k === smCanWriteLambdaAslStateName) {
+        smCanWriteLambdaAslStateString = JSON.stringify(v);
+      }
+      if (k === smHeadObjectsLambdaAslStateName) {
+        smHeadObjectsLambdaAslStateString = JSON.stringify(v);
+      }
     }
-  }
+  };
+
+  searchForState(smDefinitionJson["States"]);
 
   if (!smCanWriteLambdaAslStateString)
     throw Error("Missing state definition for CanWrite lambda");
+
+  if (!smHeadObjectsLambdaAslStateString)
+    throw Error("Missing state definition for HeadObjects lambda");
+
+  // console.log(smCanWriteLambdaAslStateString);
+  // console.log(smHeadObjectsLambdaAslStateString);
 
   return {
     uniqueTestId: randomBytes(8).toString("hex"),
     smArn,
     smRoleArn,
     smCanWriteLambdaAslStateString,
+    smHeadObjectsLambdaAslStateString,
     sourceBucket,
     workingBucket,
     // we share this definition with the dev deployment - but unfortunately that is in a different
