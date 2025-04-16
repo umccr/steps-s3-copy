@@ -26,7 +26,7 @@ import {
   StepsS3CopyInvokeArguments,
   StepsS3CopyInvokeSettings,
 } from "./steps-s3-copy-input";
-import { RcloneMapConstruct } from "./lib/rclone-map-construct";
+import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
@@ -35,6 +35,7 @@ import {
   AssetImage,
   CpuArchitecture,
   FargateTaskDefinition,
+  LinuxParameters,
   LogDriver,
 } from "aws-cdk-lib/aws-ecs";
 import { join } from "path";
@@ -79,10 +80,9 @@ export class StepsS3CopyConstruct extends Construct {
       props.allowWriteToInstalledAccount,
     );
 
-    const taskDefinition = new FargateTaskDefinition(this, "RcloneTd", {
+    const taskDefinition = new FargateTaskDefinition(this, "CopyTd", {
       runtimePlatform: {
-        // FARGATE_SPOT is only available for X86
-        cpuArchitecture: CpuArchitecture.X86_64,
+        cpuArchitecture: CpuArchitecture.ARM64,
       },
       cpu: 256,
       // there is a warning in the rclone documentation about problems with mem < 1GB - but I think that
@@ -91,21 +91,26 @@ export class StepsS3CopyConstruct extends Construct {
       taskRole: this._workingRole,
     });
 
-    const containerDefinition = taskDefinition.addContainer("RcloneContainer", {
+    // https://stackoverflow.com/questions/68933848/how-to-allow-container-with-read-only-root-filesystem-writing-to-tmpfs-volume
+    // DOESN'T WORK FOR FARGATE SO NEED TO THINK ABOUT THIS OTHER WAY
+    const linuxParams = new LinuxParameters(this, "LinuxParameters", {
+      // because we want to support SPOT signals etc, we want it to run our main container entrypoint
+      // with an initd
+      initProcessEnabled: true,
+    });
+
+    const containerDefinition = taskDefinition.addContainer("CopyContainer", {
       // set the stop timeout to the maximum allowed under Fargate Spot
       // potentially this will let us finish our rclone operation (!!! - we don't actually try to let rclone finish - see Docker image - we should)
       stopTimeout: Duration.seconds(120),
       image: new AssetImage(
-        join(__dirname, "..", "docker", "rclone-batch-docker-image"),
+        join(__dirname, "..", "docker", "copy-batch-docker-image"),
         {
-          // note we are forcing the X86 platform because we want to use Fargate spot which is only available intel/x86
-          platform: Platform.LINUX_AMD64,
+          platform: Platform.LINUX_ARM64,
         },
       ),
+      linuxParameters: linuxParams,
       readonlyRootFilesystem: true,
-      // https://stackoverflow.com/questions/68933848/how-to-allow-container-with-read-only-root-filesystem-writing-to-tmpfs-volume
-      // DOESN'T WORK FOR FARGATE SO NEED TO THINK ABOUT THIS OTHER WAY
-      // linuxParameters: linux,
       logging: LogDriver.awsLogs({
         streamPrefix: "steps-s3-copy",
         logRetention: RetentionDays.ONE_WEEK,
@@ -148,8 +153,8 @@ export class StepsS3CopyConstruct extends Construct {
 
       sourceFilesCsvKey: `{% $exists($states.input.sourceFilesCsvKey) ? $states.input.sourceFilesCsvKey : $error("Missing sourceFilesCsvKey") %}`,
       destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
-      // by default, we just copy into the top level of the destination sourceBucket
-      destinationPrefixKey: `{% [ $states.input.destinationPrefixKey, "" ][0] %}`,
+      // set a slash terminated folder to copy into, or by default we just copy into the top level of the destination bucket
+      destinationFolderKey: `{% [ $states.input.destinationFolderKey, "" ][0] %}`,
 
       // these are the default objects that will be created in the destination prefix area
       destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "STARTED_COPY.txt" ][0] %}`,
@@ -230,7 +235,7 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
-    const smallRcloneMap = new RcloneMapConstruct(this, "Small", {
+    const smallRcloneMap = new CopyMapConstruct(this, "Small", {
       vpc: props.vpc,
       vpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -240,7 +245,7 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    const largeRcloneMap = new RcloneMapConstruct(this, "Large", {
+    const largeRcloneMap = new CopyMapConstruct(this, "Large", {
       vpc: props.vpc,
       vpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,

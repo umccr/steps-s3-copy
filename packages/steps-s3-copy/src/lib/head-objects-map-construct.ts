@@ -1,5 +1,10 @@
 import { Construct } from "constructs";
-import { JsonPath } from "aws-cdk-lib/aws-stepfunctions";
+import {
+  DistributedMap,
+  ItemBatcher,
+  JsonPath,
+  S3JsonItemReader,
+} from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
 import { SOURCE_FILES_CSV_KEY_FIELD_NAME } from "../steps-s3-copy-input";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -32,10 +37,39 @@ export class HeadObjectsMapConstruct extends Construct {
       props,
     );
 
+    new DistributedMap(this, "HOMAP", {
+      toleratedFailurePercentage: 0,
+      itemBatcher: new ItemBatcher({
+        maxInputBytesPerBatch: 16384,
+        batchInput: {
+          "destinationFolderKey.$": JsonPath.stringAt(
+            "$invokeArguments.destinationFolderKey",
+          ),
+          maximumExpansion: 256,
+        },
+      }),
+      itemReader: new S3JsonItemReader({
+        bucketNamePath: "$invokeSettings.workingBucket",
+        key: JsonPath.format(
+          "{}{}",
+          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
+          JsonPath.stringAt(
+            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+          ),
+        ),
+      }),
+    });
+
     this.distributedMap = new S3JsonlDistributedMap(this, "HeadObjectsMap", {
       // this phase is used to detect errors so we have zero tolerance for files being missing (for instance)
       toleratedFailurePercentage: 0,
       batchMaxItems: 128,
+      batchInput: {
+        "destinationFolderKey.$": JsonPath.stringAt(
+          "$invokeArguments.destinationFolderKey",
+        ),
+        maximumExpansion: 256,
+      },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",
         "Key.$": JsonPath.format(

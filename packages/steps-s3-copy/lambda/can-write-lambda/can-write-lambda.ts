@@ -13,8 +13,8 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
   console.log("canWrite()");
   console.debug(JSON.stringify(event, null, 2));
 
-  if (event.invokeArguments.destinationPrefixKey)
-    if (!event.invokeArguments.destinationPrefixKey.endsWith("/"))
+  if (event.invokeArguments.destinationFolderKey)
+    if (!event.invokeArguments.destinationFolderKey.endsWith("/"))
       throw new DestinationPrefixKeyNoTrailingSlashError(
         "The destination prefix sourceKey must either be an empty string or a string with a trailing slash",
       );
@@ -29,7 +29,7 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
   try {
     const putCommand = new PutObjectCommand({
       Bucket: event.invokeArguments.destinationBucket,
-      Key: `${event.invokeArguments.destinationPrefixKey}${event.invokeArguments.destinationStartCopyRelativeKey}`,
+      Key: `${event.invokeArguments.destinationFolderKey}${event.invokeArguments.destinationStartCopyRelativeKey}`,
       Body: "A file created by copy out to ensure correct permissions and to indicate that start of the copy process",
       // we need PutTagging permission to be right - or else rclone will fail when copying our sometimes
       // tagged source files

@@ -1,4 +1,4 @@
-module rclone-batch
+module copy-batch
 
 go 1.24.1
 

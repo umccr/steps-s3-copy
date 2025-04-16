@@ -1,10 +1,6 @@
 import { Construct } from "constructs";
 import { IRole } from "aws-cdk-lib/aws-iam";
-import {
-  IntegrationPattern,
-  JsonPath,
-  Timeout,
-} from "aws-cdk-lib/aws-stepfunctions";
+import { IntegrationPattern, Timeout } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
 import {
   ContainerDefinition,
@@ -48,24 +44,24 @@ type Props = {
   //allowWriteToThisAccount?: boolean; WIP NEED TO IMPLEMENT
 };
 
-export class RcloneRunTaskConstruct extends Construct {
+export class CopyRunTaskConstruct extends Construct {
   public readonly ecsRunTask: EcsRunTask;
 
   // how long we will wait before aborting if no heartbeat received
   // (note: the actual heartbeat interval is _less_ than this)
   private readonly HEARTBEAT_TIMEOUT_SECONDS = 30;
 
-  // how long we set as the absolute upper limit for an rclone execution
+  // how long we set as the absolute upper limit for a copy execution
   // (note: this really is just an absolute safeguard against something somehow
   //  running forever - though there are other timeouts like the overall Steps timeout that
   //  presumably will kick-in before this)
-  private readonly RCLONE_TIMEOUT_HOURS = 48;
+  private readonly COPY_TIMEOUT_HOURS = 48;
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
     // https://github.com/aws/aws-cdk/issues/20013
-    this.ecsRunTask = new EcsRunTask(this, id + "CopyTask", {
+    this.ecsRunTask = EcsRunTask.jsonata(this, id + "CopyTask", {
       // we use task tokens as we want to return rclone stats/results
       integrationPattern: IntegrationPattern.WAIT_FOR_TASK_TOKEN,
       cluster: props.fargateCluster,
@@ -78,31 +74,26 @@ export class RcloneRunTaskConstruct extends Construct {
       },
       // max length for the overall copy - so think big - this might be 64 invocations of
       // copying a 100 GiB BAM file say...
-      taskTimeout: Timeout.duration(Duration.hours(this.RCLONE_TIMEOUT_HOURS)),
+      taskTimeout: Timeout.duration(Duration.hours(this.COPY_TIMEOUT_HOURS)),
       // how many seconds we can go without hearing from the rclone task
       heartbeatTimeout: Timeout.duration(
         Duration.seconds(this.HEARTBEAT_TIMEOUT_SECONDS),
       ),
-
-      // resultPath: "$.rcloneResult",
       containerOverrides: [
         {
           containerDefinition: props.containerDefinition,
-          command: JsonPath.listAt("$.Items[*].rcloneSource"),
+          // we translate the itemSelector content of the distributed map into JSON strings
+          // and pass them on the command line to our ECS task
+          // this is not pretty but there are limited ways to pass data into ECS
+          // @ts-ignore (there is a mistake with the typescript defs for this field)
+          command: `{% $states.input.Items.$string() %}`,
           environment: [
             {
-              name: "RB_DESTINATION",
-              // note this might be just a sourceBucket name, or a sourceBucket name with path
-              // (that decision is made higher in the stack)
-              // as far as rclone binary itself is concerned, it does not matter
-              value: JsonPath.stringAt("$.BatchInput.rcloneDestination"),
+              name: "CB_TASK_TOKEN",
+              value: "{% $states.context.Task.Token %}",
             },
             {
-              name: "RB_TASK_TOKEN",
-              value: JsonPath.stringAt("$$.Task.Token"),
-            },
-            {
-              name: "RB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL",
+              name: "CB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL",
               // we want to attempt to do the heartbeat some factor more often than the actual timeout
               value: Math.floor(this.HEARTBEAT_TIMEOUT_SECONDS / 3).toString(),
             },

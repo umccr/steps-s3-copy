@@ -1,0 +1,6 @@
+
+# ignore the binary we build in testing
+copy-batch
+
+# ignore if we open this folder specifically in Goland
+.idea/

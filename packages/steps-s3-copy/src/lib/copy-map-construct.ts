@@ -1,6 +1,6 @@
 import { Construct } from "constructs";
 import { JitterType, JsonPath } from "aws-cdk-lib/aws-stepfunctions";
-import { RcloneRunTaskConstruct } from "./rclone-run-task-construct";
+import { CopyRunTaskConstruct } from "./copy-run-task-construct";
 import { IVpc, SubnetType } from "aws-cdk-lib/aws-ec2";
 import {
   Cluster,
@@ -9,7 +9,6 @@ import {
 } from "aws-cdk-lib/aws-ecs";
 import {
   DESTINATION_BUCKET_FIELD_NAME,
-  DESTINATION_PREFIX_KEY_FIELD_NAME,
   MAX_ITEMS_PER_BATCH_FIELD_NAME,
   SOURCE_FILES_CSV_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
@@ -30,7 +29,7 @@ type Props = {
   containerDefinition: ContainerDefinition;
 };
 
-export class RcloneMapConstruct extends Construct {
+export class CopyMapConstruct extends Construct {
   public readonly distributedMap: S3JsonlDistributedMap;
 
   constructor(scope: Construct, id: string, props: Props) {
@@ -41,43 +40,23 @@ export class RcloneMapConstruct extends Construct {
       enableFargateCapacityProviders: true,
     });
 
-    const rcloneRunTask = new RcloneRunTaskConstruct(
-      this,
-      id + "RcloneFargateTask",
-      {
-        writerRole: props.writerRole,
-        fargateCluster: cluster,
-        vpcSubnetSelection: props.vpcSubnetSelection,
-        taskDefinition: props.taskDefinition,
-        containerDefinition: props.containerDefinition,
-      },
-    ).ecsRunTask;
+    const copyRunTask = new CopyRunTaskConstruct(this, id + "CopyFargateTask", {
+      writerRole: props.writerRole,
+      fargateCluster: cluster,
+      vpcSubnetSelection: props.vpcSubnetSelection,
+      taskDefinition: props.taskDefinition,
+      containerDefinition: props.containerDefinition,
+    }).ecsRunTask;
 
     // our task is an idempotent copy operation, so we can retry if we happen to get killed
     // (possible given we are using Spot fargate)
-    rcloneRunTask.addRetry({
+    copyRunTask.addRetry({
       errors: ["States.TaskFailed"],
       maxAttempts: 3,
       interval: Duration.minutes(1),
       jitterStrategy: JitterType.FULL,
       maxDelay: Duration.minutes(5),
     });
-
-    const bucketColumnName = "sourceBucket";
-    const keyColumnName = "sourceKey";
-
-    // {
-    //   "BatchInput": {
-    //     "rcloneDestination": "s3:cpg-cardiac-flagship-transfer/optionalpath"
-    //   },
-    //   "Items": [
-    //     {
-    //       "rcloneSource": "s3:sourceBucket/1.fastq.gz"
-    //     },
-    //     {
-    //       "rcloneSource": "s3:sourceBucket/2.fastq.gz"
-    //     },
-    // }
 
     /*const dm = new DistributedMap(this, id + "RcloneMap", {
       toleratedFailurePercentage: 25,
@@ -90,7 +69,7 @@ export class RcloneMapConstruct extends Construct {
                   `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
               ),
               JsonPath.stringAt(
-                  `$invokeArguments.${DESTINATION_PREFIX_KEY_FIELD_NAME}`,
+                  `$invokeArguments.${DESTINATION_FOLDER_KEY_FIELD_NAME}`,
               ),
           ),
         }
@@ -98,9 +77,6 @@ export class RcloneMapConstruct extends Construct {
       itemReader: new ItemRe({
 
       })
-
-
-
     }) */
 
     this.distributedMap = new S3JsonlDistributedMap(this, id + "RcloneMap", {
@@ -112,25 +88,20 @@ export class RcloneMapConstruct extends Construct {
         "Key.$": `$.key`,
       },
       itemSelector: {
-        "rcloneSource.$": JsonPath.format(
-          // note: this is not an s3:// URL, it is the peculiar syntax used by rclone
-          "s3:{}/{}",
-          JsonPath.stringAt(`$$.Map.Item.Value.${bucketColumnName}`),
-          JsonPath.stringAt(`$$.Map.Item.Value.${keyColumnName}`),
+        "s.$": JsonPath.format(
+          "s3://{}/{}",
+          JsonPath.stringAt(`$$.Map.Item.Value.sourceBucket`),
+          JsonPath.stringAt(`$$.Map.Item.Value.sourceKey`),
         ),
-      },
-      batchInput: {
-        "rcloneDestination.$": JsonPath.format(
-          "s3:{}/{}",
+        "d.$": JsonPath.format(
+          "s3://{}/{}",
           JsonPath.stringAt(
             `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
           ),
-          JsonPath.stringAt(
-            `$invokeArguments.${DESTINATION_PREFIX_KEY_FIELD_NAME}`,
-          ),
+          JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
         ),
       },
-      iterator: rcloneRunTask,
+      iterator: copyRunTask,
       // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
         "Bucket.$": "$invokeSettings.workingBucket",

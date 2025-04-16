@@ -16,7 +16,7 @@ export type StepsS3CopyInvokeArguments = {
   readonly maxItemsPerBatch: number;
 
   readonly destinationBucket: string;
-  readonly destinationPrefixKey: string;
+  readonly destinationFolderKey: string;
 
   readonly destinationStartCopyRelativeKey: string;
   readonly destinationEndCopyRelativeKey: string;
@@ -40,8 +40,8 @@ export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
 
 export const DESTINATION_BUCKET_FIELD_NAME: CopyOutStateMachineInputKeys =
   "destinationBucket";
-export const DESTINATION_PREFIX_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "destinationPrefixKey";
+export const DESTINATION_FOLDER_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "destinationFolderKey";
 
 export const DESTINATION_START_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
   "destinationStartCopyRelativeKey";

@@ -24,7 +24,7 @@ before(async () => {
   state = await testSetup();
 });
 
-test('e2e thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
+test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
   const sfnClient = new SFNClient({});
 
   const {
@@ -95,8 +95,8 @@ test('e2e thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
       input: JSON.stringify({
         sourceFilesCsvKey: testFolderObjectsTsvRelative,
         destinationBucket: state.destinationBucket,
-        destinationPrefixKey: testFolderDest,
-        maxItemsPerBatch: 1,
+        destinationFolderKey: testFolderDest,
+        maxItemsPerBatch: 3,
       }),
     }),
   );
