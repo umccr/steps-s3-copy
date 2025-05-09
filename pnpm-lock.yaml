@@ -26,8 +26,8 @@ importers:
   dev:
     dependencies:
       aws-cdk-lib:
-        specifier: 2.189.0
-        version: 2.189.0(constructs@10.4.2)
+        specifier: 2.192.0
+        version: 2.192.0(constructs@10.4.2)
       constructs:
         specifier: 10.4.2
         version: 10.4.2
@@ -36,8 +36,45 @@ importers:
         version: link:../packages/steps-s3-copy
     devDependencies:
       aws-cdk:
-        specifier: 2.1007.0
-        version: 2.1007.0
+        specifier: 2.1012.0
+        version: 2.1012.0
+
+  dev-create-mm:
+    dependencies:
+      "@aws-sdk/client-cloudformation":
+        specifier: 3.777.0
+        version: 3.777.0(aws-crt@1.26.2)
+      "@aws-sdk/client-s3":
+        specifier: 3.779.0
+        version: 3.779.0(aws-crt@1.26.2)
+      "@aws-sdk/client-sfn":
+        specifier: 3.777.0
+        version: 3.777.0(aws-crt@1.26.2)
+      "@aws-sdk/crc64-nvme-crt":
+        specifier: 3.775.0
+        version: 3.775.0
+      "@smithy/util-waiter":
+        specifier: 4.0.3
+        version: 4.0.3
+      aws-crt:
+        specifier: 1.26.2
+        version: 1.26.2
+      crc:
+        specifier: 4.3.2
+        version: 4.3.2(buffer@6.0.3)
+      p-limit:
+        specifier: 6.2.0
+        version: 6.2.0
+    devDependencies:
+      "@aws-sdk/client-sso-oidc":
+        specifier: 3.777.0
+        version: 3.777.0(aws-crt@1.26.2)
+      "@aws-sdk/client-sts":
+        specifier: 3.777.0
+        version: 3.777.0(aws-crt@1.26.2)
+      tsx:
+        specifier: 4.19.4
+        version: 4.19.4
 
   dev-testsuite:
     dependencies:
@@ -79,8 +116,8 @@ importers:
   packages/steps-s3-copy:
     devDependencies:
       aws-cdk-lib:
-        specifier: 2.189.0
-        version: 2.189.0(constructs@10.4.2)
+        specifier: 2.192.0
+        version: 2.192.0(constructs@10.4.2)
       constructs:
         specifier: 10.4.2
         version: 10.4.2
@@ -1452,10 +1489,10 @@ packages:
         integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==,
       }
 
-  aws-cdk-lib@2.189.0:
+  aws-cdk-lib@2.192.0:
     resolution:
       {
-        integrity: sha512-B5Uha7uRntOAyuKfU0eFtxij3ZVTzGAbetw5qaXlURa68wsWpKlU72/OyKugB6JYkhjCZkSTVVBxd1pVTosxEw==,
+        integrity: sha512-Y9BAlr9a4QsEsamKc2cOGzX8DpVSOh94wsrMSGRXT0bZaqmixhhmT7WYCrT1KX4MU3gYk3OiwY2BbNyWaNE8Fg==,
       }
     engines: { node: ">= 14.15.0" }
     peerDependencies:
@@ -1473,10 +1510,10 @@ packages:
       - yaml
       - mime-types
 
-  aws-cdk@2.1007.0:
+  aws-cdk@2.1012.0:
     resolution:
       {
-        integrity: sha512-/UOYOTGWUm+pP9qxg03tID5tL6euC+pb+xo0RBue+xhnUWwj/Bbsw6DbqbpOPMrNzTUxmM723/uMEQmM6S26dw==,
+        integrity: sha512-C6jSWkqP0hkY2Cs300VJHjspmTXDTMfB813kwZvRbd/OsKBfTBJBbYU16VoLAp1LVEOnQMf8otSlaSgzVF0X9A==,
       }
     engines: { node: ">= 14.15.0" }
     hasBin: true
@@ -2588,6 +2625,14 @@ packages:
     resolution:
       {
         integrity: sha512-4H8vUNGNjQ4V2EOoGw005+c+dGuPSnhpPBPHBtsZdGZBk/iJb4kguGlPWaZTZ3q5nMtFOEsY0nRDlh9PJyd6SQ==,
+      }
+    engines: { node: ">=18.0.0" }
+    hasBin: true
+
+  tsx@4.19.4:
+    resolution:
+      {
+        integrity: sha512-gK5GVzDkJK1SI1zwHf32Mqxf2tSJkNx+eYcNly5+nHvWqXUJYUkWBQtKauoESz3ymezAI++ZwT855x5p5eop+Q==,
       }
     engines: { node: ">=18.0.0" }
     hasBin: true
@@ -4278,14 +4323,14 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  aws-cdk-lib@2.189.0(constructs@10.4.2):
+  aws-cdk-lib@2.192.0(constructs@10.4.2):
     dependencies:
       "@aws-cdk/asset-awscli-v1": 2.2.229
       "@aws-cdk/asset-node-proxy-agent-v6": 2.1.0
       "@aws-cdk/cloud-assembly-schema": 41.2.0
       constructs: 10.4.2
 
-  aws-cdk@2.1007.0:
+  aws-cdk@2.1012.0:
     optionalDependencies:
       fsevents: 2.3.2
 
@@ -5016,6 +5061,13 @@ snapshots:
   tslib@2.6.2: {}
 
   tsx@4.19.3:
+    dependencies:
+      esbuild: 0.25.1
+      get-tsconfig: 4.7.6
+    optionalDependencies:
+      fsevents: 2.3.3
+
+  tsx@4.19.4:
     dependencies:
       esbuild: 0.25.1
       get-tsconfig: 4.7.6

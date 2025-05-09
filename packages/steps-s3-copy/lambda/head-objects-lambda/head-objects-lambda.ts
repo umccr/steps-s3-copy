@@ -6,7 +6,7 @@ import {
   S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { join, relative, basename } from "node:path/posix";
-import assert, { ok } from "node:assert/strict";
+import * as assert from "node:assert/strict";
 
 /**
  * The way this lambda will be invoked. We expect to be part of a Distributed Map -
@@ -219,10 +219,10 @@ export async function handler(
           // this would be a bug in the AWS SDK contract if these were empty so we will
           // hard abort the process if so
           // need these assertions to fix the typescript guard conditions
-          ok(item.Key);
-          ok(item.ETag);
-          ok(item.LastModified);
-          assert(typeof item.Size === "number");
+          assert.ok(item.Key);
+          assert.ok(item.ETag);
+          assert.ok(item.LastModified);
+          assert.equal(typeof item.Size, "number");
 
           // we skip directory markers in S3
           // note: we do this _before_ incrementing expansionCount - so if it
@@ -278,9 +278,9 @@ export async function handler(
 
       const headResult = await client.send(headCommand);
 
-      ok(headResult.ETag);
-      ok(headResult.LastModified);
-      assert(typeof headResult.ContentLength === "number");
+      assert.ok(headResult.ETag);
+      assert.ok(headResult.LastModified);
+      assert.equal(typeof headResult.ContentLength, "number");
 
       resultObjects.push({
         sourceBucket: o.sourceBucket,

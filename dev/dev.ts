@@ -55,8 +55,10 @@ class StepsS3CopyStack extends Stack {
       versioned: false,
       lifecycleRules: [
         {
+          // the working bucket holds manifests and reports of copies - which all tend to be small files
+          // so we find it useful to keep them around for a bit
           enabled: true,
-          expiration: Duration.days(1),
+          expiration: Duration.days(30),
           abortIncompleteMultipartUploadAfter: Duration.days(1),
         },
       ],
@@ -118,14 +120,9 @@ class StepsS3CopyStack extends Stack {
 }
 
 new StepsS3CopyStack(app, "StepsS3Copy", {
-  // the stack can only be deployed to 'dev'
   env: {
-    account: "843407916570",
-    region: "ap-southeast-2",
-  },
-  tags: {
-    "umccr-org:Product": "StepsS3Copy",
-    "umccr-org:Stack": "StepsS3Copy",
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION,
   },
   description: description,
 });

@@ -29,13 +29,9 @@ const copyBinaryEnvName = "CB_COPY_BINARY"
 const taskTokenEnvName = "CB_TASK_TOKEN"
 const taskTokenHeartbeatSecondsIntervalEnvName = "CB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL"
 
-const copySourcePrefixEnvName = "CB_COPY_SRC_"
-const copyDestinationPrefixEnvName = "CB_COPY_DST_"
-const copySumsPrefixEnvName = "CB_COPY_SUMS_"
-
-// our parent ECS task (when a SPOT instance) can be sent a TERM signal - we then have a hard
-// limit of 120 seconds before the process is hard killed
-// this value here is the seconds to wait after receiving the TERM in the hope that our
+// Our parent ECS task (when a SPOT instance) can be sent a TERM signal - we then have a hard
+// limit of 120 seconds before the process is hard killed.
+// This value here is the number of seconds to wait after receiving the TERM in the hope that our
 // jobs might finish
 const postTermCleanupSeconds = 90
 
@@ -43,13 +39,9 @@ const postTermCleanupSeconds = 90
 // - to the parent caller. Finishes by sending the stats back to the AWS parent task if asked.
 //
 // - Inputs
-// - os.Args not used
+// - os.Args each argument is a JSON structured CopyArg
 //
 // - Env
-// - CB_COPY_0
-// - CB_COPY_1
-// - CB_COPY_...
-// - CB_COPY_BINARY the path to a copy binary to use
 // - CB_TASK_TOKEN if present, the task token to use to send the copy results back to the parent
 // - CB_DEBUG_BANDWIDTH if present, a rclone bandwidth setting (just for debug/testing)
 // - ...any other rclone settings needed...
@@ -59,7 +51,7 @@ func main() {
 	copyBinary, copyBinaryOk := os.LookupEnv(copyBinaryEnvName)
 
 	if !copyBinaryOk {
-		log.Fatalf("No environment variable %s telling us the path to an copy executable", copyBinaryEnvName)
+		log.Fatalf("No environment variable %s telling us the path to a copy executable", copyBinaryEnvName)
 	}
 
 	// TODO re-enable once we name our binary properly
@@ -81,8 +73,10 @@ func main() {
 	var heartbeatWorker *HeartbeatWorker
 
 	if taskTokenOk {
+		log.Printf("Received task token of %s\n", taskToken)
+
 		// if a task token was passed in, we now know that we need to regularly
-		// make AWS calls to signal the parent
+		// make AWS calls to signal the parent that we are running
 
 		// fail early if there was no AWS config
 		if awsConfigErr != nil {
@@ -112,8 +106,11 @@ func main() {
 	//debugBandwidth, debugBandwidthOk := os.LookupEnv("CB_DEBUG_BANDWIDTH")
 	debugSignalWait, debugSignalWaitOk := os.LookupEnv("CB_DEBUG_SIGNAL_WAIT")
 
-	// we end up with a result array entry for each object we have been asked to copy
-	var results []any
+	// we end up with a result array entry for each object we are going to be asked to copy
+	// NOTE: we have an entry result *irrespective* of whether the copy arg makes sense or
+	//       whether the copy binary was run. If we are passed in 4 arguments - then by definition
+	//       we are going to send back 4 result JSONs!
+	results := make([]any, len(os.Args)-1)
 	var resultErrorCount int64 = 0
 
 	signalChannel := make(chan os.Signal, 1)
@@ -121,18 +118,44 @@ func main() {
 	// set as soon as we receive a SIGTERM - so that we will then just quickly skip the rest of the files
 	interrupted := false
 
-	for i := 0; true; i++ {
+	// NOTE: we shuffle the [arg] we are referring to by one
+	// so when i=0, our actual arg is os.Args[1] - this skips the CLI program name
+	for i := 0; i < len(os.Args)-1; i++ {
 
-		source, sourceOk := os.LookupEnv(copySourcePrefixEnvName + strconv.Itoa(i))
-		destination, destinationOk := os.LookupEnv(copyDestinationPrefixEnvName + strconv.Itoa(i))
+		copyArgJsonString := os.Args[i+1]
+		copyArg := CopyArg{}
 
-		if !sourceOk || !destinationOk {
-			log.Printf("Ran out of env variables to copy at %d", i)
-			break
+		copyArgErr := json.Unmarshal([]byte(copyArgJsonString), &copyArg)
+
+		if copyArgErr != nil {
+			results[i] = map[string]any{
+				"errors":    1,
+				"lastError": fmt.Sprintf("command line argument of '%s' could not be unmarshalled into a CopyArg structure with error %v", copyArgJsonString, copyArgErr),
+			}
+			resultErrorCount++
+			continue
+		}
+
+		if copyArg.Source == "" {
+			results[i] = map[string]any{
+				"errors":    1,
+				"lastError": fmt.Sprintf("command line argument of '%s' did not have a valid 's' field", copyArgJsonString),
+			}
+			resultErrorCount++
+			continue
+		}
+
+		if copyArg.Destination == "" {
+			results[i] = map[string]any{
+				"errors":    1,
+				"lastError": fmt.Sprintf("command line argument of '%s' did not have a valid 'd' field", copyArgJsonString),
+			}
+			resultErrorCount++
+			continue
 		}
 
 		// what we are processing in this iteration
-		log.Printf("Asked to copy %s to %s as the %d object to copy", source, destination, i)
+		log.Printf("copy %d: Asked to copy %s to %s\n", i, copyArg.Source, copyArg.Destination)
 
 		var copyArgs []string
 
@@ -148,57 +171,74 @@ func main() {
 		copyArgs = append(copyArgs,
 			// because we are transferring between S3 - which has a consistent idea of checksums
 			// at src and destination we enable this options
-			// "copy",
-			source,
-			destination)
+			"copy",
+			copyArg.Source,
+			copyArg.Destination)
 
-		if !interrupted {
-			// the constructed command to execute to do the copy
-			cmd := exec.Command(copyBinary, copyArgs...)
+		// note that once we are interrupted we still go through the outer loop
+		// we just don't actually do any copy operation (i.e. we do not abort/break the
+		// loop) - we want a "result" for every object specified in the args
+		if interrupted {
+			// create a fake "compatible" stats block
+			results[i] = map[string]any{
+				"errors":      1,
+				"lastError":   "skipped due to previous SIGTERM received",
+				"source":      copyArg.Source,
+				"destination": copyArg.Destination}
+			resultErrorCount++
+			continue
+		}
 
-			// we are only interested in stderr
-			stderrStringBuilder := new(strings.Builder)
-			cmd.Stderr = stderrStringBuilder
+		// the constructed command to execute to do the copy
+		cmd := exec.Command(copyBinary, copyArgs...)
 
-			// we need to be able handling getting a SIGTERM when AWS wants to reclaim our SPOT instance
-			signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
-			go func() {
-				sig := <-signalChannel
-				switch sig {
-				case syscall.SIGTERM:
-					// indicate we don't want future rclones to run
-					interrupted = true
+		// we are only interested in the separate message streams
+		stderrStringBuilder := new(strings.Builder)
+		cmd.Stderr = stderrStringBuilder
 
-					// we do however have a 120 second (hard) window in which we might want
-					// to let the current rclone finish
-					// so lets sleep for a bit before we self-terminate
-					// (we have a little debug settable value here to make our tests run quicker)
-					if debugSignalWaitOk {
-						i, err := strconv.Atoi(debugSignalWait)
-						if err == nil {
-							time.Sleep(time.Duration(i) * time.Second)
-						}
-					} else {
-						time.Sleep(postTermCleanupSeconds * time.Second)
+		stdoutStringBuilder := new(strings.Builder)
+		cmd.Stdout = stdoutStringBuilder
+
+		// we need to be able handling getting a SIGTERM when AWS wants to reclaim a SPOT instance
+		signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			sig := <-signalChannel
+			switch sig {
+			case syscall.SIGTERM:
+				// indicate we don't want future copies to run
+				interrupted = true
+
+				// we do however have a 120 second (hard) window in which we might want
+				// to let the current rclone finish
+				// so lets sleep for a bit before we self-terminate
+				// (we have a little debug settable value here to make our tests run quicker)
+				if debugSignalWaitOk {
+					i, err := strconv.Atoi(debugSignalWait)
+					if err == nil {
+						time.Sleep(time.Duration(i) * time.Second)
 					}
-
-					// terminate the currently running rclone
-					// NOTE we ignore the error here - if the process has already gone away then the
-					// signal possibly fails (by which point we should be exiting the process anyhow)
-					cmd.Process.Signal(syscall.SIGTERM)
+				} else {
+					time.Sleep(postTermCleanupSeconds * time.Second)
 				}
-			}()
 
-			runErr := cmd.Run()
-
-			if runErr != nil {
-				log.Printf("copy Run() failed with %v", runErr)
-			} else {
-				log.Printf("copy Run() succeeded")
+				// terminate the currently running rclone
+				// NOTE we ignore the error here - if the process has already gone away then the
+				// signal possibly fails (by which point we should be exiting the process anyhow)
+				cmd.Process.Signal(syscall.SIGTERM)
 			}
+		}()
 
-			foundStats := false
+		runErr := cmd.Run()
 
+		if runErr != nil {
+			log.Printf("copy %d: Run() failed with %v", i, runErr)
+		} else {
+			log.Printf("copy %d: Run() succeeded", i)
+		}
+
+		foundStats := false
+
+		/*if false {
 			// no matter what the exit code/status of the run is - we are going to (safely!) trawl
 			// through the stderr
 			// each line of stderr output is stats in JSON format or possibly other random messages
@@ -228,10 +268,11 @@ func main() {
 								resultErrorCount += errorsIntValue
 
 								// insert information about the file we were copying into the rclone stats block
-								statsValue["source"] = source
+								statsValue["source"] = copyArg.Source
+								statsValue["destination"] = copyArg.Destination
 
 								// record the stats block
-								results = append(results, statsValue)
+								results[i] = statsValue
 
 								foundStats = true
 							}
@@ -239,61 +280,78 @@ func main() {
 					}
 				} else {
 					// we couldn't parse the line as JSON so it is probably a stderr msg from rclone
-					log.Printf("rclone stderr -> %s", line)
+					log.Printf("copy %d: Run() stderr -> %s", i, line)
 				}
 			}
+		} else { */
+		stderrString := stderrStringBuilder.String()
 
-			if foundStats {
-				continue
-			}
+		log.Printf("copy %d: Run() stderr -> %s", i, stderrString)
 
-			// if`no valid stats block was output by rclone we need to make our own "compatible" one
-			// if we get a well-structured runtime error result we can work out some
-			// specific error messages
+		stdoutString := stdoutStringBuilder.String()
 
-			// keep in mind we *only* get here if rclone itself didn't provide JSON stats
-			// (which is itself a bug - as rclone does provide stats on every copy)
-			if runErr != nil {
-				if runExitErr, runExitOk := runErr.(*exec.ExitError); runExitOk {
-					// https://rclone.org/docs/#list-of-exit-codes
-					switch runExitErr.ExitCode() {
-					case 143:
-						results = append(results, map[string]any{
-							"errors":    1,
-							"lastError": "interrupted by SIGTERM",
-							"source":    source})
-						resultErrorCount++
-						continue
-					default:
-						results = append(results, map[string]any{
-							"errors":      1,
-							"lastError":   fmt.Sprintf("exit of copy with code %v but no JSON statistics block generated", runExitErr.ExitCode()),
-							"systemError": fmt.Sprintf("%#v", runExitErr),
-							"source":      source})
-						resultErrorCount++
-						continue
-					}
+		var logLineJson map[string]any
 
-				}
-			}
+		decoder := json.NewDecoder(strings.NewReader(stdoutString))
+		decoder.UseNumber()
 
+		decoderErr := decoder.Decode(&logLineJson)
+
+		if decoderErr == nil {
+			// insert information about the file we were copying into the rclone stats block
+			// logLineJson["source"] = copyArg.Source
+			// logLineJson["destination"] = copyArg.Destination
+
+			results[i] = logLineJson
+			foundStats = true
 		} else {
-			// if we have previously received a SIGTERM - then for the rest we have been asked to copy we just need to skip
-			// create a fake "compatible" stats block
-			results = append(results, map[string]any{
-				"errors":    1,
-				"lastError": "skipped due to previous SIGTERM received",
-				"source":    source})
-			resultErrorCount++
+			// we couldn't parse the output as JSON so it is probably a bug!
+			log.Printf("copy %d: Run() stdout -> %s", i, stdoutString)
+		}
+
+		if foundStats {
 			continue
+		}
+
+		// if`no valid stats block was output by rclone we need to make our own "compatible" one
+		// if we get a well-structured runtime error result we can work out some
+		// specific error messages
+
+		// keep in mind we *only* get here if rclone itself didn't provide JSON stats
+		// (which is itself a bug - as rclone does provide stats on every copy)
+		if runErr != nil {
+			if runExitErr, runExitOk := runErr.(*exec.ExitError); runExitOk {
+				// https://rclone.org/docs/#list-of-exit-codes
+				switch runExitErr.ExitCode() {
+				case 143:
+					results[i] = map[string]any{
+						"errors":      1,
+						"lastError":   "interrupted by SIGTERM",
+						"source":      copyArg.Source,
+						"destination": copyArg.Destination}
+					resultErrorCount++
+					continue
+				default:
+					results[i] = map[string]any{
+						"errors":      1,
+						"lastError":   fmt.Sprintf("exit of copy with code %v but no JSON statistics block generated", runExitErr.ExitCode()),
+						"systemError": fmt.Sprintf("%#v", runExitErr),
+						"source":      copyArg.Source,
+						"destination": copyArg.Destination}
+					resultErrorCount++
+					continue
+				}
+
+			}
 		}
 
 		// if we have fallen through all the way to here without any details then we put in
 		// something generic - but we want to make sure every copy operation has a "result" block
-		results = append(results, map[string]any{
-			"errors":    1,
-			"lastError": "Exit of rclone but no JSON statistics block generated or reason detected",
-			"source":    source})
+		results[i] = map[string]any{
+			"errors":      1,
+			"lastError":   "exit of copy tool but no JSON statistics block generated or reason detected",
+			"source":      copyArg.Source,
+			"destination": copyArg.Destination}
 		resultErrorCount++
 
 	}
@@ -304,17 +362,16 @@ func main() {
 	resultsJson, resultsJsonErr := json.MarshalIndent(results, "", "  ")
 
 	if resultsJsonErr != nil {
-		log.Fatalf("Could not marshall the rclone outputs to JSON with message %s", resultsJsonErr)
+		log.Fatalf("Could not marshall the results to JSON with message %s\n", resultsJsonErr)
 	}
 
 	resultsString := string(resultsJson)
 
+	log.Printf("Results are %v", resultsString)
+
 	// the normal mechanism by which we will send back results to our caller is
 	// Steps SendTask - which sends back JSON
 	if taskTokenOk {
-		// we can signal we no longer want heartbeats as we are about to finish up
-		heartbeatWorker.Shutdown()
-
 		sfnSvc := sfn.NewFromConfig(awsConfig)
 
 		// output
@@ -329,96 +386,27 @@ func main() {
 		//        TaskToken: aws.String(taskToken),
 		//    })
 		//} else {
-		_, err := sfnSvc.SendTaskSuccess(context.TODO(), &sfn.SendTaskSuccessInput{
+		successResult, successErr := sfnSvc.SendTaskSuccess(context.TODO(), &sfn.SendTaskSuccessInput{
 			Output:    aws.String(resultsString),
 			TaskToken: aws.String(taskToken),
 		})
-		if err != nil {
-			return
+		if successErr != nil {
+			log.Fatalf("heartbeat: success signal failure %v\n", successErr)
+		} else {
+			log.Printf("heartbeat: send success %v\n", successResult)
 		}
 		//}
+
+		// we can signal we no longer want heartbeats as we are about to finish up
+		heartbeatWorker.Shutdown()
 
 	} else {
 		// if no AWS task token was given then we just print the results
 		// (this is likely to be some sort of dev/test)
-		fmt.Println(resultsString)
+		log.Printf(resultsString)
 	}
 
-	os.Exit(int(resultErrorCount))
-}
-
-// BASED ON
-// https://www.ardanlabs.com/blog/2013/09/timer-routines-and-graceful-shutdowns.html
-// https://bbengfort.github.io/2016/06/background-work-goroutines-timer/
-
-// HeartbeatWorker Worker will do its Action once every interval, making up for lost time that
-// happened during the Action by only waiting the time left in the interval.
-type HeartbeatWorker struct {
-	SfnClient       *sfn.Client   // The client we need to do heart beat
-	TaskToken       string        // The task token to ping as a heart beat
-	Stopped         bool          // A flag determining the state of the worker
-	ShutdownChannel chan string   // A channel to communicate to the routine
-	Interval        time.Duration // The interval with which to run the Action
-	period          time.Duration // The actual period of the wait
-}
-
-// NewHeartbeatWorker creates a new worker and instantiates all the data structures required.
-func NewHeartbeatWorker(interval time.Duration, sfnClient *sfn.Client, taskToken string) *HeartbeatWorker {
-	return &HeartbeatWorker{
-		SfnClient:       sfnClient,
-		TaskToken:       taskToken,
-		Stopped:         false,
-		ShutdownChannel: make(chan string),
-		Interval:        interval,
-		period:          interval,
-	}
-}
-
-// Run starts the worker and listens for a shutdown call.
-func (w *HeartbeatWorker) Run() {
-
-	log.Println("Heartbeat worker started")
-
-	// Loop that runs forever
-	for {
-		select {
-		case <-time.After(w.period):
-			// do nothing.
-		case <-w.ShutdownChannel:
-			w.ShutdownChannel <- "Down"
-			// this is our exit path out of the infinite for loop
-			return
-		}
-
-		started := time.Now()
-		w.Action()
-		finished := time.Now()
-
-		duration := finished.Sub(started)
-		w.period = w.Interval - duration
-	}
-}
-
-// Shutdown is a graceful shutdown mechanism
-func (w *HeartbeatWorker) Shutdown() {
-	w.Stopped = true
-
-	w.ShutdownChannel <- "Down"
-	<-w.ShutdownChannel
-
-	close(w.ShutdownChannel)
-}
-
-// Action tell the parent caller ECS that we are alive and/or still-alive
-func (w *HeartbeatWorker) Action() {
-	_, err := w.SfnClient.SendTaskHeartbeat(context.TODO(), &sfn.SendTaskHeartbeatInput{
-		TaskToken: aws.String(w.TaskToken),
-	})
-	if err != nil {
-		log.Printf("heartbeat signal failed with %v\n", err)
-	} else {
-		log.Printf("heartbeat signal sent\n")
-	}
+	os.Exit(0) // int(resultErrorCount))
 }
 
 // If a ternaryish operator

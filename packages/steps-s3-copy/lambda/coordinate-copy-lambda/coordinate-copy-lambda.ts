@@ -18,7 +18,8 @@ interface InvokeEvent {
 }
 
 // we should pass this in from above
-const SIZE_THRESHOLD_BYTES = 16 * 1024 * 1024;
+// set to 5 MiB as that is the definitional minimum size of a multipart part
+const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
 /**
  * A handler that processes the list/head of all the objects that we are
@@ -113,8 +114,8 @@ export async function handler(event: InvokeEvent) {
     const SMALL_NAME = "small.jsonl";
     const LARGE_NAME = "large.jsonl";
 
-    const smallDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
-    const largeDf = df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
+    const smallDf = df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
+    const largeDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
 
     smallDf.writeJSON(SMALL_NAME, { format: "lines" });
     manifestParts.base = SMALL_NAME;

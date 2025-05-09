@@ -49,7 +49,7 @@ export class CopyRunTaskConstruct extends Construct {
 
   // how long we will wait before aborting if no heartbeat received
   // (note: the actual heartbeat interval is _less_ than this)
-  private readonly HEARTBEAT_TIMEOUT_SECONDS = 30;
+  private readonly HEARTBEAT_TIMEOUT_SECONDS = 100;
 
   // how long we set as the absolute upper limit for a copy execution
   // (note: this really is just an absolute safeguard against something somehow
@@ -75,7 +75,7 @@ export class CopyRunTaskConstruct extends Construct {
       // max length for the overall copy - so think big - this might be 64 invocations of
       // copying a 100 GiB BAM file say...
       taskTimeout: Timeout.duration(Duration.hours(this.COPY_TIMEOUT_HOURS)),
-      // how many seconds we can go without hearing from the rclone task
+      // how many seconds we can go without hearing from the copy task
       heartbeatTimeout: Timeout.duration(
         Duration.seconds(this.HEARTBEAT_TIMEOUT_SECONDS),
       ),
@@ -85,8 +85,10 @@ export class CopyRunTaskConstruct extends Construct {
           // we translate the itemSelector content of the distributed map into JSON strings
           // and pass them on the command line to our ECS task
           // this is not pretty but there are limited ways to pass data into ECS
+          // NOTE: we need to use the Items[] form to prevent Jsonata from converting single item arrays
+          // into a single item (which then doesn't meet the requirements of ECS "command")
           // @ts-ignore (there is a mistake with the typescript defs for this field)
-          command: `{% $states.input.Items.$string() %}`,
+          command: `{% $states.input.Items[].$string() %}`,
           environment: [
             {
               name: "CB_TASK_TOKEN",
@@ -95,7 +97,7 @@ export class CopyRunTaskConstruct extends Construct {
             {
               name: "CB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL",
               // we want to attempt to do the heartbeat some factor more often than the actual timeout
-              value: Math.floor(this.HEARTBEAT_TIMEOUT_SECONDS / 3).toString(),
+              value: Math.floor(this.HEARTBEAT_TIMEOUT_SECONDS / 4).toString(),
             },
           ],
         },

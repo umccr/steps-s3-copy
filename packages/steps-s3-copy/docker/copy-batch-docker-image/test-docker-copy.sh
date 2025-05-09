@@ -18,14 +18,12 @@ set +e
 # note the /etc files here are not important! We are just using them as source files
 # that happen to already exist in the docker image by default
 docker run --rm \
-       --env CB_COPY_SRC_0="/etc/issue.net" \
-       --env CB_COPY_DST_0="/tmp/issue-net-renamed" \
-       --env CB_COPY_SRC_1="/etc/os-release" \
-       --env CB_COPY_DST_1="/tmp/os-release" \
-       --env CB_COPY_SRC_2="/etc/a-file-that-does-not-exist" \
-       --env CB_COPY_DST_2="/tmp/does-not-matter" \
        --mount "type=bind,source=$TEMPD,target=/tmp" \
-       copy-batch-image
+       copy-batch-image \
+       '{"d":"/whatever/we/are/missing/s"}' \
+       '{"s":"/work/cloud-checksum","d":"/tmp/cloud-checksum-renamed"}' \
+       '{"s":"/work/copy-batch","d":"/tmp/copy-batch"}' \
+       '{"s":"/etc/a-file-that-does-not-exist","d":"/tmp/does-not-matter"}'
 
 # need to write some assertions here (need to separate out various outputs)
 

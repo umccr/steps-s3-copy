@@ -28,11 +28,11 @@ import {
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
-import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import {
   AssetImage,
+  Cluster,
   CpuArchitecture,
   FargateTaskDefinition,
   LinuxParameters,
@@ -72,6 +72,12 @@ export class StepsS3CopyConstruct extends Construct {
           "If specified, the working bucket prefix key must end with a slash or be the empty string",
         );
 
+    // we define a fargate cluster in which we will be spinning up all of our compute
+    const cluster = new Cluster(this, "FargateCluster", {
+      vpc: props.vpc,
+      enableFargateCapacityProviders: true,
+    });
+
     // we build a single role that is shared between the statemachine and the lambda workers
     // we have some use cases where external parties want to trust a single named role and this
     // allows that scenario
@@ -84,10 +90,8 @@ export class StepsS3CopyConstruct extends Construct {
       runtimePlatform: {
         cpuArchitecture: CpuArchitecture.ARM64,
       },
-      cpu: 256,
-      // there is a warning in the rclone documentation about problems with mem < 1GB - but I think that
-      // is mainly for large multi-file syncs... we do individual/small file copies so 512 should be fine
-      memoryLimitMiB: 512,
+      cpu: 1024,
+      memoryLimitMiB: 2048,
       taskRole: this._workingRole,
     });
 
@@ -236,21 +240,27 @@ export class StepsS3CopyConstruct extends Construct {
     );
 
     const smallRcloneMap = new CopyMapConstruct(this, "Small", {
-      vpc: props.vpc,
-      vpcSubnetSelection: props.vpcSubnetSelection,
+      // for small items we use a value that is much bigger than what will work
+      // - this let steps batch them up itself
+      // to the max that can fit in its payload limit
+      // this means that each invoke will for instance be copying 10-20 small items
+      maxItemsPerBatch: 16,
+      cluster: cluster,
+      clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
       inputPath: "$coordinateCopyResults.small",
-      assign: undefined,
       taskDefinition: taskDefinition,
       containerDefinition: containerDefinition,
     });
 
     const largeRcloneMap = new CopyMapConstruct(this, "Large", {
-      vpc: props.vpc,
-      vpcSubnetSelection: props.vpcSubnetSelection,
+      // for larger items - designate a single copy at a time - hoping we maximise our
+      // concurrency
+      maxItemsPerBatch: 1,
+      cluster: cluster,
+      clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
       inputPath: "$coordinateCopyResults.large",
-      assign: undefined,
       taskDefinition: taskDefinition,
       containerDefinition: containerDefinition,
     });
@@ -262,36 +272,29 @@ export class StepsS3CopyConstruct extends Construct {
       aggressiveTimes: props.aggressiveTimes,
     });
 
-    const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
-      this,
-      "SummariseCopy",
-      {
-        writerRole: this._workingRole,
-      },
-    );
+    //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
+    //  this,
+    //  "SummariseCopy",
+    //  {
+    //    writerRole: this._workingRole,
+    //  },
+    //);
 
-    const rclones = new Parallel(this, "RcloneParallel", {
-      queryLanguage: QueryLanguage.JSONATA,
-      assign: {
-        rcloneResultsLarge: {
-          manifestBucket: "{% $states.result[0].ResultWriterDetails.Bucket %}",
-          manifestKey: "{% $states.result[0].ResultWriterDetails.Key %}",
-        },
-        rcloneResultsSmall: {
-          manifestBucket: "{% $states.result[1].ResultWriterDetails.Bucket %}",
-          manifestKey: "{% $states.result[1].ResultWriterDetails.Key %}",
-        },
-      },
-    }).branch(largeRcloneMap.distributedMap, smallRcloneMap.distributedMap);
+    // we construct a set of independent copiers that handle different types of objects
+    // we can tune the copiers for their object types
+    const copiers = new Parallel(this, "CopyParallel", {}).branch(
+      smallRcloneMap.distributedMap,
+      largeRcloneMap.distributedMap,
+    );
 
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
         .next(canWriteStep)
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
-        .next(rclones)
+        .next(copiers)
         //.next(thawObjectsMap.distributedMap)
-        .next(summariseCopyLambdaStep.invocableLambda)
+        //.next(summariseCopyLambdaStep.invocableLambda)
         .next(success),
     );
 

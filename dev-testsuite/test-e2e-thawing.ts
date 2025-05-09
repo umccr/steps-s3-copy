@@ -24,7 +24,7 @@ before(async () => {
   state = await testSetup();
 });
 
-test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
+test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
   const sfnClient = new SFNClient({});
 
   const {

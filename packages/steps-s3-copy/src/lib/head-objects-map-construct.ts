@@ -1,9 +1,8 @@
 import { Construct } from "constructs";
 import {
-  DistributedMap,
-  ItemBatcher,
+  JitterType,
   JsonPath,
-  S3JsonItemReader,
+  StateGraph,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
 import { SOURCE_FILES_CSV_KEY_FIELD_NAME } from "../steps-s3-copy-input";
@@ -12,7 +11,7 @@ import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { join } from "node:path";
-import { Architecture, Runtime, Function } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Function, Runtime } from "aws-cdk-lib/aws-lambda";
 
 type Props = {
   readonly writerRole: IRole;
@@ -37,7 +36,12 @@ export class HeadObjectsMapConstruct extends Construct {
       props,
     );
 
-    new DistributedMap(this, "HOMAP", {
+    const graph = new StateGraph(
+      this.lambdaStep.invocableLambda,
+      `Map ${id} Iterator`,
+    );
+
+    /*new DistributedMap(this, "HOMAP", {
       toleratedFailurePercentage: 0,
       itemBatcher: new ItemBatcher({
         maxInputBytesPerBatch: 16384,
@@ -58,12 +62,14 @@ export class HeadObjectsMapConstruct extends Construct {
           ),
         ),
       }),
-    });
+    }); */
 
     this.distributedMap = new S3JsonlDistributedMap(this, "HeadObjectsMap", {
       // this phase is used to detect errors so we have zero tolerance for files being missing (for instance)
       toleratedFailurePercentage: 0,
-      batchMaxItems: 128,
+      // our main danger is the _results_ of the head operations exceeding our Steps/lambda limits
+      // we have tried values above 1000 which has failed
+      maxItemsPerBatch: 128,
       batchInput: {
         "destinationFolderKey.$": JsonPath.stringAt(
           "$invokeArguments.destinationFolderKey",
@@ -80,7 +86,7 @@ export class HeadObjectsMapConstruct extends Construct {
           ),
         ),
       },
-      iterator: this.lambdaStep.invocableLambda,
+      iterator: graph,
       resultWriter: {
         "Bucket.$": "$invokeSettings.workingBucket",
         "Prefix.$": JsonPath.format(
@@ -140,6 +146,15 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
     this.invocableLambda = new LambdaInvoke(this, this.stateName, {
       lambdaFunction: this.lambda,
       payloadResponseOnly: true,
+    });
+
+    this.invocableLambda.addRetry({
+      errors: ["SlowDown"],
+      maxAttempts: 5,
+      backoffRate: 2,
+      interval: Duration.seconds(30),
+      jitterStrategy: JitterType.FULL,
+      maxDelay: Duration.minutes(2),
     });
   }
 }
