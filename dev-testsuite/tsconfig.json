@@ -1,4 +1,7 @@
 {
-  "extends": "@tsconfig/node18/tsconfig.json",
-  "exclude": ["node_modules", "cdk.out"],
+  "extends": "@tsconfig/node22/tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler"
+  },
+  "exclude": ["node_modules", "cdk.out"]
 }

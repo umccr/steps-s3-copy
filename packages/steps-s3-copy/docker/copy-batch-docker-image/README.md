@@ -1,15 +1,14 @@
-# rclone-batch
+# copy-batch
 
-`rclone-batch` is a Go wrapper around the invocation of `rclone`. Why do we need
-a wrapper? Well we want to get the statistics output of `rclone` in a way
-that we can standardise and use in our Steps DistributedMap results.
+`copy-batch` is a Go wrapper around the invocation of a copy binary. Why do we need
+a wrapper? Well we want some decent control over the manner and flags for invoking
+our copy binary, as well as custom processing of their outputs.
 
 Also, we want optionally to be able to send this info
 back to the parent AWS Steps via Task Tokens.
 
 Furthermore, there are aspects of signal
-handling that we want to support for Fargate Spot that is not quite the same as
-`rclone` out of the box.
+handling that we want to support for Fargate Spot.
 
 ## How to dev?
 
@@ -30,7 +29,7 @@ This is good for
 - basic program logic
 
 ```shell
-./test-docker-direct.sh
+./test-docker-copy.sh
 ```
 
 Will build the Docker image that is used by the parent AWS ECS, but then

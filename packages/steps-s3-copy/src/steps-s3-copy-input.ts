@@ -3,19 +3,28 @@
  * This is more for internal consistency - it is not directly
  * used to define the "schema" of the state machine.
  */
-export type StepsS3CopyInput = {
-  sourceFilesCsvKey: string;
+export type StepsS3CopyInput = StepsS3CopyInvokeArguments &
+  StepsS3CopyInvokeSettings;
 
-  requiredRegion: string;
+export type StepsS3CopyInvokeArguments = {
+  readonly sourceRequiredRegion?: string;
+  readonly destinationRequiredRegion?: string;
 
-  copyConcurrency: number;
-  maxItemsPerBatch: number;
+  readonly sourceFilesCsvKey: string;
 
-  destinationBucket: string;
-  destinationPrefixKey: string;
+  readonly copyConcurrency: number;
+  readonly maxItemsPerBatch: number;
 
-  destinationStartCopyRelativeKey: string;
-  destinationEndCopyRelativeKey: string;
+  readonly destinationBucket: string;
+  readonly destinationFolderKey: string;
+
+  readonly destinationStartCopyRelativeKey: string;
+  readonly destinationEndCopyRelativeKey: string;
+};
+
+export type StepsS3CopyInvokeSettings = {
+  readonly workingBucket: string;
+  readonly workingBucketPrefixKey: string;
 };
 
 export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInput;
@@ -31,8 +40,8 @@ export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
 
 export const DESTINATION_BUCKET_FIELD_NAME: CopyOutStateMachineInputKeys =
   "destinationBucket";
-export const DESTINATION_PREFIX_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "destinationPrefixKey";
+export const DESTINATION_FOLDER_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "destinationFolderKey";
 
 export const DESTINATION_START_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
   "destinationStartCopyRelativeKey";

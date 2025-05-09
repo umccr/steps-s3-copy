@@ -1,6 +1,5 @@
-
 /**
- * A designated area in our working bucket that is where we can find the list
+ * A designated area in our working sourceBucket that is where we can find the list
  * of objects to copy - and other working files. We introduce a prefix
  * here so that we can test out that our prefix mechanisms work.
  *

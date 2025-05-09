@@ -15,7 +15,7 @@ const app = new App();
 
 const description = "A steps orchestration for S3 object copying";
 
-// our working bucket can perform in a sub-folder so we do that to test that
+// our working sourceBucket can perform in a sub-folder so we do that to test that
 // functionality out
 const WORKING_BUCKET_PREFIX = "a-working-folder/";
 
@@ -34,7 +34,7 @@ class StepsS3CopyStack extends Stack {
     // we constantly create temporary files here as part of the test suite
     // and we want them to autoexpire
     // if you want to set up permanent demonstrations/tests for copying
-    // then need to do that in another bucket
+    // then need to do that in another sourceBucket
     const sourceBucket = new Bucket(this, "Source", {
       versioned: false,
       lifecycleRules: [
@@ -55,8 +55,10 @@ class StepsS3CopyStack extends Stack {
       versioned: false,
       lifecycleRules: [
         {
+          // the working bucket holds manifests and reports of copies - which all tend to be small files
+          // so we find it useful to keep them around for a bit
           enabled: true,
-          expiration: Duration.days(1),
+          expiration: Duration.days(30),
           abortIncompleteMultipartUploadAfter: Duration.days(1),
         },
       ],
@@ -96,6 +98,15 @@ class StepsS3CopyStack extends Stack {
     new CfnOutput(this, "StateMachineArn", {
       value: stepsS3Copy.stateMachine.stateMachineArn,
     });
+    new CfnOutput(this, "StateMachineRoleArn", {
+      value: stepsS3Copy.stateMachine.role.roleArn,
+    });
+    new CfnOutput(this, "StateMachineCanWriteLambdaAslStateName", {
+      value: stepsS3Copy.canWriteLambdaAslStateName,
+    });
+    new CfnOutput(this, "StateMachineHeadObjectsLambdaAslStateName", {
+      value: stepsS3Copy.headObjectsLambdaAslStateName,
+    });
     new CfnOutput(this, "SourceBucket", {
       value: sourceBucket.bucketName,
     });
@@ -109,14 +120,9 @@ class StepsS3CopyStack extends Stack {
 }
 
 new StepsS3CopyStack(app, "StepsS3Copy", {
-  // the stack can only be deployed to 'dev'
   env: {
-    account: "843407916570",
-    region: "ap-southeast-2",
-  },
-  tags: {
-    "umccr-org:Product": "StepsS3Copy",
-    "umccr-org:Stack": "StepsS3Copy",
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION,
   },
   description: description,
 });

@@ -11,7 +11,8 @@
     "clean": "git clean -fXd",
     "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
     "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy",
-    "dev-test": "cd dev-testsuite && pnpx tsx test.mts StepsS3Copy"
+    "dev-test-step": "cd dev-testsuite && pnpx tsx --test --test-concurrency=1 test-step-*.ts",
+    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts"
   },
   "keywords": [],
   "author": {
@@ -20,8 +21,8 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@tsconfig/node18": "18.2.4",
-    "@types/node": "18.19.44",
+    "@tsconfig/node22": "22.0.1",
+    "@types/node": "22.13.14",
     "esbuild": "0.23.1",
     "prettier": "3.5.3",
     "typescript": "5.8.2"
