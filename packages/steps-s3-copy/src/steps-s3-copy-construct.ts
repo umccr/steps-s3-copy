@@ -41,6 +41,7 @@ import {
 import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -111,6 +112,7 @@ export class StepsS3CopyConstruct extends Construct {
         join(__dirname, "..", "docker", "copy-batch-docker-image"),
         {
           platform: Platform.LINUX_ARM64,
+          target: "fargate",
         },
       ),
       linuxParameters: linuxParams,
@@ -239,21 +241,22 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
-    const smallRcloneMap = new CopyMapConstruct(this, "Small", {
+    const smallCopierMap = new SmallObjectsCopyMapConstruct(this, "Small", {
       // for small items we use a value that is much bigger than what will work
       // - this let steps batch them up itself
       // to the max that can fit in its payload limit
       // this means that each invoke will for instance be copying 10-20 small items
-      maxItemsPerBatch: 16,
-      cluster: cluster,
-      clusterVpcSubnetSelection: props.vpcSubnetSelection,
+      //maxItemsPerBatch: 16,
+      //cluster: cluster,
+      //clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
+      maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.small",
-      taskDefinition: taskDefinition,
-      containerDefinition: containerDefinition,
+      //taskDefinition: taskDefinition,
+      //containerDefinition: containerDefinition,
     });
 
-    const largeRcloneMap = new CopyMapConstruct(this, "Large", {
+    const largeCopierMap = new CopyMapConstruct(this, "Large", {
       // for larger items - designate a single copy at a time - hoping we maximise our
       // concurrency
       maxItemsPerBatch: 1,
@@ -283,8 +286,8 @@ export class StepsS3CopyConstruct extends Construct {
     // we construct a set of independent copiers that handle different types of objects
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
-      smallRcloneMap.distributedMap,
-      largeRcloneMap.distributedMap,
+      smallCopierMap.distributedMap,
+      largeCopierMap.distributedMap,
     );
 
     const definition = ChainDefinitionBody.fromChainable(
@@ -314,8 +317,8 @@ export class StepsS3CopyConstruct extends Construct {
       this._stateMachine,
     );
     thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
-    smallRcloneMap.distributedMap.grantNestedPermissions(this._stateMachine);
-    largeRcloneMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    largeCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
 
     // first policy is we need to let the state machine access our CSV list
     // of objects to copy, and write back to record the status of the copies

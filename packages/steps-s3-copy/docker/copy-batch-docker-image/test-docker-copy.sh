@@ -3,7 +3,7 @@
 # we want to exit immediately on error (especially for Go/Docker build errors)
 set -e
 
-docker build . -t copy-batch-image
+docker build . --target fargate -t copy-batch-image
 
 # make a temporary directory for the copy destination
 # NOTE: we do not remove this on a EXIT trap as that interferes with the assert.sh exit codes
