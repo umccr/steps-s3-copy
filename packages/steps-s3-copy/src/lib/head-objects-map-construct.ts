@@ -70,12 +70,12 @@ export class HeadObjectsMapConstruct extends Construct {
       // our main danger is the _results_ of the head operations exceeding our Steps/lambda limits
       // some simple maths - the "head" data for a single object is a maximum of 1k(ish)
       // so that means we can fit 256 of them in the standard Steps result payload (256kb)
-      maxItemsPerBatch: 2,
+      maxItemsPerBatch: 1,
       batchInput: {
         "destinationFolderKey.$": JsonPath.stringAt(
           "$invokeArguments.destinationFolderKey",
         ),
-        maximumExpansion: 128,
+        maximumExpansion: 256,
       },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",

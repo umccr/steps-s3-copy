@@ -257,7 +257,7 @@ export class StepsS3CopyConstruct extends Construct {
       // for larger items - designate a single copy at a time - gaining concurrency
       // via the distributed map itself
       maxItemsPerBatch: 1,
-      maxConcurrency: 1000,
+      maxConcurrency: 2000,
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
