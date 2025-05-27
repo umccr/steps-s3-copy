@@ -18,7 +18,7 @@ RUN go build copy-batch-fargate.go ecs-heartbeat.go copy-runner.go constants.go 
 # the tag removes some legacy Go 1.x support from the AWS lambda library
 RUN go build -tags lambda.norpc copy-batch-lambda.go copy-runner.go constants.go types.go utils.go
 
-ADD https://github.com/umccr/cloud-checksum/releases/download/0.2.4/cloud-checksum-aarch64-unknown-linux-gnu.tar.gz .
+ADD https://github.com/umccr/cloud-checksum/releases/download/0.2.5/cloud-checksum-aarch64-unknown-linux-gnu.tar.gz .
 
 RUN gzip -dc cloud-checksum-aarch64-unknown-linux-gnu.tar.gz | tar xf -
 

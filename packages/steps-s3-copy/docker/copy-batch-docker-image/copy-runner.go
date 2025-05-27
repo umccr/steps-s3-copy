@@ -53,6 +53,7 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, toCopy *[]*C
 
 		cliArgs = append(cliArgs,
 			"copy",
+			"--concurrency", "1",
 			//"--...",
 			copyArg.Source,
 			copyArg.Destination)

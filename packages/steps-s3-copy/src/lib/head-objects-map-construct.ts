@@ -68,13 +68,14 @@ export class HeadObjectsMapConstruct extends Construct {
       // this phase is used to detect errors so we have zero tolerance for files being missing (for instance)
       toleratedFailurePercentage: 0,
       // our main danger is the _results_ of the head operations exceeding our Steps/lambda limits
-      // we have tried values above 1000 which has failed
-      maxItemsPerBatch: 128,
+      // some simple maths - the "head" data for a single object is a maximum of 1k(ish)
+      // so that means we can fit 256 of them in the standard Steps result payload (256kb)
+      maxItemsPerBatch: 2,
       batchInput: {
         "destinationFolderKey.$": JsonPath.stringAt(
           "$invokeArguments.destinationFolderKey",
         ),
-        maximumExpansion: 256,
+        maximumExpansion: 128,
       },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",
@@ -137,6 +138,7 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
         // in the AWS console un-minified
         minify: false,
       },
+      memorySize: 128,
       // we can theoretically need to loop through 1000s of objects - and those object Heads etc may
       // be doing back-off/retries because of all the concurrent activity
       // so we give ourselves plenty of time

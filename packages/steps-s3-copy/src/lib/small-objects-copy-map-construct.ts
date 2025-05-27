@@ -57,9 +57,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       {
         toleratedFailurePercentage: 0,
         maxItemsPerBatch: 128,
-        batchInput: {
-          destinationBucket: `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
-        },
+        batchInput: {},
         inputPath: props.inputPath,
         itemReader: {
           "Bucket.$": `$.bucket`,
@@ -127,7 +125,7 @@ export class SmallObjectsCopyLambdaStepConstruct extends Construct {
       role: props.writerRole,
       code: code,
       architecture: Architecture.ARM_64,
-      memorySize: 1024,
+      memorySize: 128,
       // we can theoretically need to loop through lots of objects - and those object Heads etc may
       // be doing back-off/retries because of all the concurrent activity
       // so we give ourselves plenty of time

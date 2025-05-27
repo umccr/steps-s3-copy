@@ -21,7 +21,6 @@ import {
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
-import { ThawObjectsMapConstruct } from "./lib/thaw-objects-map-construct";
 import {
   StepsS3CopyInvokeArguments,
   StepsS3CopyInvokeSettings,
@@ -32,6 +31,7 @@ import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import {
   AssetImage,
+  AwsLogDriverMode,
   Cluster,
   CpuArchitecture,
   FargateTaskDefinition,
@@ -79,7 +79,7 @@ export class StepsS3CopyConstruct extends Construct {
       enableFargateCapacityProviders: true,
     });
 
-    // we build a single role that is shared between the statemachine and the lambda workers
+    // we build a single role that is shared between the state machine and the lambda workers
     // we have some use cases where external parties want to trust a single named role and this
     // allows that scenario
     this._workingRole = this.createWorkingRole(
@@ -91,46 +91,43 @@ export class StepsS3CopyConstruct extends Construct {
       runtimePlatform: {
         cpuArchitecture: CpuArchitecture.ARM64,
       },
-      cpu: 1024,
-      memoryLimitMiB: 2048,
+      cpu: 256,
+      memoryLimitMiB: 512,
       taskRole: this._workingRole,
     });
 
-    // https://stackoverflow.com/questions/68933848/how-to-allow-container-with-read-only-root-filesystem-writing-to-tmpfs-volume
-    // DOESN'T WORK FOR FARGATE SO NEED TO THINK ABOUT THIS OTHER WAY
     const linuxParams = new LinuxParameters(this, "LinuxParameters", {
       // because we want to support SPOT signals etc, we want it to run our main container entrypoint
       // with an initd
       initProcessEnabled: true,
+      // want to also consider read only
+      // https://stackoverflow.com/questions/68933848/how-to-allow-container-with-read-only-root-filesystem-writing-to-tmpfs-volume
+      // DOESN'T WORK FOR FARGATE SO NEED TO THINK ABOUT THIS OTHER WAY
     });
 
     const containerDefinition = taskDefinition.addContainer("CopyContainer", {
-      // set the stop timeout to the maximum allowed under Fargate Spot
-      // potentially this will let us finish our rclone operation (!!! - we don't actually try to let rclone finish - see Docker image - we should)
-      stopTimeout: Duration.seconds(120),
       image: new AssetImage(
         join(__dirname, "..", "docker", "copy-batch-docker-image"),
         {
           platform: Platform.LINUX_ARM64,
+          // our docker image can be built for use by either fargate or lambdas - we chose fargate here at build time
           target: "fargate",
         },
       ),
       linuxParameters: linuxParams,
       readonlyRootFilesystem: true,
       logging: LogDriver.awsLogs({
+        mode: AwsLogDriverMode.NON_BLOCKING,
         streamPrefix: "steps-s3-copy",
         logRetention: RetentionDays.ONE_WEEK,
+        // optimal size suggested from
+        // https://aws.amazon.com/blogs/containers/preventing-log-loss-with-non-blocking-mode-in-the-awslogs-container-log-driver/
+        // HOWEVER - we now that our tool has very minimal output to stdout/stderr so we do not need to change from the default of 1 MiB
+        // maxBufferSize: Size.mebibytes(25),
       }),
-      // eg the equivalent of
-      // RCLONE_CONFIG_S3_TYPE=s3 RCLONE_CONFIG_S3_PROVIDER=AWS RCLONE_CONFIG_S3_ENV_AUTH=true RCLONE_CONFIG_S3_REGION=ap-southeast-2 rclone copy src dest
-      environment: {
-        RCLONE_CONFIG_S3_TYPE: "s3",
-        RCLONE_CONFIG_S3_PROVIDER: "AWS",
-        RCLONE_CONFIG_S3_ENV_AUTH: "true",
-        RCLONE_CONFIG_S3_REGION: Stack.of(this).region,
-        // we already establish the sourceBucket exists - so we don't want rclone to also check on each copy
-        RCLONE_S3_NO_CHECK_BUCKET: "true",
-      },
+      // set the stop timeout to the maximum allowed under Fargate Spot
+      // potentially this will let us finish our copy operation (!!! - we don't actually try to let copy finish - see Docker image - we should)
+      stopTimeout: Duration.seconds(120),
     });
 
     const success = new Succeed(this, "Succeed");
@@ -257,9 +254,10 @@ export class StepsS3CopyConstruct extends Construct {
     });
 
     const largeCopierMap = new CopyMapConstruct(this, "Large", {
-      // for larger items - designate a single copy at a time - hoping we maximise our
-      // concurrency
+      // for larger items - designate a single copy at a time - gaining concurrency
+      // via the distributed map itself
       maxItemsPerBatch: 1,
+      maxConcurrency: 1000,
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -268,12 +266,12 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
-      writerRole: this._workingRole,
-      workingBucket: props.workingBucket,
-      workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
-      aggressiveTimes: props.aggressiveTimes,
-    });
+    //const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
+    //  writerRole: this._workingRole,
+    //  workingBucket: props.workingBucket,
+    //  workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+    //  aggressiveTimes: props.aggressiveTimes,
+    //});
 
     //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
     //  this,
@@ -316,7 +314,7 @@ export class StepsS3CopyConstruct extends Construct {
     this._headObjectsMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
     );
-    thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    // thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
     smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
     largeCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
 
@@ -373,16 +371,19 @@ export class StepsS3CopyConstruct extends Construct {
     allowWriteIntoInstalledAccount: boolean | undefined,
   ): IRole {
     const writerRole = new Role(this, "WriterRole", {
+      // in some circumstances we want to force the name of this role so we can give instructions to
+      // data recipients about an explicit named role to "trust"
       roleName: forcedRoleName,
       // note: this role is used by *all* the "work" bits of the orchestration - so both ECS tasks and lambdas
       // AND for using the TestState API where we simulate stages of the state machine
+      // HENCE we need a composite principal for the assumed by
       assumedBy: new CompositePrincipal(
         new ServicePrincipal("ecs-tasks.amazonaws.com"),
         new ServicePrincipal("lambda.amazonaws.com"),
       ),
     });
 
-    // the role is assigned to lambdas - so they need enough permissions to execture
+    // the role is assigned to lambdas - so they need enough permissions to execute
     writerRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName(
         "service-role/AWSLambdaBasicExecutionRole",
@@ -422,7 +423,7 @@ export class StepsS3CopyConstruct extends Construct {
       ManagedPolicy.fromAwsManagedPolicyName("AmazonS3FullAccess"),
     );
 
-    // allow sending of state messages to signify task aborts etc
+    // allow sending of state messages to signify task aborts etc from ECS Fargate
     writerRole.addToPolicy(
       new PolicyStatement({
         resources: ["*"],

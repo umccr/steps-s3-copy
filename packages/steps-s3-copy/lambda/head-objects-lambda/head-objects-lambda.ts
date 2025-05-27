@@ -32,6 +32,9 @@ export type HeadObjectsLambdaItem = {
   // key of object or (key + "/*") to indicate a folder
   sourceKey: string;
 
+  // if present, access the source bucket anonymously
+  sourceNoSignRequest?: boolean;
+
   // a SUMS checksum definition we are asserting about this object
   // if not present then default to no assertions about checksums.
   // specifying a sums is incompatible with a wildcard sourceKey as sums
@@ -54,18 +57,12 @@ export type HeadObjectsLambdaItem = {
  * In the case of wildcard inputs, we will have expanded them out to individual
  * objects.
  */
-export type HeadObjectsLambdaResultItem = {
-  // source bucket for object
-  sourceBucket: string;
-
-  // key of object (no wildcards allowed by this point)
-  sourceKey: string;
-
+export type HeadObjectsLambdaResultItem = Omit<
+  HeadObjectsLambdaItem,
+  "sourceRootFolderKey" | "destinationRelativeFolderKey"
+> & {
   // derived destination key for object
   destinationKey: string;
-
-  // if present in the input, the SUMS checksums
-  sums?: string;
 
   // storage class of object currently
   storageClass: string;
@@ -179,6 +176,9 @@ export async function handler(
   }
 
   const client = new S3Client({});
+  const anonClient = new S3Client({
+    signer: { sign: async (request) => request },
+  });
 
   // we build an array of details of objects that we find either from ListObjects
   // *or* by calling HeadObject
@@ -207,7 +207,7 @@ export async function handler(
       let expansionCount = 0;
 
       for await (const data of paginateListObjectsV2(
-        { client },
+        { client: o.sourceNoSignRequest ? anonClient : client },
         {
           Bucket: o.sourceBucket,
           Prefix: sourceKeyPrefix,
@@ -276,7 +276,9 @@ export async function handler(
         Key: o.sourceKey,
       });
 
-      const headResult = await client.send(headCommand);
+      const headResult = o.sourceNoSignRequest
+        ? await anonClient.send(headCommand)
+        : await client.send(headCommand);
 
       assert.ok(headResult.ETag);
       assert.ok(headResult.LastModified);

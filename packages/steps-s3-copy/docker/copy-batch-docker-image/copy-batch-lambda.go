@@ -23,6 +23,8 @@ func handler(ctx context.Context, event StepsDistributedMapBatch) (any, error) {
 		log.Fatalf("No environment variable %s telling us the path to a copy executable", copyBinaryEnvName)
 	}
 
+    // our guarantee to the caller is that if passed in an array of 4 items, we will return
+    // a result with 4 items
 	toCopy := make([]*CopyArg, len(event.Items))
 	toCopyResults := make([]*CopyResult, len(event.Items))
 
@@ -30,24 +32,10 @@ func handler(ctx context.Context, event StepsDistributedMapBatch) (any, error) {
 		toCopy[i] = &val
 	}
 
+    // passing in -1 to signify we don't want SIGTERM handling
 	copyRunner(copyBinary, -1, &toCopy, &toCopyResults)
 
 	return toCopyResults, nil
-
-	// we need to report this back as JSON though
-	/*resultsJson, resultsJsonErr := json.MarshalIndent(results, "", "  ")
-
-	if resultsJsonErr != nil {
-		log.Fatalf("Could not marshall the results to JSON with message %s\n", resultsJsonErr)
-	}
-
-	resultsString := string(resultsJson)
-
-	response := events.APIGatewayProxyResponse{
-		StatusCode: 200,
-		Body:       resultsString,
-	}
-	return response, nil */
 }
 
 func main() {
