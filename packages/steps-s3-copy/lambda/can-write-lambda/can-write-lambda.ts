@@ -27,16 +27,21 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
   });
 
   try {
-    const putCommand = new PutObjectCommand({
-      Bucket: event.invokeArguments.destinationBucket,
-      Key: `${event.invokeArguments.destinationFolderKey}${event.invokeArguments.destinationStartCopyRelativeKey}`,
-      Body: "A file created by copy out to ensure correct permissions and to indicate that start of the copy process",
-      // we need PutTagging permission to be right - or else rclone will fail when copying our sometimes
-      // tagged source files
-      Tagging: "testtag=ok",
-    });
+    if (event.invokeArguments.dryRun) {
+      // is there an operation we can do here that doesn't end up writing anything?
+      // how about initiate multi part?
+    } else {
+      const putCommand = new PutObjectCommand({
+        Bucket: event.invokeArguments.destinationBucket,
+        Key: `${event.invokeArguments.destinationFolderKey}${event.invokeArguments.destinationStartCopyRelativeKey}`,
+        Body: "A file created by copy out to ensure correct permissions and to indicate that start of the copy process",
+        // we need PutTagging permission to be right - or else rclone will fail when copying our sometimes
+        // tagged source files
+        Tagging: "testtag=ok",
+      });
 
-    await client.send(putCommand);
+      await client.send(putCommand);
+    }
   } catch (e: any) {
     if (e.Code === "PermanentRedirect")
       throw new WrongRegionError(

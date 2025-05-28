@@ -5,13 +5,10 @@ import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { join } from "node:path";
-import { JsonPath, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
+import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type Props = {
   readonly writerRole: IRole;
-
-  readonly workingBucket: string;
-  readonly workingBucketPrefixKey: string;
 };
 
 /**
@@ -42,7 +39,7 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
         architecture: Architecture.ARM_64,
         // possibly this function needs to load some larger (GiB?) manifest files so we give it plenty
         // of time, though I expect it till not need this most of the time
-        timeout: Duration.seconds(30),
+        timeout: Duration.minutes(5),
         // similarly for memory, it may have to put an entire (GiB?) manifest in memory
         memorySize: 8192,
         handler: "handler",
@@ -58,10 +55,6 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
           externalModules: ["nodejs-polars"],
           nodeModules: ["nodejs-polars"],
         },
-        environment: {
-          WORKING_BUCKET: props.workingBucket,
-          WORKING_BUCKET_PREFIX_KEY: props.workingBucketPrefixKey,
-        },
       },
     );
 
@@ -70,11 +63,17 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
       `Coordinate Inputs into Copy Sets`,
       {
         lambdaFunction: coordinateCopyLambda,
-        payload: TaskInput.fromJsonPathAt("$headObjectsResults"),
+        queryLanguage: QueryLanguage.JSONATA,
+        payload: TaskInput.fromObject({
+          invokeArguments: "{% $invokeArguments %}",
+          invokeSettings: "{% $invokeSettings %}",
+          headObjectsResults: "{% $headObjectsResults %}",
+        }),
+        // note we use payloadResponseOnly so that $states.result is the data we want to store
+        payloadResponseOnly: true,
         assign: {
-          "coordinateCopyResults.$": "$.Payload",
+          coordinateCopyResults: "{% $states.result %}",
         },
-        resultPath: JsonPath.DISCARD,
       },
     );
   }

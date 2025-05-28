@@ -22,8 +22,8 @@ import {
 import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
 import {
+  DRY_RUN_KEY_FIELD_NAME,
   StepsS3CopyInvokeArguments,
-  StepsS3CopyInvokeSettings,
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
@@ -45,6 +45,11 @@ import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-const
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
+
+export type StepsS3CopyInvokeSettings = {
+  readonly workingBucket: string;
+  readonly workingBucketPrefixKey: string;
+};
 
 /**
  * A construct that makes a state machine for bulk copying large lists of
@@ -162,6 +167,9 @@ export class StepsS3CopyConstruct extends Construct {
       // these are the default objects that will be created in the destination prefix area
       destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "STARTED_COPY.txt" ][0] %}`,
       destinationEndCopyRelativeKey: `{% [ $states.input.destinationEndCopyRelativeKey, "ENDED_COPY.csv" ][0] %}`,
+
+      // typecast any input to a boolean, if left blank or not passed in, we will end up with false
+      [DRY_RUN_KEY_FIELD_NAME]: `{% [ $states.input.${DRY_RUN_KEY_FIELD_NAME}, false ][0] %}`,
     };
     const jsonataInvokeSettings: {
       [K in keyof StepsS3CopyInvokeSettings]: string;
@@ -233,8 +241,6 @@ export class StepsS3CopyConstruct extends Construct {
       "CoordinateCopy",
       {
         writerRole: this._workingRole,
-        workingBucket: props.workingBucket,
-        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
       },
     );
 
@@ -248,7 +254,7 @@ export class StepsS3CopyConstruct extends Construct {
       //clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
       maxItemsPerBatch: 128,
-      inputPath: "$coordinateCopyResults.small",
+      inputPath: "$coordinateCopyResults.copySets.small",
       //taskDefinition: taskDefinition,
       //containerDefinition: containerDefinition,
     });
@@ -261,7 +267,7 @@ export class StepsS3CopyConstruct extends Construct {
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
-      inputPath: "$coordinateCopyResults.large",
+      inputPath: "$coordinateCopyResults.copySets.large",
       taskDefinition: taskDefinition,
       containerDefinition: containerDefinition,
     });
