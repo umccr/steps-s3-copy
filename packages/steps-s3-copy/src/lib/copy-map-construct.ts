@@ -38,6 +38,7 @@ type Props = {
   readonly inputPath: string;
 
   readonly maxItemsPerBatch: number;
+  readonly maxConcurrency: number;
 
   readonly taskDefinition: TaskDefinition;
   readonly containerDefinition: ContainerDefinition;
@@ -49,21 +50,25 @@ export class CopyMapConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
+    // we are passed in a desired maxConcurrency in our props
+    // however - we need to fit in with the limits imposed by ECS/Fargate regarding
+    // launch rates. So we introduce our own jitter for starting/
+
     // Rate of tasks launched by a service on AWS Fargate
-    // Each supported Region:
-    // 500
-    // Adjustable
-    // No
+    // Each supported Region: 500
+    // Adjustable: No
     // The maximum number of tasks that can be provisioned per service per minute on Fargate by the Amazon ECS service scheduler.
 
-    // we put some leeway in the launch number as we don't really know what else is happening in the account
-    const TASK_LAUNCH_NUMBER = 500 - 50;
+    const TASK_LAUNCH_NUMBER = 500.0;
     const TASK_LAUNCH_PER_SECONDS = 60;
 
+    const waitWindow =
+      Math.floor(
+        (props.maxConcurrency / TASK_LAUNCH_NUMBER) * TASK_LAUNCH_PER_SECONDS,
+      ) + 1;
+
     const delayStep = Wait.jsonata(this, id + "StartJitterDelay", {
-      time: WaitTime.seconds(
-        `{% $floor($random() * ${TASK_LAUNCH_PER_SECONDS}) %}`,
-      ),
+      time: WaitTime.seconds(`{% $floor($random() * ${waitWindow}) %}`),
     });
 
     const copyRunTask = new CopyRunTaskConstruct(this, id + "CopyFargateTask", {
@@ -145,7 +150,7 @@ export class CopyMapConstruct extends Construct {
     this.distributedMap = new S3JsonlDistributedMap(this, id + "CopyMap", {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
-      maxConcurrency: TASK_LAUNCH_NUMBER,
+      maxConcurrency: props.maxConcurrency,
       batchInput: undefined,
       inputPath: props.inputPath,
       itemReader: {
