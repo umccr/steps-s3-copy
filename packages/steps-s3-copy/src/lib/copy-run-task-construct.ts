@@ -69,6 +69,7 @@ export class CopyRunTaskConstruct extends Construct {
       launchTarget: new EcsFargateNotSpotLaunchTarget({
         platformVersion: FargatePlatformVersion.VERSION1_4,
       }),
+      assignPublicIp: true,
       subnets: {
         subnetType: props.vpcSubnetSelection,
       },

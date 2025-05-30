@@ -12,7 +12,11 @@
     "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
     "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy",
     "dev-test-step": "cd dev-testsuite && pnpx tsx --test --test-concurrency=1 test-step-*.ts",
-    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts"
+    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts",
+    "dev-test-e2e-dryrun": "cd dev-testsuite && pnpx tsx --test test-e2e-dryrun.ts",
+    "dev-test-e2e-koalas": "cd dev-testsuite && pnpx tsx --test test-e2e-koalas.ts",
+    "dev-test-e2e-realistic": "cd dev-testsuite && pnpx tsx --test test-e2e-realistic.ts",
+    "dev-test-e2e-thawing": "cd dev-testsuite && pnpx tsx --test test-e2e-thawing.ts"
   },
   "keywords": [],
   "author": {
@@ -21,10 +25,10 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@tsconfig/node22": "22.0.1",
-    "@types/node": "22.13.14",
-    "esbuild": "0.23.1",
+    "@tsconfig/node22": "22.0.2",
+    "@types/node": "22.15.26",
+    "esbuild": "0.25.5",
     "prettier": "3.5.3",
-    "typescript": "5.8.2"
+    "typescript": "5.8.3"
   }
 }

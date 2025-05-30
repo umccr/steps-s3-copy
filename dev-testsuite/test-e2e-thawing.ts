@@ -24,7 +24,7 @@ before(async () => {
   state = await testSetup();
 });
 
-test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
+test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
   const sfnClient = new SFNClient({});
 
   const {
@@ -33,6 +33,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     testFolderObjectsTsvAbsolute,
     testFolderObjectsTsvRelative,
   } = getPaths(state.workingBucketPrefixKey, state.uniqueTestId);
+
+  console.info("Creating test objects");
 
   // these are the templates for the objects we are going to create as source objects
   const sourceObjectParams: Record<string, TestObjectParams> = {
@@ -80,6 +82,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     (n) => `${testFolderSrc}${n}`,
   );
 
+  console.info("Creating copy instruction JSONL");
+
   await makeObjectDictionaryJsonl(
     {
       [state.sourceBucket]: testObjectKeys,
@@ -87,6 +91,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     state.workingBucket,
     testFolderObjectsTsvAbsolute,
   );
+
+  console.info("Triggering copy");
 
   const executionStartResult = await sfnClient.send(
     new StartExecutionCommand({
@@ -100,6 +106,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
       }),
     }),
   );
+
+  console.info("Waiting for copy...");
 
   const executionResult = await waitUntilStateMachineFinishes(
     { client: sfnClient, maxWaitTime: TEST_EXPECTED_SECONDS },

@@ -1,5 +1,4 @@
 import {
-  checkExceptions,
   createWaiter,
   WaiterConfiguration,
   WaiterResult,

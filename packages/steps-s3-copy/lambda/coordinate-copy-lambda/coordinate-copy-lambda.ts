@@ -1,7 +1,7 @@
 import { GetObjectCommand, S3, S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import pl from "nodejs-polars";
-import { createReadStream } from "node:fs";
+import { createReadStream, rmSync } from "node:fs";
 import { chdir } from "node:process";
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
@@ -109,6 +109,8 @@ export async function handler(event: LambdaEvent) {
       }),
     );
 
+    // note we bring this entirely into memory - whereas we _possibly_ could stream it in to the dataframe -
+    // is fine for the moment - we just allocate a decent amount of memory to this lambda
     const getSuccessContent = await getSuccessResult.Body.transformToString();
 
     const df = pl.readJSON(getSuccessContent, {
@@ -119,39 +121,31 @@ export async function handler(event: LambdaEvent) {
 
     const stats = await computeStats(df);
 
-    // if we are doing a dry run - then we have done all we want to do (head objects and stats) - pass
-    // an empty list of objects to the actual copiers
-    const smallDf = event.invokeArguments.dryRun
-      ? df.filter(false)
-      : df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
-    const largeDf = event.invokeArguments.dryRun
-      ? df.filter(false)
-      : df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
+    // if we are doing a dry run - then we want to still collect stats etc - but at the end of the day
+    // we will pass an empty list of objects to the actual copiers
+    const emptyDf = df.filter(false);
 
-    await createJsonlFromDataFrame(
-      event.headObjectsResults.manifestBucket,
-      event.headObjectsResults.manifestAbsoluteKey,
-      smallDf,
-      "small",
-    );
-    await createJsonlFromDataFrame(
-      event.headObjectsResults.manifestBucket,
-      event.headObjectsResults.manifestAbsoluteKey,
-      largeDf,
-      "large",
-    );
+    const smallDf = df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
+    const largeDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
+
+    // const needsThawingDf = df.filter(storage class = ??)
+    // needs to also make sure these thawed objects are _not_ in the other copy sets
 
     return {
       stats: stats,
       copySets: {
-        small: {
-          bucket: event.headObjectsResults.manifestBucket,
-          key: smallKey,
-        },
-        large: {
-          bucket: event.headObjectsResults.manifestBucket,
-          key: largeKey,
-        },
+        small: await createJsonlFromDataFrame(
+          event.headObjectsResults.manifestBucket,
+          event.headObjectsResults.manifestAbsoluteKey,
+          event.invokeArguments.dryRun ? emptyDf : smallDf,
+          "small",
+        ),
+        large: await createJsonlFromDataFrame(
+          event.headObjectsResults.manifestBucket,
+          event.headObjectsResults.manifestAbsoluteKey,
+          event.invokeArguments.dryRun ? emptyDf : largeDf,
+          "large",
+        ),
       },
     };
   }
@@ -172,7 +166,7 @@ async function createJsonlFromDataFrame(
 ) {
   const tmpName = tmpNameSync();
 
-  // write the frame locally on disk in our jsonl format
+  // write the frame locally on disk in jsonl format
   df.writeJSON(tmpName, { format: "lines" });
 
   // now upload to S3 in a location adjacent to the original manifest that was passed to us
@@ -181,6 +175,15 @@ async function createJsonlFromDataFrame(
   const newKey = path.format(originalParts);
 
   await uploadFile(tmpName, originalBucket, newKey);
+
+  // although our /tmp directory will be cleared at the end of the lambda, we mind
+  // as well try to delete it in case our dataframes are large
+  rmSync(tmpName);
+
+  return {
+    bucket: originalBucket,
+    key: newKey,
+  };
 }
 
 /**
