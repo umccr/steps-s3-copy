@@ -1,16 +1,20 @@
 import { GetObjectCommand, S3, S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
-
 import pl from "nodejs-polars";
 import { createReadStream } from "node:fs";
 import { chdir } from "node:process";
-import path = require("node:path/posix");
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
+import { tmpNameSync } from "tmp";
+import path = require("node:path/posix");
 
-interface InvokeEvent {
+interface LambdaEvent {
+  // settings for the overall Steps invocation
   invokeSettings: StepsS3CopyInvokeSettings;
+
+  // arguments passed to the overall Steps invocation
   invokeArguments: StepsS3CopyInvokeArguments;
+
   // the manifest bucket and key are definitions of where in S3
   // results from the previous DistributedMaps operations have gone
   // in this particular case - this is a result that documents HEAD level details
@@ -33,7 +37,7 @@ const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
  *
  * @param event
  */
-export async function handler(event: InvokeEvent) {
+export async function handler(event: LambdaEvent) {
   // debug input event
   console.debug("coordinateCopy()");
   console.debug(JSON.stringify(event, null, 2));
@@ -115,15 +119,8 @@ export async function handler(event: InvokeEvent) {
 
     const stats = await computeStats(df);
 
-    const manifestParts = path.parse(
-      event.headObjectsResults.manifestAbsoluteKey,
-    );
-
-    const SMALL_NAME = "small.jsonl";
-    const LARGE_NAME = "large.jsonl";
-
     // if we are doing a dry run - then we have done all we want to do (head objects and stats) - pass
-    // an empty list of objecs to actually copy
+    // an empty list of objects to the actual copiers
     const smallDf = event.invokeArguments.dryRun
       ? df.filter(false)
       : df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
@@ -131,22 +128,17 @@ export async function handler(event: InvokeEvent) {
       ? df.filter(false)
       : df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
 
-    smallDf.writeJSON(SMALL_NAME, { format: "lines" });
-    manifestParts.base = SMALL_NAME;
-    const smallKey = path.format(manifestParts);
-    await uploadFile(
-      SMALL_NAME,
+    await createJsonlFromDataFrame(
       event.headObjectsResults.manifestBucket,
-      smallKey,
+      event.headObjectsResults.manifestAbsoluteKey,
+      smallDf,
+      "small",
     );
-
-    largeDf.writeJSON(LARGE_NAME, { format: "lines" });
-    manifestParts.base = LARGE_NAME;
-    const largeKey = path.format(manifestParts);
-    await uploadFile(
-      LARGE_NAME,
+    await createJsonlFromDataFrame(
       event.headObjectsResults.manifestBucket,
-      largeKey,
+      event.headObjectsResults.manifestAbsoluteKey,
+      largeDf,
+      "large",
     );
 
     return {
@@ -163,6 +155,32 @@ export async function handler(event: InvokeEvent) {
       },
     };
   }
+}
+
+/**
+ *
+ * @param originalBucket
+ * @param originalKey
+ * @param df
+ * @param newName
+ */
+async function createJsonlFromDataFrame(
+  originalBucket: string,
+  originalKey: string,
+  df: pl.DataFrame,
+  newName: string,
+) {
+  const tmpName = tmpNameSync();
+
+  // write the frame locally on disk in our jsonl format
+  df.writeJSON(tmpName, { format: "lines" });
+
+  // now upload to S3 in a location adjacent to the original manifest that was passed to us
+  const originalParts = path.parse(originalKey);
+  originalParts.base = newName + ".jsonl";
+  const newKey = path.format(originalParts);
+
+  await uploadFile(tmpName, originalBucket, newKey);
 }
 
 /**
