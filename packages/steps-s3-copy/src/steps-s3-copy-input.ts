@@ -3,9 +3,6 @@
  * This is more for internal consistency - it is not directly
  * used to define the "schema" of the state machine.
  */
-export type StepsS3CopyInput = StepsS3CopyInvokeArguments &
-  StepsS3CopyInvokeSettings;
-
 export type StepsS3CopyInvokeArguments = {
   readonly sourceRequiredRegion?: string;
   readonly destinationRequiredRegion?: string;
@@ -20,14 +17,16 @@ export type StepsS3CopyInvokeArguments = {
 
   readonly destinationStartCopyRelativeKey: string;
   readonly destinationEndCopyRelativeKey: string;
+
+  /**
+   * If present and true, instructs the copier to go through the motions of
+   * doing a copy (including checking for existence of all the objects) - but not
+   * actually perform the copy.
+   */
+  readonly dryRun?: boolean;
 };
 
-export type StepsS3CopyInvokeSettings = {
-  readonly workingBucket: string;
-  readonly workingBucketPrefixKey: string;
-};
-
-export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInput;
+export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
 
 // this odd construct just makes sure that the JSON paths we specify
 // here correspond with fields in the master "input" schema for the
@@ -47,3 +46,5 @@ export const DESTINATION_START_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachine
   "destinationStartCopyRelativeKey";
 export const DESTINATION_END_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
   "destinationEndCopyRelativeKey";
+
+export const DRY_RUN_KEY_FIELD_NAME: CopyOutStateMachineInputKeys = "dryRun";

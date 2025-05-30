@@ -16,7 +16,7 @@ import {
 // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
 // of one minute of wait - and if the objects are in fact not thawed straight away - more minutes!
 // so give ourselves 5 minutes before we abort
-const TEST_EXPECTED_SECONDS = 300;
+const TEST_EXPECTED_SECONDS = 5 * 60;
 
 let state: TestSetupState;
 
@@ -24,7 +24,7 @@ before(async () => {
   state = await testSetup();
 });
 
-test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
+test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
   const sfnClient = new SFNClient({});
 
   const {
@@ -33,6 +33,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     testFolderObjectsTsvAbsolute,
     testFolderObjectsTsvRelative,
   } = getPaths(state.workingBucketPrefixKey, state.uniqueTestId);
+
+  console.info("Creating test objects");
 
   // these are the templates for the objects we are going to create as source objects
   const sourceObjectParams: Record<string, TestObjectParams> = {
@@ -47,6 +49,10 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
       storageClass:
         "GLACIER" /* this is now Glacier Flexible Retrieval - the enum name is still the original name */,
     },
+    //
+    // the following 3 *will* work even without any actual thawing code - as IR is just like regular S3
+    // we do this just to confirm this code path
+    //
     [`standard-single-part.bin`]: {
       sizeInBytes: 256 * KiB,
     },
@@ -80,6 +86,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     (n) => `${testFolderSrc}${n}`,
   );
 
+  console.info("Creating copy instruction JSONL");
+
   await makeObjectDictionaryJsonl(
     {
       [state.sourceBucket]: testObjectKeys,
@@ -87,6 +95,8 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     state.workingBucket,
     testFolderObjectsTsvAbsolute,
   );
+
+  console.info("Triggering copy");
 
   const executionStartResult = await sfnClient.send(
     new StartExecutionCommand({
@@ -96,10 +106,11 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
         sourceFilesCsvKey: testFolderObjectsTsvRelative,
         destinationBucket: state.destinationBucket,
         destinationFolderKey: testFolderDest,
-        maxItemsPerBatch: 3,
       }),
     }),
   );
+
+  console.info("Waiting for copy...");
 
   const executionResult = await waitUntilStateMachineFinishes(
     { client: sfnClient, maxWaitTime: TEST_EXPECTED_SECONDS },
@@ -108,9 +119,14 @@ test.skip('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     },
   );
 
+  console.info("Copy finished");
+
+  // debug
+  console.log(executionResult);
+
   assert(
     executionResult.state === WaiterState.SUCCESS,
-    "Orchestration did not succeed as expected",
+    `Orchestration did not succeed as expected - it got ${executionResult.state} rather than ${WaiterState.SUCCESS}`,
   );
 
   await assertDestinations(

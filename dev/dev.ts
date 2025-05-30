@@ -87,7 +87,8 @@ class StepsS3CopyStack extends Stack {
 
     const stepsS3Copy = new StepsS3CopyConstruct(this, "StepsS3Copy", {
       vpc: vpc,
-      vpcSubnetSelection: SubnetType.PRIVATE_WITH_EGRESS,
+      // note for dev we use a public subnet as that is most likely to always be available in a default VPC
+      vpcSubnetSelection: SubnetType.PUBLIC,
       workingBucket: workingBucket.bucketName,
       workingBucketPrefixKey: WORKING_BUCKET_PREFIX,
       aggressiveTimes: true,

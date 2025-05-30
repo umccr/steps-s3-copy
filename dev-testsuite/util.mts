@@ -107,6 +107,28 @@ export async function makeObjectDictionaryJsonl(
   );
 }
 
+export async function makeInstructionsJsonl(
+  instructions: any[],
+  bucket: string,
+  key: string,
+) {
+  let content = "";
+
+  for (const i of instructions) {
+    const jsonLine = JSON.stringify(i, null, 0);
+    content += `${jsonLine}\n`;
+  }
+
+  // now save the JSONL to S3
+  const response = await s3Client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: content,
+    }),
+  );
+}
+
 /**
  * Makes an S3 object of a certain size and storage class - and
  * filled with basically blank data
