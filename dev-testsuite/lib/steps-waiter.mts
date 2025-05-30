@@ -63,7 +63,7 @@ export const waitUntilStateMachineFinishes = async (
   params: WaiterConfiguration<SFNClient>,
   input: DescribeExecutionInput,
 ): Promise<WaiterResult> => {
-  const serviceDefaults = { minDelay: 5, maxDelay: 120 };
+  const serviceDefaults = { minDelay: 5, maxDelay: 15 };
   const result = await createWaiter(
     { ...serviceDefaults, ...params },
     input,

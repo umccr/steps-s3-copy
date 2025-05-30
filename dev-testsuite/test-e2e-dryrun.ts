@@ -10,7 +10,7 @@ import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import assert from "node:assert";
 import { assertDestinations } from "./lib/assert-destinations.mjs";
 
-// this does not copying so should finish quick
+// this does no copying so should finish quick
 const TEST_EXPECTED_SECONDS = 60;
 
 let state: TestSetupState;
@@ -123,9 +123,5 @@ test("dryrun", { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     "Orchestration did not succeed as expected",
   );
 
-  await assertDestinations(
-    state.uniqueTestId,
-    state.destinationBucket,
-    testObjects,
-  );
+  // should assert on stats results
 });

@@ -1,8 +1,6 @@
 # Steps S3 Copy
 
-A service that can be installed (either directly or as a CDK
-construct) and which enables parallel file copying into a
-destination bucket in the same region.
+A CDK construct which enables large scale parallel copying of genomic objects.
 
 ## Development
 
@@ -37,8 +35,10 @@ output leaves a lot to be desired. This is definitely work in progress.
 
 NOTE: this test suite runs against _the deployed_ stack in AWS.
 
+See `package.json` for the test suites. As an example, run
+
 ```shell
-pnpm run dev-test
+pnpm run dev-test-e2e
 ```
 
 ## Input

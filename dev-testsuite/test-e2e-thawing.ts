@@ -16,7 +16,7 @@ import {
 // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
 // of one minute of wait - and if the objects are in fact not thawed straight away - more minutes!
 // so give ourselves 5 minutes before we abort
-const TEST_EXPECTED_SECONDS = 300;
+const TEST_EXPECTED_SECONDS = 5 * 60;
 
 let state: TestSetupState;
 
@@ -49,6 +49,10 @@ test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
       storageClass:
         "GLACIER" /* this is now Glacier Flexible Retrieval - the enum name is still the original name */,
     },
+    //
+    // the following 3 *will* work even without any actual thawing code - as IR is just like regular S3
+    // we do this just to confirm this code path
+    //
     [`standard-single-part.bin`]: {
       sizeInBytes: 256 * KiB,
     },
@@ -102,7 +106,6 @@ test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
         sourceFilesCsvKey: testFolderObjectsTsvRelative,
         destinationBucket: state.destinationBucket,
         destinationFolderKey: testFolderDest,
-        maxItemsPerBatch: 3,
       }),
     }),
   );
@@ -116,9 +119,14 @@ test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
     },
   );
 
+  console.info("Copy finished");
+
+  // debug
+  console.log(executionResult);
+
   assert(
     executionResult.state === WaiterState.SUCCESS,
-    "Orchestration did not succeed as expected",
+    `Orchestration did not succeed as expected - it got ${executionResult.state} rather than ${WaiterState.SUCCESS}`,
   );
 
   await assertDestinations(
