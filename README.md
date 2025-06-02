@@ -1,97 +1,184 @@
 # Steps S3 Copy
 
-A CDK construct which enables large scale parallel copying of genomic objects.
+A CDK construct which enables large scale parallel copying of objects between object stores.
 
 ## Development
 
-On check-out (once only) (note that `pre-commit` is presumed installed externally)
+See [DEV](./DEV.md).
 
-```shell
-pre-commit install
-```
+## Use
 
-For package installation (note that `pnpm` is presumed installed externally)
+### Installing the CDK construct
 
-```shell
-pnpm install
-```
+The CDK construct is published as an `npm` package.
 
-Edit the packages and deploy to dev
+An example of the use of the CDK construct is in the `dev` project. It
+deploys an example CDK to an arbitrary account - though small changes may need to be
+made to make it compatible with your VPC environment.
 
-```shell
-pnpm run dev-deploy
-```
+The configurable properties of the construct itself are:
 
-To remove entirely
+```typescript
+export interface StepsS3CopyConstructProps {
+  /**
+   * The VPC that any associated compute will be executed in
+   */
+  readonly vpc: IVpc;
 
-```shell
-pnpm run dev-destroy
-```
+  /**
+   * The VPC subnet that will be used for compute units (would generally
+   * be "private with egress" - but should work with others if properly
+   * configured).
+   */
+  readonly vpcSubnetSelection: SubnetType;
 
-## Testing (WIP)
+  /**
+   * If present, sets the fixed name of the role that will perform all the S3 operations
+   * in the target bucket account. This parameter exists because
+   * destination organisations may want a specifically *named*
+   * principal for target bucket resource policies.
+   *
+   * If undefined, CDK will choose the role name.
+   */
+  readonly writerRoleName?: string;
 
-There is a basic test suite that exercises some functionality though the
-output leaves a lot to be desired. This is definitely work in progress.
+  /**
+   * A bucket in the installation account that will be used for working
+   * artifacts such as temporary files, distributed maps outputs etc.
+   * These objects will be small, but the bucket can be set with a
+   * lifecycle to delete the objects after 30 days (or however long the
+   * maximum copy operation may be set to)
+   */
+  readonly workingBucket: string;
 
-NOTE: this test suite runs against _the deployed_ stack in AWS.
+  /**
+   * A prefix in the workingBucket that will be used for all artifacts
+   * created. Note that the prefix can be something simple such as "temp".
+   * The copy out stack will handle making sure there is enough
+   * uniqueness in artifacts that they don't clash.
+   *
+   * If undefined or the empty string, then artifacts will be created in the root
+   * of the bucket.
+   */
+  readonly workingBucketPrefixKey?: string;
 
-See `package.json` for the test suites. As an example, run
+  /**
+   * Whether the stack should use duration/timeouts that are more suited
+   * to demonstration/development. i.e. minutes rather than hours for polling intervals,
+   * hours rather than days for copy time-outs.
+   */
+  readonly aggressiveTimes?: boolean;
 
-```shell
-pnpm run dev-test-e2e
-```
-
-## Input
-
-```json
-{
-  "sourceFilesCsvBucket": "sourceBucket-with-csv",
-  "sourceFilesCsvKey": "sourceKey-of-source-files.csv",
-  "destinationBucket": "a-target-sourceBucket-in-same-region-but-not-same-account",
-  "maxItemsPerBatch": 10
+  /**
+   * Whether the stack should be given any permissions to copy data into
+   * the same account it is installed into. For demonstration/development
+   * this might be useful - but in general this should be not set - as the
+   * primary use case is to copy objects "out" of the account/buckets.
+   */
+  readonly allowWriteToInstalledAccount?: boolean;
 }
 ```
 
-The copy will fan-out wide (to sensible width (~ 100)) - but there is a small AWS Config
-cost to the startup/shutdown
-of the Fargate tasks. Therefore the `maxItemsPerBatch` controls how many individuals files are attempted per
-Fargate task - though noting that we request SPOT tasks.
+### Create the set of "copy instructions"
 
-So there is balance between the likelihood of SPOT interruptions v re-use of Fargate tasks. If
-tasks are SPOT interrupted - then the next invocation will skip already transferred files (assuming
-at least one is copied) - so it is probably safe and cheapest to leave the items per batch at 10
-and be prepared to perhaps re-execute the copy.
+In order to allow copying objects at the scale we expect - the input list of objects to copy (the "copy instructions")
+is created as a JSONL formatted object that is stored in the `workingBucket`/`workingBucketPrefixKey`.
 
-## Learnings
+Each individual "copy instruction" meets the following schema
 
-Some learnings from actual copies.
+```typescript
+export type CopyInstruction = {
+  // source bucket for object
+  sourceBucket: string;
 
-Switch off AWS Config continuous for SecurityGroup and NetworkInterface.
+  // key of object or (key + "/*") to indicate a folder
+  sourceKey: string;
 
-Items per batch of 100 - caused problems with the filenames occupying too much space in the environment passed into the Task.
+  // if present, access the source bucket/key anonymously
+  sourceNoSignRequest?: boolean;
 
-Concurrency of 80 caused issues with Throttling and Capacity - putting more sensible Retry policies on RunTask seems to
-have fixed the Throttling. We were still seeing capacity issues.
+  // a SUMS checksum definition we are asserting about this object
+  // if not present then default to no assertions about checksums.
+  // specifying a sums is incompatible with a wildcard sourceKey as sums
+  // are checksums for specific objects, not folders
+  sums?: string;
 
-The final copy needed to have a concurrency down to 25 to safely not have any issues.
+  // if present, indicates the portion of the sourceKey that is the root of the folder
+  // structure that should be copied. This affects how destination folders are calculated..
+  sourceRootFolderKey?: string;
 
-## S3 Learnings
+  // -- OR --
 
-Creating S3 checksums using S3 Batch (Copy) (as recommended by AWS) does not work for any
-objects greater than 5GiB (5368709120). This is the upper limit of the CopyObject
-call that is made by S3 Batch.
+  // if present, a folder(s) path to relatively add to destination path prefix (if any)
+  destinationRelativeFolderKey?: string;
+};
+```
 
-S3 objects can be constructed with inconsistent part sizes when making a
-Multipart Upload.
+Note that by default copy instructions will place objects directly into the destination bucket
+and destination folder (see "Invoking" below). That is, the directory structure of the
+source objects will not be replicated into the destination - just the base file name.
 
-GetObjectAttributes is the only way to retrieve details about multi part uploads - but
-it does not return any details if the objects are not created with "new" checksums.
-Objects created with just ETags do not return the parts as an array.
+However, the instructions have two fields that can be used to create directory
+structures in the destination (only one of which can be used on any single copy instruction).
 
-Task definition size Each supported Region: 64 Kilobytes No The maximum size, in KiB, of a task definition. The task definition
-accepts the command line arguments when the copier is launched (or values passed in via environment variables) - so sets the
-maximum launch size (unless we were to pivot to other services like dynamo)
+### Invoking the Steps orchestration
 
-These names are the object keys. The name for a key is a sequence of Unicode characters whose UTF-8 encoding is at most 1024 bytes long.
-The following are some of the rules: The bucket name can be between 3 and 63 characters long, and
-can contain only lower-case characters, numbers, periods, and dashes. Each label in the bucket name must start with a lowercase letter or number.
+Once the copy instructions file is created, it should be uploaded to the working bucket. The steps
+orchestration can then be invoked with the following input schema.
+
+```typescript
+export type StepsS3CopyInvokeArguments = {
+  /**
+   * The region that source buckets MUST be in.
+   *
+   * If undefined, will default to the region that the orchestration is installed into.
+   */
+  readonly sourceRequiredRegion?: string;
+
+  /**
+   * The region that destination bucket MUST be in.
+   *
+   * If undefined, will default to the region that the orchestration is installed into.
+   */
+  readonly destinationRequiredRegion?: string;
+
+  /**
+   * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
+   * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
+   * according to a
+   *
+   * TODO: NOTE: we need to rename this field!!!
+   */
+  readonly sourceFilesCsvKey: string;
+
+  /**
+   * The destination bucket to copy the objects.
+   */
+  readonly destinationBucket: string;
+
+  /**
+   * A slash terminated folder key in which to root the destination
+   * objects, or "" to mean place objects in the root of the bucket.
+   */
+  readonly destinationFolderKey: string;
+
+  readonly copyConcurrency: number;
+  readonly maxItemsPerBatch: number;
+
+  readonly destinationStartCopyRelativeKey: string;
+  readonly destinationEndCopyRelativeKey: string;
+
+  /**
+   * If present and true, instructs the copier to go through the motions of
+   * doing a copy (including checking for existence of all the objects) - but not
+   * actually perform the copy.
+   */
+  readonly dryRun?: boolean;
+};
+```
+
+Note that the `sourceFilesCsvKey` is actually the JSONL of copy instructions - and is a path
+_that is relative_ to the working folder.
+
+For instance if we uploaded the JSONL to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
+specify a `sourceFilesCsvKey` of `instructions.jsonl`.

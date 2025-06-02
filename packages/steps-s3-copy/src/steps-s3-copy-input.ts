@@ -4,16 +4,42 @@
  * used to define the "schema" of the state machine.
  */
 export type StepsS3CopyInvokeArguments = {
+  /**
+   * The region that source buckets MUST be in.
+   *
+   * If undefined, will default to the region that the orchestration is installed in.
+   */
   readonly sourceRequiredRegion?: string;
+
+  /**
+   * The region that destination bucket MUST be in.
+   *
+   * If undefined, will default to the region that the orchestration is installed in.
+   */
   readonly destinationRequiredRegion?: string;
 
+  /**
+   * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
+   * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
+   * according to a
+   *
+   * TODO: NOTE: we need to rename this field!!!
+   */
   readonly sourceFilesCsvKey: string;
+
+  /**
+   * The destination bucket to copy the objects.
+   */
+  readonly destinationBucket: string;
+
+  /**
+   * A slash terminated folder key in which to root the destination
+   * objects, or "" to mean place objects in the root of the bucket.
+   */
+  readonly destinationFolderKey: string;
 
   readonly copyConcurrency: number;
   readonly maxItemsPerBatch: number;
-
-  readonly destinationBucket: string;
-  readonly destinationFolderKey: string;
 
   readonly destinationStartCopyRelativeKey: string;
   readonly destinationEndCopyRelativeKey: string;
