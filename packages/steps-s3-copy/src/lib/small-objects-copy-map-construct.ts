@@ -27,6 +27,10 @@ type Props = {
   readonly inputPath: string;
 
   readonly maxItemsPerBatch: number;
+
+  readonly lambdaStateName: string;
+
+  readonly mapStateName: string;
 };
 
 /**
@@ -51,62 +55,111 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       `Map ${id} Iterator`,
     );
 
-    this.distributedMap = new S3JsonlDistributedMap(
-      this,
-      "SmallObjectsCopyMap",
-      {
-        toleratedFailurePercentage: 0,
-        maxItemsPerBatch: 128,
-        batchInput: {},
-        inputPath: props.inputPath,
-        itemReader: {
-          "Bucket.$": `$.bucket`,
-          "Key.$": `$.key`,
-        },
-        iterator: graph,
-        itemSelector: {
-          "s.$": JsonPath.format(
-            "s3://{}/{}",
-            JsonPath.stringAt(`$$.Map.Item.Value.sourceBucket`),
-            JsonPath.stringAt(`$$.Map.Item.Value.sourceKey`),
-          ),
-          "d.$": JsonPath.format(
-            "s3://{}/{}",
-            JsonPath.stringAt(
-              `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
-            ),
-            JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
-          ),
-        },
-        resultWriter: {
-          "Bucket.$": "$invokeSettings.workingBucket",
-          "Prefix.$": JsonPath.format(
-            "{}{}",
-            JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-            JsonPath.stringAt(
-              `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
-            ),
-          ),
-        },
-        resultSelector: {
-          type: id,
-          "mapRunArn.$": "$.MapRunArn",
-          "manifestBucket.$": "$.ResultWriterDetails.Bucket",
-          "manifestKey.$": "$.ResultWriterDetails.Key",
-        },
+    this.distributedMap = new S3JsonlDistributedMap(this, props.mapStateName, {
+      toleratedFailurePercentage: 0,
+      maxItemsPerBatch: 128,
+      batchInput: {},
+      inputPath: props.inputPath,
+      itemReader: {
+        "Bucket.$": `$.bucket`,
+        "Key.$": `$.key`,
       },
-    );
+      iterator: graph,
+      itemSelector: {
+        "s.$": JsonPath.format(
+          "s3://{}/{}",
+          JsonPath.stringAt(`$$.Map.Item.Value.sourceBucket`),
+          JsonPath.stringAt(`$$.Map.Item.Value.sourceKey`),
+        ),
+        "d.$": JsonPath.format(
+          "s3://{}/{}",
+          JsonPath.stringAt(
+            `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
+          ),
+          JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
+        ),
+      },
+      resultWriter: {
+        "Bucket.$": "$invokeSettings.workingBucket",
+        "Prefix.$": JsonPath.format(
+          "{}{}",
+          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
+          JsonPath.stringAt(
+            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+          ),
+        ),
+      },
+      resultSelector: {
+        type: id,
+        "mapRunArn.$": "$.MapRunArn",
+        "manifestBucket.$": "$.ResultWriterDetails.Bucket",
+        "manifestKey.$": "$.ResultWriterDetails.Key",
+      },
+    });
   }
 }
 
 /**
  */
+// export class SmallObjectsCopyLambdaStepConstruct extends Construct {
+//   public readonly invocableLambda;
+//   public readonly lambda: Function;
+//   public readonly stateName: string = `Small Objects Copy`;
+
+//   constructor(scope: Construct, id: string, props: Props) {
+//     super(scope, id);
+
+//     const code = DockerImageCode.fromImageAsset(
+//       join(__dirname, "..", "..", "docker", "copy-batch-docker-image"),
+//       {
+//         target: "lambda",
+//         platform: Platform.LINUX_ARM64,
+//         buildArgs: {
+//           provenance: "false",
+//         },
+//       },
+//     );
+
+//     this.lambda = new DockerImageFunction(this, "SmallObjectsCopyFunction", {
+//       // our pre-made role will have the ability to read source objects
+//       role: props.writerRole,
+//       code: code,
+//       architecture: Architecture.ARM_64,
+//       memorySize: 128,
+//       // we can theoretically need to loop through lots of objects - and those object Heads etc may
+//       // be doing back-off/retries because of all the concurrent activity
+//       // so we give ourselves plenty of time
+//       timeout: Duration.minutes(15),
+//     });
+
+//     this.invocableLambda = new LambdaInvoke(this, this.stateName, {
+//       lambdaFunction: this.lambda,
+//       payloadResponseOnly: true,
+//     });
+
+//     this.invocableLambda.addRetry({
+//       errors: ["SlowDown"],
+//       maxAttempts: 5,
+//       backoffRate: 2,
+//       interval: Duration.seconds(30),
+//       jitterStrategy: JitterType.FULL,
+//       maxDelay: Duration.minutes(2),
+//     });
+//   }
+// }
+
 export class SmallObjectsCopyLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
   public readonly lambda: Function;
-  public readonly stateName: string = `Small Objects Copy`;
 
-  constructor(scope: Construct, id: string, props: Props) {
+  // CHANGED: make stateName dynamically assigned (no default here)
+  public readonly stateName: string;
+
+  constructor(
+    scope: Construct,
+    id: string,
+    props: Props & { lambdaStateName: string },
+  ) {
     super(scope, id);
 
     const code = DockerImageCode.fromImageAsset(
@@ -121,17 +174,17 @@ export class SmallObjectsCopyLambdaStepConstruct extends Construct {
     );
 
     this.lambda = new DockerImageFunction(this, "SmallObjectsCopyFunction", {
-      // our pre-made role will have the ability to read source objects
       role: props.writerRole,
       code: code,
       architecture: Architecture.ARM_64,
       memorySize: 128,
-      // we can theoretically need to loop through lots of objects - and those object Heads etc may
-      // be doing back-off/retries because of all the concurrent activity
-      // so we give ourselves plenty of time
       timeout: Duration.minutes(15),
     });
 
+    //A DDED: assign dynamic state name from props
+    this.stateName = props.lambdaStateName;
+
+    //CHANGED: use dynamic state name instead of hardcoded string
     this.invocableLambda = new LambdaInvoke(this, this.stateName, {
       lambdaFunction: this.lambda,
       payloadResponseOnly: true,

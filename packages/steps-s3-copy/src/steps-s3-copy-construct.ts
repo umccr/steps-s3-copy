@@ -255,6 +255,8 @@ export class StepsS3CopyConstruct extends Construct {
       writerRole: this._workingRole,
       maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.copySets.small",
+      lambdaStateName: "Small Objects Copy",
+      mapStateName: "SmallObjectsCopyMap",
       //taskDefinition: taskDefinition,
       //containerDefinition: containerDefinition,
     });
