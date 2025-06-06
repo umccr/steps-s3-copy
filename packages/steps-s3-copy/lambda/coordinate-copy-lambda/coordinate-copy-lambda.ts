@@ -29,6 +29,14 @@ interface LambdaEvent {
 // set to 5 MiB as that is the definitional minimum size of a multipart part
 const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
+// These are the storage classes requiring thaw before copying
+const COLD_STORAGE_CLASSES = [
+  "GLACIER",
+  "DEEP_ARCHIVE",
+  "INTELLIGENT_TIERING_ARCHIVE_ACCESS",
+  "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
+];
+
 /**
  * A handler that processes the list/head of all the objects that we are
  * attempting to copy - and creates sub-list suitable for input to
@@ -125,11 +133,20 @@ export async function handler(event: LambdaEvent) {
     // we will pass an empty list of objects to the actual copiers
     const emptyDf = df.filter(false);
 
-    const smallDf = df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
-    const largeDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
+    // Defining the copy sets based on the size of the objects and their storage class (cold or no)
 
-    // const needsThawingDf = df.filter(storage class = ??)
-    // needs to also make sure these thawed objects are _not_ in the other copy sets
+    // Small objects that do not need thawing
+    const smallDf = df
+      .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+
+    // Small objects that require thawing
+    const smallThawDf = df
+      .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+
+    // All large objects
+    const largeDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
 
     return {
       stats: stats,
@@ -144,7 +161,14 @@ export async function handler(event: LambdaEvent) {
           event.headObjectsResults.manifestBucket,
           event.headObjectsResults.manifestAbsoluteKey,
           event.invokeArguments.dryRun ? emptyDf : largeDf,
+
           "large",
+        ),
+        smallThaw: await createJsonlFromDataFrame(
+          event.headObjectsResults.manifestBucket,
+          event.headObjectsResults.manifestAbsoluteKey,
+          event.invokeArguments.dryRun ? emptyDf : smallThawDf,
+          "smallThaw",
         ),
       },
     };
