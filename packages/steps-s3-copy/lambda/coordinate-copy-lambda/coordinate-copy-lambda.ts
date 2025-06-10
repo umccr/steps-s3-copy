@@ -145,8 +145,10 @@ export async function handler(event: LambdaEvent) {
       .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
       .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
 
-    // All large objects
-    const largeDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
+    // Large objects that do not need thawing
+    const largeDf = df
+      .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
 
     return {
       stats: stats,

@@ -23,13 +23,9 @@ import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 
 type Props = {
   readonly writerRole: IRole;
-
   readonly inputPath: string;
-
   readonly maxItemsPerBatch: number;
-
   readonly lambdaStateName: string;
-
   readonly mapStateName: string;
 };
 
@@ -99,60 +95,10 @@ export class SmallObjectsCopyMapConstruct extends Construct {
   }
 }
 
-/**
- */
-// export class SmallObjectsCopyLambdaStepConstruct extends Construct {
-//   public readonly invocableLambda;
-//   public readonly lambda: Function;
-//   public readonly stateName: string = `Small Objects Copy`;
-
-//   constructor(scope: Construct, id: string, props: Props) {
-//     super(scope, id);
-
-//     const code = DockerImageCode.fromImageAsset(
-//       join(__dirname, "..", "..", "docker", "copy-batch-docker-image"),
-//       {
-//         target: "lambda",
-//         platform: Platform.LINUX_ARM64,
-//         buildArgs: {
-//           provenance: "false",
-//         },
-//       },
-//     );
-
-//     this.lambda = new DockerImageFunction(this, "SmallObjectsCopyFunction", {
-//       // our pre-made role will have the ability to read source objects
-//       role: props.writerRole,
-//       code: code,
-//       architecture: Architecture.ARM_64,
-//       memorySize: 128,
-//       // we can theoretically need to loop through lots of objects - and those object Heads etc may
-//       // be doing back-off/retries because of all the concurrent activity
-//       // so we give ourselves plenty of time
-//       timeout: Duration.minutes(15),
-//     });
-
-//     this.invocableLambda = new LambdaInvoke(this, this.stateName, {
-//       lambdaFunction: this.lambda,
-//       payloadResponseOnly: true,
-//     });
-
-//     this.invocableLambda.addRetry({
-//       errors: ["SlowDown"],
-//       maxAttempts: 5,
-//       backoffRate: 2,
-//       interval: Duration.seconds(30),
-//       jitterStrategy: JitterType.FULL,
-//       maxDelay: Duration.minutes(2),
-//     });
-//   }
-// }
-
 export class SmallObjectsCopyLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
   public readonly lambda: Function;
-
-  // CHANGED: make stateName dynamically assigned (no default here)
+  public readonly lambdaFunction: Function;
   public readonly stateName: string;
 
   constructor(
@@ -181,10 +127,9 @@ export class SmallObjectsCopyLambdaStepConstruct extends Construct {
       timeout: Duration.minutes(15),
     });
 
-    //A DDED: assign dynamic state name from props
+    this.lambdaFunction = this.lambda;
     this.stateName = props.lambdaStateName;
 
-    //CHANGED: use dynamic state name instead of hardcoded string
     this.invocableLambda = new LambdaInvoke(this, this.stateName, {
       lambdaFunction: this.lambda,
       payloadResponseOnly: true,

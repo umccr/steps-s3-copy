@@ -22,6 +22,7 @@ type Props = {
  */
 export class ThawObjectsLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
+  public readonly lambdaFunction;
 
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
@@ -50,6 +51,8 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       // so we give ourselves plenty of time
       timeout: Duration.minutes(5),
     });
+
+    this.lambdaFunction = thawObjectsLambda;
 
     thawObjectsLambda.addToRolePolicy(
       new PolicyStatement({

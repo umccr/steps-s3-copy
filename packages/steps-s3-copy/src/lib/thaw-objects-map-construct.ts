@@ -1,22 +1,22 @@
 import { Construct } from "constructs";
-import { JsonPath } from "aws-cdk-lib/aws-stepfunctions";
-import { S3CsvDistributedMap } from "./s3-csv-distributed-map";
 import { ThawObjectsLambdaStepConstruct } from "./thaw-objects-lambda-step-construct";
 import { Duration } from "aws-cdk-lib";
-import { SOURCE_FILES_CSV_KEY_FIELD_NAME } from "../steps-s3-copy-input";
 import { IRole } from "aws-cdk-lib/aws-iam";
+import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
+import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
 
 type Props = {
   readonly writerRole: IRole;
-
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
-
   readonly aggressiveTimes?: boolean;
+  readonly inputPath: string;
+  readonly mapStateName: string;
 };
 
 export class ThawObjectsMapConstruct extends Construct {
-  public readonly distributedMap: S3CsvDistributedMap;
+  public readonly distributedMap: S3JsonlDistributedMap;
+  public readonly lambdaStep: ThawObjectsLambdaStepConstruct;
 
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
@@ -27,6 +27,13 @@ export class ThawObjectsMapConstruct extends Construct {
       {
         writerRole: props.writerRole,
       },
+    );
+
+    this.lambdaStep = thawObjectsLambdaStep;
+
+    const graph = new StateGraph(
+      thawObjectsLambdaStep.invocableLambda,
+      `Map ${id} Iterator`,
     );
 
     // for real deep glacier - we need to support retries up to 48 hours
@@ -45,27 +52,9 @@ export class ThawObjectsMapConstruct extends Construct {
       maxAttempts: maxAttempts,
     });
 
-    // these names are internal only - but we pull out as a const to make sure
-    // they are consistent
-    const bucketColumnName = "b";
-    const keyColumnName = "k";
-
-    this.distributedMap = new S3CsvDistributedMap(this, "ThawObjectsMap", {
-      // we use this phase to detect errors early - and if so we want to fail the entire run
+    this.distributedMap = new S3JsonlDistributedMap(this, props.mapStateName, {
       toleratedFailurePercentage: 0,
-      itemReaderCsvHeaders: [bucketColumnName, keyColumnName],
-      itemReader: {
-        Bucket: props.workingBucket,
-        "Key.$": JsonPath.format(
-          "{}{}",
-          props.workingBucketPrefixKey,
-          JsonPath.stringAt(`$.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`),
-        ),
-      },
-      itemSelector: {
-        "bucket.$": JsonPath.stringAt(`$$.Map.Item.Value.${bucketColumnName}`),
-        "key.$": JsonPath.stringAt(`$$.Map.Item.Value.${keyColumnName}`),
-      },
+      maxItemsPerBatch: 128,
       batchInput: {
         glacierFlexibleRetrievalThawDays: 1,
         glacierFlexibleRetrievalThawSpeed: props.aggressiveTimes
@@ -84,7 +73,16 @@ export class ThawObjectsMapConstruct extends Construct {
           ? "Standard"
           : "Bulk",
       },
-      iterator: thawObjectsLambdaStep.invocableLambda,
+      inputPath: props.inputPath,
+      itemReader: {
+        "Bucket.$": "$.bucket",
+        "Key.$": "$.key",
+      },
+      iterator: graph,
+      itemSelector: {
+        "bucket.$": JsonPath.stringAt("$$.Map.Item.Value.sourceBucket"),
+        "key.$": JsonPath.stringAt("$$.Map.Item.Value.sourceKey"),
+      },
       resultPath: JsonPath.DISCARD,
     });
   }

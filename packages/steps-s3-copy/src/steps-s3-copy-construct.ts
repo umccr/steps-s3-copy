@@ -42,6 +42,7 @@ import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
+import { SmallThawedCopyMapConstruct } from "./lib/small-thawed-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -244,6 +245,19 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
+    const smallThawedCopierMap = new SmallThawedCopyMapConstruct(
+      this,
+      "SmallThawedCopy",
+      {
+        writerRole: this._workingRole,
+        workingBucket: props.workingBucket,
+        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+        inputPath: "$coordinateCopyResults.copySets.smallThaw",
+        mapStateName: "ThawSmallObjectsMap",
+        aggressiveTimes: props.aggressiveTimes,
+      },
+    );
+
     const smallCopierMap = new SmallObjectsCopyMapConstruct(this, "Small", {
       // for small items we use a value that is much bigger than what will work
       // - this let steps batch them up itself
@@ -255,7 +269,7 @@ export class StepsS3CopyConstruct extends Construct {
       writerRole: this._workingRole,
       maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.copySets.small",
-      lambdaStateName: "Small Objects Copy",
+      lambdaStateName: "SmallObjectsCopy",
       mapStateName: "SmallObjectsCopyMap",
       //taskDefinition: taskDefinition,
       //containerDefinition: containerDefinition,
@@ -274,13 +288,6 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    //const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
-    //  writerRole: this._workingRole,
-    //  workingBucket: props.workingBucket,
-    //  workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
-    //  aggressiveTimes: props.aggressiveTimes,
-    //});
-
     //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
     //  this,
     //  "SummariseCopy",
@@ -293,6 +300,7 @@ export class StepsS3CopyConstruct extends Construct {
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
       smallCopierMap.distributedMap,
+      smallThawedCopierMap.chain,
       largeCopierMap.distributedMap,
     );
 
@@ -319,10 +327,17 @@ export class StepsS3CopyConstruct extends Construct {
       timeout: props.aggressiveTimes ? Duration.days(7) : Duration.days(30),
     });
 
+    // Grant Lambda invoke permissions to state machine role. Solves : Circular dependency between resources
+    smallThawedCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+      this._stateMachine.role,
+    );
+
     this._headObjectsMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
     );
-    // thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    smallThawedCopierMap.distributedMap.grantNestedPermissions(
+      this._stateMachine,
+    );
     smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
     largeCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
 
