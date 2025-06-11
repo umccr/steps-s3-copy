@@ -150,6 +150,11 @@ export async function handler(event: LambdaEvent) {
       .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
       .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
 
+    // Large objects that require thawing
+    const largeThawDf = df
+      .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+
     return {
       stats: stats,
       copySets: {
@@ -171,6 +176,12 @@ export async function handler(event: LambdaEvent) {
           event.headObjectsResults.manifestAbsoluteKey,
           event.invokeArguments.dryRun ? emptyDf : smallThawDf,
           "smallThaw",
+        ),
+        largeThaw: await createJsonlFromDataFrame(
+          event.headObjectsResults.manifestBucket,
+          event.headObjectsResults.manifestAbsoluteKey,
+          event.invokeArguments.dryRun ? emptyDf : largeThawDf,
+          "largeThaw",
         ),
       },
     };

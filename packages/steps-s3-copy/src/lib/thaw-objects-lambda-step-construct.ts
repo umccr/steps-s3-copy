@@ -64,7 +64,7 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
 
     this.invocableLambda = new LambdaInvoke(
       this,
-      `Are The Objects Available To Copy?`,
+      `${id}_Are The Objects Available To Copy?`,
       {
         lambdaFunction: thawObjectsLambda,
         // resultPath: JsonPath.DISCARD,

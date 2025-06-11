@@ -43,6 +43,7 @@ import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
 import { SmallThawedCopyMapConstruct } from "./lib/small-thawed-copy-map-construct";
+import { LargeThawedCopyMapConstruct } from "./lib/large-thawed-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -288,6 +289,25 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
+    const largeThawedCopierMap = new LargeThawedCopyMapConstruct(
+      this,
+      "LargeThawedCopy",
+      {
+        writerRole: this._workingRole,
+        workingBucket: props.workingBucket,
+        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+        inputPath: "$coordinateCopyResults.copySets.largeThaw",
+        aggressiveTimes: props.aggressiveTimes,
+
+        cluster: cluster,
+        clusterVpcSubnetSelection: props.vpcSubnetSelection,
+        taskDefinition: taskDefinition,
+        containerDefinition: containerDefinition,
+        maxItemsPerBatch: 1,
+        maxConcurrency: 2000,
+      },
+    );
+
     //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
     //  this,
     //  "SummariseCopy",
@@ -302,6 +322,7 @@ export class StepsS3CopyConstruct extends Construct {
       smallCopierMap.distributedMap,
       smallThawedCopierMap.chain,
       largeCopierMap.distributedMap,
+      largeThawedCopierMap.chain,
     );
 
     const definition = ChainDefinitionBody.fromChainable(
@@ -329,6 +350,9 @@ export class StepsS3CopyConstruct extends Construct {
 
     // Grant Lambda invoke permissions to state machine role. Solves : Circular dependency between resources
     smallThawedCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+      this._stateMachine.role,
+    );
+    largeThawedCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
       this._stateMachine.role,
     );
 

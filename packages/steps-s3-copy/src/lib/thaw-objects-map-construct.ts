@@ -23,7 +23,7 @@ export class ThawObjectsMapConstruct extends Construct {
 
     const thawObjectsLambdaStep = new ThawObjectsLambdaStepConstruct(
       this,
-      "LambdaStep",
+      `${id}_LambdaStep`,
       {
         writerRole: props.writerRole,
       },
