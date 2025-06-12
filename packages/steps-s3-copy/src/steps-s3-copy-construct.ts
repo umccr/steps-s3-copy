@@ -275,9 +275,10 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    const smallThawedCopierMap = new ThawSmallCopyMapConstruct(
+    // Thaw + copy composite constructs for cold storage files
+    const thawSmallCopierMap = new ThawSmallCopyMapConstruct(
       this,
-      "SmallThawedCopy",
+      "ThawSmallCopy",
       {
         writerRole: this._workingRole,
         workingBucket: props.workingBucket,
@@ -287,9 +288,9 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
-    const largeThawedCopierMap = new ThawLargeCopyMapConstruct(
+    const thawLargeCopierMap = new ThawLargeCopyMapConstruct(
       this,
-      "LargeThawedCopy",
+      "ThawLargeCopy",
       {
         maxItemsPerBatch: 1,
         maxConcurrency: 2000,
@@ -318,9 +319,9 @@ export class StepsS3CopyConstruct extends Construct {
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
       smallCopierMap.distributedMap,
-      smallThawedCopierMap.chain,
       largeCopierMap.distributedMap,
-      largeThawedCopierMap.chain,
+      thawSmallCopierMap.chain,
+      thawLargeCopierMap.chain,
     );
 
     const definition = ChainDefinitionBody.fromChainable(
@@ -347,17 +348,17 @@ export class StepsS3CopyConstruct extends Construct {
     });
 
     // Grant Lambda invoke permissions to state machine role. Solves : Circular dependency between resources
-    smallThawedCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+    thawSmallCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
       this._stateMachine.role,
     );
-    largeThawedCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+    thawLargeCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
       this._stateMachine.role,
     );
 
     this._headObjectsMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
     );
-    smallThawedCopierMap.distributedMap.grantNestedPermissions(
+    thawSmallCopierMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
     );
     smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);

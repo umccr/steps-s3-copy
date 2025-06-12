@@ -6,7 +6,7 @@ import { chdir } from "node:process";
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import { tmpNameSync } from "tmp";
-import path = require("node:path/posix");
+import * as path from "node:path/posix";
 
 interface LambdaEvent {
   // settings for the overall Steps invocation
@@ -64,7 +64,7 @@ export async function handler(event: LambdaEvent) {
 
   const getManifestResult = await client.send(getManifestCommand);
 
-  const getManifestContent = await getManifestResult.Body.transformToString();
+  const getManifestContent = await getManifestResult.Body!.transformToString();
 
   // A sample manifest
   // {"DestinationBucket":"elsa-data-tmp",
@@ -119,7 +119,7 @@ export async function handler(event: LambdaEvent) {
 
     // note we bring this entirely into memory - whereas we _possibly_ could stream it in to the dataframe -
     // is fine for the moment - we just allocate a decent amount of memory to this lambda
-    const getSuccessContent = await getSuccessResult.Body.transformToString();
+    const getSuccessContent = await getSuccessResult.Body!.transformToString();
 
     const df = pl.readJSON(getSuccessContent, {
       // we infer the schema from the entire table
