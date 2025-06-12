@@ -42,8 +42,8 @@ import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
-import { SmallThawedCopyMapConstruct } from "./lib/small-thawed-copy-map-construct";
-import { LargeThawedCopyMapConstruct } from "./lib/large-thawed-copy-map-construct";
+import { ThawSmallCopyMapConstruct } from "./lib/thaw-small-copy-map-construct";
+import { ThawLargeCopyMapConstruct } from "./lib/thaw-large-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -246,19 +246,6 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
-    const smallThawedCopierMap = new SmallThawedCopyMapConstruct(
-      this,
-      "SmallThawedCopy",
-      {
-        writerRole: this._workingRole,
-        workingBucket: props.workingBucket,
-        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
-        inputPath: "$coordinateCopyResults.copySets.smallThaw",
-        mapStateName: "ThawSmallObjectsMap",
-        aggressiveTimes: props.aggressiveTimes,
-      },
-    );
-
     const smallCopierMap = new SmallObjectsCopyMapConstruct(this, "Small", {
       // for small items we use a value that is much bigger than what will work
       // - this let steps batch them up itself
@@ -271,7 +258,6 @@ export class StepsS3CopyConstruct extends Construct {
       maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.copySets.small",
       lambdaStateName: "SmallObjectsCopy",
-      mapStateName: "SmallObjectsCopyMap",
       //taskDefinition: taskDefinition,
       //containerDefinition: containerDefinition,
     });
@@ -289,22 +275,34 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    const largeThawedCopierMap = new LargeThawedCopyMapConstruct(
+    const smallThawedCopierMap = new ThawSmallCopyMapConstruct(
       this,
-      "LargeThawedCopy",
+      "SmallThawedCopy",
       {
         writerRole: this._workingRole,
         workingBucket: props.workingBucket,
         workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
-        inputPath: "$coordinateCopyResults.copySets.largeThaw",
+        inputPath: "$coordinateCopyResults.copySets.smallThaw",
         aggressiveTimes: props.aggressiveTimes,
+      },
+    );
 
-        cluster: cluster,
-        clusterVpcSubnetSelection: props.vpcSubnetSelection,
-        taskDefinition: taskDefinition,
-        containerDefinition: containerDefinition,
+    const largeThawedCopierMap = new ThawLargeCopyMapConstruct(
+      this,
+      "LargeThawedCopy",
+      {
         maxItemsPerBatch: 1,
         maxConcurrency: 2000,
+        cluster: cluster,
+        clusterVpcSubnetSelection: props.vpcSubnetSelection,
+        writerRole: this._workingRole,
+        inputPath: "$coordinateCopyResults.copySets.largeThaw",
+        taskDefinition: taskDefinition,
+        containerDefinition: containerDefinition,
+
+        workingBucket: props.workingBucket,
+        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+        aggressiveTimes: props.aggressiveTimes,
       },
     );
 

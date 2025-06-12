@@ -26,7 +26,6 @@ type Props = {
   readonly inputPath: string;
   readonly maxItemsPerBatch: number;
   readonly lambdaStateName: string;
-  readonly mapStateName: string;
 };
 
 /**
@@ -51,7 +50,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       `Map ${id} Iterator`,
     );
 
-    this.distributedMap = new S3JsonlDistributedMap(this, props.mapStateName, {
+    this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: 128,
       batchInput: {},

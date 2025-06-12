@@ -10,7 +10,7 @@ import {
   ContainerDefinition,
 } from "aws-cdk-lib/aws-ecs";
 
-interface LargeThawedCopyMapProps {
+interface ThawLargeCopyMapProps {
   readonly writerRole: IRole;
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
@@ -26,13 +26,13 @@ interface LargeThawedCopyMapProps {
   readonly maxConcurrency: number;
 }
 
-export class LargeThawedCopyMapConstruct extends Construct {
+export class ThawLargeCopyMapConstruct extends Construct {
   public readonly chain: IChainable;
   public readonly distributedMap;
   public readonly thawStep;
   public readonly copyStep;
 
-  constructor(scope: Construct, id: string, props: LargeThawedCopyMapProps) {
+  constructor(scope: Construct, id: string, props: ThawLargeCopyMapProps) {
     super(scope, id);
 
     const thawStep = new ThawObjectsMapConstruct(this, "ThawLargeObjects", {
@@ -41,7 +41,7 @@ export class LargeThawedCopyMapConstruct extends Construct {
       workingBucketPrefixKey: props.workingBucketPrefixKey,
       aggressiveTimes: props.aggressiveTimes,
       inputPath: props.inputPath,
-      mapStateName: `${id}`,
+      mapStateName: id,
     });
 
     const copyStep = new CopyMapConstruct(this, "CopyLargeObjects", {

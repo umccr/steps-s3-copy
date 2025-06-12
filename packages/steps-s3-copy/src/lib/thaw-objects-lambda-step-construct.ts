@@ -62,13 +62,9 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       }),
     );
 
-    this.invocableLambda = new LambdaInvoke(
-      this,
-      `${id}_Are The Objects Available To Copy?`,
-      {
-        lambdaFunction: thawObjectsLambda,
-        // resultPath: JsonPath.DISCARD,
-      },
-    );
+    this.invocableLambda = new LambdaInvoke(this, id, {
+      lambdaFunction: thawObjectsLambda,
+      // resultPath: JsonPath.DISCARD,
+    });
   }
 }

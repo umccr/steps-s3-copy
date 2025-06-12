@@ -4,22 +4,21 @@ import { ThawObjectsMapConstruct } from "./thaw-objects-map-construct";
 import { SmallObjectsCopyMapConstruct } from "./small-objects-copy-map-construct";
 import { IRole } from "aws-cdk-lib/aws-iam";
 
-interface SmallThawedCopyMapProps {
+interface ThawSmallCopyMapProps {
   readonly writerRole: IRole;
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
   readonly inputPath: string;
-  readonly mapStateName: string;
   readonly aggressiveTimes?: boolean;
 }
 
-export class SmallThawedCopyMapConstruct extends Construct {
+export class ThawSmallCopyMapConstruct extends Construct {
   public readonly chain: IChainable;
   public readonly distributedMap;
   public readonly thawStep;
   public readonly copyStep;
 
-  constructor(scope: Construct, id: string, props: SmallThawedCopyMapProps) {
+  constructor(scope: Construct, id: string, props: ThawSmallCopyMapProps) {
     super(scope, id);
 
     const thawStep = new ThawObjectsMapConstruct(this, "ThawSmallObjects", {
@@ -28,7 +27,7 @@ export class SmallThawedCopyMapConstruct extends Construct {
       workingBucketPrefixKey: props.workingBucketPrefixKey,
       aggressiveTimes: props.aggressiveTimes,
       inputPath: props.inputPath,
-      mapStateName: props.mapStateName,
+      mapStateName: id,
     });
 
     const copyStep = new SmallObjectsCopyMapConstruct(
@@ -39,7 +38,6 @@ export class SmallThawedCopyMapConstruct extends Construct {
         inputPath: props.inputPath,
         maxItemsPerBatch: 128,
         lambdaStateName: "SmallThawedCopyLambda",
-        mapStateName: "SmallThawedCopyMap",
       },
     );
 
