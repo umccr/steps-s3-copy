@@ -347,7 +347,7 @@ export class StepsS3CopyConstruct extends Construct {
       timeout: props.aggressiveTimes ? Duration.days(7) : Duration.days(30),
     });
 
-    // Grant Lambda invoke permissions to state machine role. Solves : Circular dependency between resources
+    // Grant Lambda invoke permissions to state machine role.
     thawSmallCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
       this._stateMachine.role,
     );

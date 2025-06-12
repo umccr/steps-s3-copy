@@ -11,7 +11,10 @@ interface ThawSmallCopyMapProps {
   readonly inputPath: string;
   readonly aggressiveTimes?: boolean;
 }
-
+/**
+ * Two-step construct that restores cold-storage objects and then transfers them in batches using Lambda.
+ * Composed of ThawObjectsMapConstruct → SmallObjectsCopyMapConstruct (from thaw-objects-map-construct and small-objects-copy-map-construct)
+ */
 export class ThawSmallCopyMapConstruct extends Construct {
   public readonly chain: IChainable;
   public readonly distributedMap;
@@ -21,6 +24,7 @@ export class ThawSmallCopyMapConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ThawSmallCopyMapProps) {
     super(scope, id);
 
+    // Step 1: Thaw objects from cold storage using a Lambda-driven distributed map
     const thawStep = new ThawObjectsMapConstruct(this, "ThawSmallObjects", {
       writerRole: props.writerRole,
       workingBucket: props.workingBucket,
@@ -30,6 +34,7 @@ export class ThawSmallCopyMapConstruct extends Construct {
       mapStateName: id,
     });
 
+    // Step 2: Copy thawed small objects in batches using a Lambda-based copy construct
     const copyStep = new SmallObjectsCopyMapConstruct(
       this,
       "CopySmallObjects",
@@ -41,6 +46,7 @@ export class ThawSmallCopyMapConstruct extends Construct {
       },
     );
 
+    // Define the execution chain: thaw first, then copy
     this.chain = Chain.start(thawStep.distributedMap).next(
       copyStep.distributedMap,
     );

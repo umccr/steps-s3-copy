@@ -25,7 +25,10 @@ interface ThawLargeCopyMapProps {
   readonly maxItemsPerBatch: number;
   readonly maxConcurrency: number;
 }
-
+/**
+ * Two-step construct that restores cold-storage objects and then transfers them using Fargate tasks.
+ * Composed of ThawObjectsMapConstruct → CopyMapConstruct (from thaw-objects-map-construct and copy-map-construct)
+ */
 export class ThawLargeCopyMapConstruct extends Construct {
   public readonly chain: IChainable;
   public readonly distributedMap;
@@ -35,6 +38,7 @@ export class ThawLargeCopyMapConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ThawLargeCopyMapProps) {
     super(scope, id);
 
+    // Step 1: Thaw objects from cold storage using a Lambda-driven distributed map
     const thawStep = new ThawObjectsMapConstruct(this, "ThawLargeObjects", {
       writerRole: props.writerRole,
       workingBucket: props.workingBucket,
@@ -44,6 +48,7 @@ export class ThawLargeCopyMapConstruct extends Construct {
       mapStateName: id,
     });
 
+    // Step 2: Copy thawed large objects using Fargate-based tasks
     const copyStep = new CopyMapConstruct(this, "CopyLargeObjects", {
       writerRole: props.writerRole,
       inputPath: props.inputPath,
@@ -55,6 +60,7 @@ export class ThawLargeCopyMapConstruct extends Construct {
       maxConcurrency: props.maxConcurrency,
     });
 
+    // Define the execution chain: thaw first, then copy
     this.chain = Chain.start(thawStep.distributedMap).next(
       copyStep.distributedMap,
     );
