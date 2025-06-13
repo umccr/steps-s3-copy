@@ -16,7 +16,7 @@ import {
 // we have at least one "thaw" steps loop that we have to go through - so that adds a minimum
 // of one minute of wait - and if the objects are in fact not thawed straight away - more minutes!
 // so give ourselves 5 minutes before we abort
-const TEST_EXPECTED_SECONDS = 5 * 60;
+const TEST_EXPECTED_SECONDS = 7 * 60;
 
 let state: TestSetupState;
 

@@ -42,6 +42,8 @@ import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
+import { ThawSmallCopyMapConstruct } from "./lib/thaw-small-copy-map-construct";
+import { ThawLargeCopyMapConstruct } from "./lib/thaw-large-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -255,6 +257,7 @@ export class StepsS3CopyConstruct extends Construct {
       writerRole: this._workingRole,
       maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.copySets.small",
+      lambdaStateName: "SmallObjectsCopy",
       //taskDefinition: taskDefinition,
       //containerDefinition: containerDefinition,
     });
@@ -272,12 +275,37 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    //const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
-    //  writerRole: this._workingRole,
-    //  workingBucket: props.workingBucket,
-    //  workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
-    //  aggressiveTimes: props.aggressiveTimes,
-    //});
+    // Thaw + copy composite constructs for cold storage files
+    const thawSmallCopierMap = new ThawSmallCopyMapConstruct(
+      this,
+      "ThawSmallCopy",
+      {
+        writerRole: this._workingRole,
+        workingBucket: props.workingBucket,
+        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+        inputPath: "$coordinateCopyResults.copySets.smallThaw",
+        aggressiveTimes: props.aggressiveTimes,
+      },
+    );
+
+    const thawLargeCopierMap = new ThawLargeCopyMapConstruct(
+      this,
+      "ThawLargeCopy",
+      {
+        maxItemsPerBatch: 1,
+        maxConcurrency: 2000,
+        cluster: cluster,
+        clusterVpcSubnetSelection: props.vpcSubnetSelection,
+        writerRole: this._workingRole,
+        inputPath: "$coordinateCopyResults.copySets.largeThaw",
+        taskDefinition: taskDefinition,
+        containerDefinition: containerDefinition,
+
+        workingBucket: props.workingBucket,
+        workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+        aggressiveTimes: props.aggressiveTimes,
+      },
+    );
 
     //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
     //  this,
@@ -292,6 +320,8 @@ export class StepsS3CopyConstruct extends Construct {
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
       smallCopierMap.distributedMap,
       largeCopierMap.distributedMap,
+      thawSmallCopierMap.chain,
+      thawLargeCopierMap.chain,
     );
 
     const definition = ChainDefinitionBody.fromChainable(
@@ -317,10 +347,20 @@ export class StepsS3CopyConstruct extends Construct {
       timeout: props.aggressiveTimes ? Duration.days(7) : Duration.days(30),
     });
 
+    // Grant Lambda invoke permissions to state machine role.
+    thawSmallCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+      this._stateMachine.role,
+    );
+    thawLargeCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+      this._stateMachine.role,
+    );
+
     this._headObjectsMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
     );
-    // thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    thawSmallCopierMap.distributedMap.grantNestedPermissions(
+      this._stateMachine,
+    );
     smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
     largeCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
 
