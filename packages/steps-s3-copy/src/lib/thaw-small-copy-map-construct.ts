@@ -1,57 +1,82 @@
 import { Construct } from "constructs";
-import { Chain, IChainable } from "aws-cdk-lib/aws-stepfunctions";
-import { ThawObjectsMapConstruct } from "./thaw-objects-map-construct";
-import { SmallObjectsCopyMapConstruct } from "./small-objects-copy-map-construct";
+import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
+import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
+import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
+import { ThawObjectsLambdaStepConstruct } from "./thaw-objects-lambda-step-construct";
+import { SmallObjectsCopyStepConstruct } from "./small-objects-copy-step-construct";
 
-interface ThawSmallCopyMapProps {
+type Props = {
   readonly writerRole: IRole;
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
-  readonly inputPath: string;
   readonly aggressiveTimes?: boolean;
-}
-/**
- * Two-step construct that restores cold-storage objects and then transfers them in batches using Lambda.
- * Composed of ThawObjectsMapConstruct → SmallObjectsCopyMapConstruct (from thaw-objects-map-construct and small-objects-copy-map-construct)
- */
-export class ThawSmallCopyMapConstruct extends Construct {
-  public readonly chain: IChainable;
-  public readonly distributedMap;
-  public readonly thawStep;
-  public readonly copyStep;
+  readonly inputPath: string;
+  readonly mapStateName: string;
+};
 
-  constructor(scope: Construct, id: string, props: ThawSmallCopyMapProps) {
+export class ThawSmallCopyMapConstruct extends Construct {
+  public readonly distributedMap: S3JsonlDistributedMap;
+  public readonly lambdaStep: ThawObjectsLambdaStepConstruct;
+
+  constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    // Step 1: Thaw objects from cold storage using a Lambda-driven distributed map
-    const thawStep = new ThawObjectsMapConstruct(this, "ThawSmallObjects", {
+    const thawStep = new ThawObjectsLambdaStepConstruct(this, "ThawStep", {
       writerRole: props.writerRole,
-      workingBucket: props.workingBucket,
-      workingBucketPrefixKey: props.workingBucketPrefixKey,
-      aggressiveTimes: props.aggressiveTimes,
-      inputPath: props.inputPath,
-      mapStateName: id,
     });
 
-    // Step 2: Copy thawed small objects in batches using a Lambda-based copy construct
-    const copyStep = new SmallObjectsCopyMapConstruct(
-      this,
-      "CopySmallObjects",
-      {
-        writerRole: props.writerRole,
-        inputPath: props.inputPath,
-        maxItemsPerBatch: 128,
-        lambdaStateName: "SmallThawedCopyLambda",
-      },
-    );
+    this.lambdaStep = thawStep;
 
-    // Define the execution chain: thaw first, then copy
-    this.chain = Chain.start(thawStep.distributedMap).next(
-      copyStep.distributedMap,
-    );
-    this.distributedMap = copyStep.distributedMap;
-    this.thawStep = thawStep;
-    this.copyStep = copyStep;
+    thawStep.invocableLambda.addRetry({
+      errors: ["IsThawingError"],
+      interval: props.aggressiveTimes ? Duration.minutes(1) : Duration.hours(1),
+      backoffRate: 1,
+      maxAttempts: props.aggressiveTimes ? 3 : 50,
+    });
+
+    const copyStep = new SmallObjectsCopyStepConstruct(this, "CopyStep", {
+      writerRole: props.writerRole,
+      lambdaStateName: "CopySmallObject",
+    });
+
+    const startState = thawStep.invocableLambda;
+    startState.next(copyStep.step);
+
+    const graph = new StateGraph(startState, `Map ${id} Iterator`);
+
+    this.distributedMap = new S3JsonlDistributedMap(this, props.mapStateName, {
+      toleratedFailurePercentage: 0,
+      maxItemsPerBatch: 128,
+      batchInput: {
+        glacierFlexibleRetrievalThawDays: 1,
+        glacierFlexibleRetrievalThawSpeed: props.aggressiveTimes
+          ? "Expedited"
+          : "Bulk",
+        glacierDeepArchiveThawDays: 1,
+        glacierDeepArchiveThawSpeed: props.aggressiveTimes
+          ? "Expedited"
+          : "Bulk",
+        intelligentTieringArchiveThawDays: 1,
+        intelligentTieringArchiveThawSpeed: props.aggressiveTimes
+          ? "Standard"
+          : "Bulk",
+        intelligentTieringDeepArchiveThawDays: 1,
+        intelligentTieringDeepArchiveThawSpeed: props.aggressiveTimes
+          ? "Standard"
+          : "Bulk",
+      },
+      inputPath: props.inputPath,
+      itemReader: {
+        "Bucket.$": "$.bucket",
+        "Key.$": "$.key",
+      },
+      iterator: graph,
+      itemSelector: {
+        "bucket.$": JsonPath.stringAt("$$.Map.Item.Value.sourceBucket"),
+        "key.$": JsonPath.stringAt("$$.Map.Item.Value.sourceKey"),
+      },
+      resultPath: JsonPath.DISCARD,
+    });
   }
 }

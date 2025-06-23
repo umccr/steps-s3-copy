@@ -285,6 +285,7 @@ export class StepsS3CopyConstruct extends Construct {
         workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
         inputPath: "$coordinateCopyResults.copySets.smallThaw",
         aggressiveTimes: props.aggressiveTimes,
+        mapStateName: "ThawSmallCopy",
       },
     );
 
@@ -320,7 +321,7 @@ export class StepsS3CopyConstruct extends Construct {
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
       smallCopierMap.distributedMap,
       largeCopierMap.distributedMap,
-      thawSmallCopierMap.chain,
+      thawSmallCopierMap.distributedMap,
       thawLargeCopierMap.chain,
     );
 
@@ -348,9 +349,9 @@ export class StepsS3CopyConstruct extends Construct {
     });
 
     // Grant Lambda invoke permissions to state machine role.
-    thawSmallCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
-      this._stateMachine.role,
-    );
+    // thawSmallCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
+    //   this._stateMachine.role,
+    // );
     thawLargeCopierMap.thawStep.lambdaStep.lambdaFunction.grantInvoke(
       this._stateMachine.role,
     );
