@@ -1,5 +1,5 @@
 import { Construct } from "constructs";
-import { ThawObjectsLambdaStepConstruct } from "./thaw-objects-lambda-step-construct";
+import { ThawObjectsLambdaStepConstruct } from "./thaw-lambda-step-construct";
 import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";

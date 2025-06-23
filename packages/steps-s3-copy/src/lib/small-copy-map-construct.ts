@@ -1,25 +1,12 @@
 import { Construct } from "constructs";
-import {
-  JitterType,
-  JsonPath,
-  StateGraph,
-} from "aws-cdk-lib/aws-stepfunctions";
-import { Duration } from "aws-cdk-lib";
+import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
 import {
   DESTINATION_BUCKET_FIELD_NAME,
   SOURCE_FILES_CSV_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
-import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
-import { join } from "node:path";
-import {
-  Architecture,
-  DockerImageCode,
-  DockerImageFunction,
-  Function,
-} from "aws-cdk-lib/aws-lambda";
-import { Platform } from "aws-cdk-lib/aws-ecr-assets";
+import { SmallObjectsCopyLambdaStepConstruct } from "./small-copy-lambda-step-construct";
 
 type Props = {
   readonly writerRole: IRole;
@@ -90,57 +77,6 @@ export class SmallObjectsCopyMapConstruct extends Construct {
         "manifestBucket.$": "$.ResultWriterDetails.Bucket",
         "manifestKey.$": "$.ResultWriterDetails.Key",
       },
-    });
-  }
-}
-
-export class SmallObjectsCopyLambdaStepConstruct extends Construct {
-  public readonly invocableLambda;
-  public readonly lambda: Function;
-  public readonly lambdaFunction: Function;
-  public readonly stateName: string;
-
-  constructor(
-    scope: Construct,
-    id: string,
-    props: Props & { lambdaStateName: string },
-  ) {
-    super(scope, id);
-
-    const code = DockerImageCode.fromImageAsset(
-      join(__dirname, "..", "..", "docker", "copy-batch-docker-image"),
-      {
-        target: "lambda",
-        platform: Platform.LINUX_ARM64,
-        buildArgs: {
-          provenance: "false",
-        },
-      },
-    );
-
-    this.lambda = new DockerImageFunction(this, "SmallObjectsCopyFunction", {
-      role: props.writerRole,
-      code: code,
-      architecture: Architecture.ARM_64,
-      memorySize: 128,
-      timeout: Duration.minutes(15),
-    });
-
-    this.lambdaFunction = this.lambda;
-    this.stateName = props.lambdaStateName;
-
-    this.invocableLambda = new LambdaInvoke(this, this.stateName, {
-      lambdaFunction: this.lambda,
-      payloadResponseOnly: true,
-    });
-
-    this.invocableLambda.addRetry({
-      errors: ["SlowDown"],
-      maxAttempts: 5,
-      backoffRate: 2,
-      interval: Duration.seconds(30),
-      jitterStrategy: JitterType.FULL,
-      maxDelay: Duration.minutes(2),
     });
   }
 }

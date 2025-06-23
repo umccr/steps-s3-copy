@@ -41,9 +41,9 @@ import {
 import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
-import { ThawSmallCopyMapConstruct } from "./lib/thaw-small-copy-map-construct";
-import { ThawLargeCopyMapConstruct } from "./lib/thaw-large-copy-map-construct";
+import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
+import { SmallThawCopyMapConstruct } from "./lib/small-thaw-copy-map-construct";
+import { LargeThawCopyMapConstruct } from "./lib/large-thaw-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -276,22 +276,22 @@ export class StepsS3CopyConstruct extends Construct {
     });
 
     // Thaw + copy composite constructs for cold storage files
-    const thawSmallCopierMap = new ThawSmallCopyMapConstruct(
+    const thawSmallCopierMap = new SmallThawCopyMapConstruct(
       this,
-      "ThawSmallCopy",
+      "SmallThawCopy",
       {
         writerRole: this._workingRole,
         workingBucket: props.workingBucket,
         workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
         inputPath: "$coordinateCopyResults.copySets.smallThaw",
         aggressiveTimes: props.aggressiveTimes,
-        mapStateName: "ThawSmallCopy",
+        mapStateName: "SmallThawCopy",
       },
     );
 
-    const thawLargeCopierMap = new ThawLargeCopyMapConstruct(
+    const thawLargeCopierMap = new LargeThawCopyMapConstruct(
       this,
-      "ThawLargeCopy",
+      "LargeThawCopy",
       {
         maxItemsPerBatch: 1,
         maxConcurrency: 2000,

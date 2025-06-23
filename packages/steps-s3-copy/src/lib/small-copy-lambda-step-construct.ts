@@ -6,6 +6,7 @@ import {
   DockerImageCode,
   DockerImageFunction,
   Architecture,
+  Function,
 } from "aws-cdk-lib/aws-lambda";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { JitterType } from "aws-cdk-lib/aws-stepfunctions";
@@ -16,14 +17,17 @@ type Props = {
   readonly lambdaStateName: string;
 };
 
-/**
- * A construct that defines a LambdaInvoke step for copying a single small S3 object.
- * Intended to be used inside a Distributed Map where each item is handled independently.
- */
-export class SmallObjectsCopyStepConstruct extends Construct {
-  public readonly step: LambdaInvoke;
+export class SmallObjectsCopyLambdaStepConstruct extends Construct {
+  public readonly invocableLambda;
+  public readonly lambda: Function;
+  public readonly lambdaFunction: Function;
+  public readonly stateName: string;
 
-  constructor(scope: Construct, id: string, props: Props) {
+  constructor(
+    scope: Construct,
+    id: string,
+    props: Props & { lambdaStateName: string },
+  ) {
     super(scope, id);
 
     const code = DockerImageCode.fromImageAsset(
@@ -37,20 +41,23 @@ export class SmallObjectsCopyStepConstruct extends Construct {
       },
     );
 
-    const copyLambda = new DockerImageFunction(this, "CopySmallObjectLambda", {
-      code,
+    this.lambda = new DockerImageFunction(this, "SmallObjectsCopyFunction", {
       role: props.writerRole,
+      code: code,
       architecture: Architecture.ARM_64,
       memorySize: 128,
       timeout: Duration.minutes(15),
     });
 
-    this.step = new LambdaInvoke(this, props.lambdaStateName, {
-      lambdaFunction: copyLambda,
+    this.lambdaFunction = this.lambda;
+    this.stateName = props.lambdaStateName;
+
+    this.invocableLambda = new LambdaInvoke(this, this.stateName, {
+      lambdaFunction: this.lambda,
       payloadResponseOnly: true,
     });
 
-    this.step.addRetry({
+    this.invocableLambda.addRetry({
       errors: ["SlowDown"],
       maxAttempts: 5,
       backoffRate: 2,

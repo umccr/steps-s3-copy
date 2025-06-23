@@ -1,6 +1,6 @@
 import { Construct } from "constructs";
 import { Chain, IChainable } from "aws-cdk-lib/aws-stepfunctions";
-import { ThawObjectsMapConstruct } from "./thaw-objects-map-construct";
+import { ThawObjectsMapConstruct } from "./thaw-map-construct";
 import { CopyMapConstruct } from "./copy-map-construct";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -10,7 +10,7 @@ import {
   ContainerDefinition,
 } from "aws-cdk-lib/aws-ecs";
 
-interface ThawLargeCopyMapProps {
+interface LargeThawCopyMapProps {
   readonly writerRole: IRole;
   readonly workingBucket: string;
   readonly workingBucketPrefixKey: string;
@@ -29,17 +29,17 @@ interface ThawLargeCopyMapProps {
  * Two-step construct that restores cold-storage objects and then transfers them using Fargate tasks.
  * Composed of ThawObjectsMapConstruct → CopyMapConstruct (from thaw-objects-map-construct and copy-map-construct)
  */
-export class ThawLargeCopyMapConstruct extends Construct {
+export class LargeThawCopyMapConstruct extends Construct {
   public readonly chain: IChainable;
   public readonly distributedMap;
   public readonly thawStep;
   public readonly copyStep;
 
-  constructor(scope: Construct, id: string, props: ThawLargeCopyMapProps) {
+  constructor(scope: Construct, id: string, props: LargeThawCopyMapProps) {
     super(scope, id);
 
     // Step 1: Thaw objects from cold storage using a Lambda-driven distributed map
-    const thawStep = new ThawObjectsMapConstruct(this, "ThawLargeObjects", {
+    const thawStep = new ThawObjectsMapConstruct(this, "LargeThawObjects", {
       writerRole: props.writerRole,
       workingBucket: props.workingBucket,
       workingBucketPrefixKey: props.workingBucketPrefixKey,

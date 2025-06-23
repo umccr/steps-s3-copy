@@ -3,8 +3,8 @@ import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
-import { ThawObjectsLambdaStepConstruct } from "./thaw-objects-lambda-step-construct";
-import { SmallObjectsCopyStepConstruct } from "./small-objects-copy-step-construct";
+import { ThawObjectsLambdaStepConstruct } from "./thaw-lambda-step-construct";
+import { SmallObjectsCopyLambdaStepConstruct } from "./small-copy-lambda-step-construct";
 
 type Props = {
   readonly writerRole: IRole;
@@ -15,7 +15,7 @@ type Props = {
   readonly mapStateName: string;
 };
 
-export class ThawSmallCopyMapConstruct extends Construct {
+export class SmallThawCopyMapConstruct extends Construct {
   public readonly distributedMap: S3JsonlDistributedMap;
   public readonly lambdaStep: ThawObjectsLambdaStepConstruct;
 
@@ -35,13 +35,13 @@ export class ThawSmallCopyMapConstruct extends Construct {
       maxAttempts: props.aggressiveTimes ? 3 : 50,
     });
 
-    const copyStep = new SmallObjectsCopyStepConstruct(this, "CopyStep", {
+    const copyStep = new SmallObjectsCopyLambdaStepConstruct(this, "CopyStep", {
       writerRole: props.writerRole,
       lambdaStateName: "CopySmallObject",
     });
 
     const startState = thawStep.invocableLambda;
-    startState.next(copyStep.step);
+    startState.next(copyStep.invocableLambda);
 
     const graph = new StateGraph(startState, `Map ${id} Iterator`);
 
