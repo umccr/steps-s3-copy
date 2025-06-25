@@ -64,7 +64,8 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
 
     this.invocableLambda = new LambdaInvoke(this, id, {
       lambdaFunction: thawObjectsLambda,
-      // resultPath: JsonPath.DISCARD,
+      // Keep only the Lambda return value (the original event) to pass the next step
+      outputPath: "$.Payload",
     });
   }
 }

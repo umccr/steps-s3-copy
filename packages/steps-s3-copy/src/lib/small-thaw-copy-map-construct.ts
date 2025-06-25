@@ -22,7 +22,7 @@ export class SmallThawCopyMapConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const thawStep = new ThawObjectsLambdaStepConstruct(this, "ThawStep", {
+    const thawStep = new ThawObjectsLambdaStepConstruct(this, "SmallThawStep", {
       writerRole: props.writerRole,
     });
 
