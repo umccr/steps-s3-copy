@@ -80,12 +80,16 @@ export class CopyMapConstruct extends Construct {
      * Otherwise, skips straight to the delay step before copying.
      */
 
-    let preCopyStep;
+    let entryState;
 
     if (props.thaw) {
-      const thawStep = new ThawObjectsLambdaStepConstruct(this, id + "Thaw", {
-        writerRole: props.writerRole,
-      });
+      const thawStep = new ThawObjectsLambdaStepConstruct(
+        this,
+        id + "ThawLambda",
+        {
+          writerRole: props.writerRole,
+        },
+      );
 
       const interval = props.aggressiveTimes
         ? Duration.minutes(1)
@@ -101,9 +105,9 @@ export class CopyMapConstruct extends Construct {
       });
 
       thawStep.invocableLambda.next(delayStep);
-      preCopyStep = thawStep.invocableLambda;
+      entryState = thawStep.invocableLambda;
     } else {
-      preCopyStep = delayStep;
+      entryState = delayStep;
     }
 
     const copyRunTask = new CopyRunTaskConstruct(this, id + "CopyFargateTask", {
@@ -137,7 +141,7 @@ export class CopyMapConstruct extends Construct {
       maxDelay: Duration.minutes(5),
     });
 
-    const graph = new StateGraph(preCopyStep, `Map ${id} Iterator`);
+    const graph = new StateGraph(entryState, `Map ${id} Iterator`);
 
     delayStep.next(copyRunTask);
     copyRunTask.bindToGraph(graph);
@@ -182,7 +186,7 @@ export class CopyMapConstruct extends Construct {
       }),
     });
 
-    this.distributedMap = new S3JsonlDistributedMap(this, id + "CopyMap", {
+    this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
       maxConcurrency: props.maxConcurrency,
