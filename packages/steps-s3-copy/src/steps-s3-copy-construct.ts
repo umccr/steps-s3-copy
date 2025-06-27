@@ -277,7 +277,7 @@ export class StepsS3CopyConstruct extends Construct {
       this,
       "NeedThawSmall",
       {
-        thaw: true,
+        addThawStep: true,
         aggressiveTimes: props.aggressiveTimes,
         writerRole: this._workingRole,
         inputPath: "$coordinateCopyResults.copySets.smallThaw",
@@ -286,7 +286,7 @@ export class StepsS3CopyConstruct extends Construct {
     );
 
     const thawLargeCopierMap = new CopyMapConstruct(this, "NeedThawLarge", {
-      thaw: true,
+      addThawStep: true,
       aggressiveTimes: props.aggressiveTimes,
       maxItemsPerBatch: 1,
       maxConcurrency: 2000,

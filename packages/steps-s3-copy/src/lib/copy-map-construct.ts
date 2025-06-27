@@ -44,7 +44,7 @@ type Props = {
   readonly taskDefinition: TaskDefinition;
   readonly containerDefinition: ContainerDefinition;
 
-  readonly thaw?: boolean;
+  readonly addThawStep?: boolean;
   readonly aggressiveTimes?: boolean;
 };
 
@@ -82,7 +82,7 @@ export class CopyMapConstruct extends Construct {
 
     let entryState;
 
-    if (props.thaw) {
+    if (props.addThawStep) {
       const thawStep = new ThawObjectsLambdaStepConstruct(
         this,
         id + "ThawLambda",

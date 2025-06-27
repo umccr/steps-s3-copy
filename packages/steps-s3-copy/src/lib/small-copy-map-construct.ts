@@ -24,7 +24,7 @@ type Props = {
   readonly writerRole: IRole;
   readonly inputPath: string;
   readonly maxItemsPerBatch: number;
-  readonly thaw?: boolean;
+  readonly addThawStep?: boolean;
   readonly aggressiveTimes?: boolean;
 };
 
@@ -53,7 +53,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
 
     let entryState: State;
 
-    if (props.thaw) {
+    if (props.addThawStep) {
       const thawStep = new ThawObjectsLambdaStepConstruct(
         this,
         id + "ThawLambda",
