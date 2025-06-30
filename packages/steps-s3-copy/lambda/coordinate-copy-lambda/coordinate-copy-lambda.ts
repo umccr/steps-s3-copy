@@ -6,7 +6,7 @@ import { chdir } from "node:process";
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import { tmpNameSync } from "tmp";
-import path = require("node:path/posix");
+import * as path from "node:path/posix";
 
 interface LambdaEvent {
   // settings for the overall Steps invocation
@@ -28,6 +28,14 @@ interface LambdaEvent {
 // we should pass this in from above
 // set to 5 MiB as that is the definitional minimum size of a multipart part
 const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
+
+// These are the storage classes requiring thaw before copying
+const COLD_STORAGE_CLASSES = [
+  "GLACIER",
+  "DEEP_ARCHIVE",
+  "INTELLIGENT_TIERING_ARCHIVE_ACCESS",
+  "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
+];
 
 /**
  * A handler that processes the list/head of all the objects that we are
@@ -56,7 +64,7 @@ export async function handler(event: LambdaEvent) {
 
   const getManifestResult = await client.send(getManifestCommand);
 
-  const getManifestContent = await getManifestResult.Body.transformToString();
+  const getManifestContent = await getManifestResult.Body!.transformToString();
 
   // A sample manifest
   // {"DestinationBucket":"elsa-data-tmp",
@@ -111,7 +119,7 @@ export async function handler(event: LambdaEvent) {
 
     // note we bring this entirely into memory - whereas we _possibly_ could stream it in to the dataframe -
     // is fine for the moment - we just allocate a decent amount of memory to this lambda
-    const getSuccessContent = await getSuccessResult.Body.transformToString();
+    const getSuccessContent = await getSuccessResult.Body!.transformToString();
 
     const df = pl.readJSON(getSuccessContent, {
       // we infer the schema from the entire table
@@ -125,11 +133,27 @@ export async function handler(event: LambdaEvent) {
     // we will pass an empty list of objects to the actual copiers
     const emptyDf = df.filter(false);
 
-    const smallDf = df.filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES));
-    const largeDf = df.filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES));
+    // Defining the copy sets based on the size of the objects and their storage class (cold or no)
 
-    // const needsThawingDf = df.filter(storage class = ??)
-    // needs to also make sure these thawed objects are _not_ in the other copy sets
+    // Small objects that do not need thawing
+    const smallDf = df
+      .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+
+    // Small objects that require thawing
+    const smallThawDf = df
+      .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+
+    // Large objects that do not need thawing
+    const largeDf = df
+      .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+
+    // Large objects that require thawing
+    const largeThawDf = df
+      .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
 
     return {
       stats: stats,
@@ -144,7 +168,20 @@ export async function handler(event: LambdaEvent) {
           event.headObjectsResults.manifestBucket,
           event.headObjectsResults.manifestAbsoluteKey,
           event.invokeArguments.dryRun ? emptyDf : largeDf,
+
           "large",
+        ),
+        smallThaw: await createJsonlFromDataFrame(
+          event.headObjectsResults.manifestBucket,
+          event.headObjectsResults.manifestAbsoluteKey,
+          event.invokeArguments.dryRun ? emptyDf : smallThawDf,
+          "smallThaw",
+        ),
+        largeThaw: await createJsonlFromDataFrame(
+          event.headObjectsResults.manifestBucket,
+          event.headObjectsResults.manifestAbsoluteKey,
+          event.invokeArguments.dryRun ? emptyDf : largeThawDf,
+          "largeThaw",
         ),
       },
     };

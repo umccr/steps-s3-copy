@@ -22,6 +22,7 @@ type Props = {
  */
 export class ThawObjectsLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
+  public readonly lambdaFunction;
 
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
@@ -51,6 +52,8 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       timeout: Duration.minutes(5),
     });
 
+    this.lambdaFunction = thawObjectsLambda;
+
     thawObjectsLambda.addToRolePolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
@@ -59,13 +62,10 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       }),
     );
 
-    this.invocableLambda = new LambdaInvoke(
-      this,
-      `Are The Objects Available To Copy?`,
-      {
-        lambdaFunction: thawObjectsLambda,
-        // resultPath: JsonPath.DISCARD,
-      },
-    );
+    this.invocableLambda = new LambdaInvoke(this, id, {
+      lambdaFunction: thawObjectsLambda,
+      // Keep only the Lambda return value (the original event) to pass the next step
+      outputPath: "$.Payload",
+    });
   }
 }

@@ -145,10 +145,11 @@ export async function handler(event: ThawObjectsEvent) {
   // the *only* way this method can fail via error is this path
   // where we tell the Steps we are in the process of thawing
   // *all* other paths should continue on (where they can fail in the rclone)
-  if (isThawing > 0)
+  if (isThawing > 0) {
     throw new IsThawingError(
       `${isThawing}/${event.Items.length} are in the process of thawing`,
     );
-
-  return {};
+  }
+  // Return original input so downstream steps (e.g. ECS copy) get expected fields
+  return event;
 }

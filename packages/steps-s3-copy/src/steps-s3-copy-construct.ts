@@ -41,7 +41,7 @@ import {
 import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { SmallObjectsCopyMapConstruct } from "./lib/small-objects-copy-map-construct";
+import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -272,12 +272,31 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    //const thawObjectsMap = new ThawObjectsMapConstruct(this, "ThawObjects", {
-    //  writerRole: this._workingRole,
-    //  workingBucket: props.workingBucket,
-    //  workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
-    //  aggressiveTimes: props.aggressiveTimes,
-    //});
+    // Objects that are in deep glacier need to be thawed before copying
+    const thawSmallCopierMap = new SmallObjectsCopyMapConstruct(
+      this,
+      "NeedThawSmall",
+      {
+        addThawStep: true,
+        aggressiveTimes: props.aggressiveTimes,
+        writerRole: this._workingRole,
+        inputPath: "$coordinateCopyResults.copySets.smallThaw",
+        maxItemsPerBatch: 128,
+      },
+    );
+
+    const thawLargeCopierMap = new CopyMapConstruct(this, "NeedThawLarge", {
+      addThawStep: true,
+      aggressiveTimes: props.aggressiveTimes,
+      maxItemsPerBatch: 1,
+      maxConcurrency: 2000,
+      cluster: cluster,
+      clusterVpcSubnetSelection: props.vpcSubnetSelection,
+      writerRole: this._workingRole,
+      inputPath: "$coordinateCopyResults.copySets.largeThaw",
+      taskDefinition: taskDefinition,
+      containerDefinition: containerDefinition,
+    });
 
     //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
     //  this,
@@ -292,6 +311,8 @@ export class StepsS3CopyConstruct extends Construct {
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
       smallCopierMap.distributedMap,
       largeCopierMap.distributedMap,
+      thawSmallCopierMap.distributedMap,
+      thawLargeCopierMap.distributedMap,
     );
 
     const definition = ChainDefinitionBody.fromChainable(
@@ -300,7 +321,6 @@ export class StepsS3CopyConstruct extends Construct {
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
         .next(copiers)
-        //.next(thawObjectsMap.distributedMap)
         //.next(summariseCopyLambdaStep.invocableLambda)
         .next(success),
     );
@@ -320,9 +340,14 @@ export class StepsS3CopyConstruct extends Construct {
     this._headObjectsMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
     );
-    // thawObjectsMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    thawSmallCopierMap.distributedMap.grantNestedPermissions(
+      this._stateMachine,
+    );
     smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
     largeCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    thawLargeCopierMap.distributedMap.grantNestedPermissions(
+      this._stateMachine,
+    );
 
     // first policy is we need to let the state machine access our CSV list
     // of objects to copy, and write back to record the status of the copies

@@ -28,6 +28,7 @@ import {
 import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
+import { ThawObjectsLambdaStepConstruct } from "./thaw-lambda-step-construct";
 
 type Props = {
   readonly cluster: ICluster;
@@ -42,6 +43,9 @@ type Props = {
 
   readonly taskDefinition: TaskDefinition;
   readonly containerDefinition: ContainerDefinition;
+
+  readonly addThawStep?: boolean;
+  readonly aggressiveTimes?: boolean;
 };
 
 export class CopyMapConstruct extends Construct {
@@ -70,6 +74,41 @@ export class CopyMapConstruct extends Construct {
     const delayStep = Wait.jsonata(this, id + "StartJitterDelay", {
       time: WaitTime.seconds(`{% $floor($random() * ${waitWindow}) %}`),
     });
+
+    /**
+     * Adds a thawing step if needed, with retries on IsThawingError.
+     * Otherwise, skips straight to the delay step before copying.
+     */
+
+    let entryState;
+
+    if (props.addThawStep) {
+      const thawStep = new ThawObjectsLambdaStepConstruct(
+        this,
+        id + "ThawLambda",
+        {
+          writerRole: props.writerRole,
+        },
+      );
+
+      const interval = props.aggressiveTimes
+        ? Duration.minutes(1)
+        : Duration.hours(1);
+      const backoffRate = props.aggressiveTimes ? 1 : 1;
+      const maxAttempts = props.aggressiveTimes ? 3 : 50;
+
+      thawStep.invocableLambda.addRetry({
+        errors: ["IsThawingError"],
+        interval: interval,
+        backoffRate: backoffRate,
+        maxAttempts: maxAttempts,
+      });
+
+      thawStep.invocableLambda.next(delayStep);
+      entryState = thawStep.invocableLambda;
+    } else {
+      entryState = delayStep;
+    }
 
     const copyRunTask = new CopyRunTaskConstruct(this, id + "CopyFargateTask", {
       writerRole: props.writerRole,
@@ -102,7 +141,7 @@ export class CopyMapConstruct extends Construct {
       maxDelay: Duration.minutes(5),
     });
 
-    const graph = new StateGraph(delayStep, `Map ${id} Iterator`);
+    const graph = new StateGraph(entryState, `Map ${id} Iterator`);
 
     delayStep.next(copyRunTask);
     copyRunTask.bindToGraph(graph);
@@ -147,17 +186,36 @@ export class CopyMapConstruct extends Construct {
       }),
     });
 
-    this.distributedMap = new S3JsonlDistributedMap(this, id + "CopyMap", {
+    this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
       maxConcurrency: props.maxConcurrency,
-      batchInput: undefined,
+      batchInput: {
+        glacierFlexibleRetrievalThawDays: 1,
+        glacierFlexibleRetrievalThawSpeed: props.aggressiveTimes
+          ? "Expedited"
+          : "Bulk",
+        glacierDeepArchiveThawDays: 1,
+        glacierDeepArchiveThawSpeed: props.aggressiveTimes
+          ? "Expedited"
+          : "Bulk",
+        intelligentTieringArchiveThawDays: 1,
+        intelligentTieringArchiveThawSpeed: props.aggressiveTimes
+          ? "Standard"
+          : "Bulk",
+        intelligentTieringDeepArchiveThawDays: 1,
+        intelligentTieringDeepArchiveThawSpeed: props.aggressiveTimes
+          ? "Standard"
+          : "Bulk",
+      },
       inputPath: props.inputPath,
       itemReader: {
         "Bucket.$": `$.bucket`,
         "Key.$": `$.key`,
       },
       itemSelector: {
+        "bucket.$": JsonPath.stringAt("$$.Map.Item.Value.sourceBucket"),
+        "key.$": JsonPath.stringAt("$$.Map.Item.Value.sourceKey"),
         "s.$": JsonPath.format(
           "s3://{}/{}",
           JsonPath.stringAt(`$$.Map.Item.Value.sourceBucket`),
