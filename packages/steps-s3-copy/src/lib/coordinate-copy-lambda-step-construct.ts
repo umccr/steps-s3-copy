@@ -53,7 +53,12 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
           // this means that the reference to nodejs-polars is left unchanged by esbuild, *and*
           // we npm install nodejs-polars which brings in the large platform dependent binaries
           externalModules: ["nodejs-polars"],
-          nodeModules: ["nodejs-polars"],
+          nodeModules: [
+            "nodejs-polars",
+            "tmp",
+            "@aws-sdk/client-s3",
+            "@aws-sdk/lib-storage",
+          ],
         },
       },
     );
