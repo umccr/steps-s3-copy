@@ -421,6 +421,15 @@ export class StepsS3CopyConstruct extends Construct {
       ),
     );
 
+    // Allow the task definition role ecr access to the guardduty agent
+    // https://docs.aws.amazon.com/guardduty/latest/ug/prereq-runtime-monitoring-ecs-support.html#before-enable-runtime-monitoring-ecs
+    // Which is in another account - 005257825471.dkr.ecr.ap-southeast-2.amazonaws.com/aws-guardduty-agent-fargate
+      writerRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName(
+        "service-role/AmazonECSTaskExecutionRolePolicy",
+      ),
+    );
+
     // TODO: because we have given S3FUllAccess this policy is essentially ignored
     // we need to use this in conjunction with a tightened equiv for the "copier"
     writerRole.addToPolicy(
