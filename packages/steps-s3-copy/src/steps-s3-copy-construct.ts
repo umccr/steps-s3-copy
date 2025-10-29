@@ -29,6 +29,7 @@ import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
+import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
 import {
   AssetImage,
   AwsLogDriverMode,
@@ -298,13 +299,13 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
-    //  this,
-    //  "SummariseCopy",
-    //  {
-    //    writerRole: this._workingRole,
-    //  },
-    //);
+    const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
+      this,
+      "SummariseCopy",
+      {
+        writerRole: this._workingRole,
+      },
+    );
 
     // we construct a set of independent copiers that handle different types of objects
     // we can tune the copiers for their object types
@@ -321,7 +322,7 @@ export class StepsS3CopyConstruct extends Construct {
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
         .next(copiers)
-        //.next(summariseCopyLambdaStep.invocableLambda)
+        .next(summariseCopyLambdaStep.invocableLambda)
         .next(success),
     );
 
@@ -424,7 +425,7 @@ export class StepsS3CopyConstruct extends Construct {
     // Allow the task definition role ecr access to the guardduty agent
     // https://docs.aws.amazon.com/guardduty/latest/ug/prereq-runtime-monitoring-ecs-support.html#before-enable-runtime-monitoring-ecs
     // Which is in another account - 005257825471.dkr.ecr.ap-southeast-2.amazonaws.com/aws-guardduty-agent-fargate
-      writerRole.addManagedPolicy(
+    writerRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName(
         "service-role/AmazonECSTaskExecutionRolePolicy",
       ),
