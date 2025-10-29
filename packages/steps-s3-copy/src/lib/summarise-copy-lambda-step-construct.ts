@@ -67,8 +67,15 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       payload: TaskInput.fromObject({
         invokeArguments: "{% $invokeArguments %}",
         invokeSettings: "{% $invokeSettings %}",
-        rcloneResultsSmall: "{% $rcloneResultsSmall %}",
-        rcloneResultsLarge: "{% $rcloneResultsLarge %}",
+        destinationBucket: "{% $invokeArguments.destinationBucket %}",
+        destinationPrefixKey: "{% $invokeArguments.destinationFolderKey %}",
+        destinationEndCopyRelativeKey:
+          "{% $invokeArguments.destinationEndCopyRelativeKey %}",
+        workingBucket: "{% $invokeSettings.workingBucket %}",
+        rcloneResultsSmall: "{% $states.input[type='Small'] %}",
+        rcloneResultsLarge: "{% $states.input[type='Large'] %}",
+        rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
+        rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
       }),
       payloadResponseOnly: true,
     });
