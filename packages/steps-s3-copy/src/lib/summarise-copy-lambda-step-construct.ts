@@ -53,6 +53,21 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           forceDockerBundling: true,
           // and these are the modules we need to install
           nodeModules: ["csv-stringify"],
+          commandHooks: {
+            beforeBundling(inputDir: string, outputDir: string) {
+              // inputDir === packages/steps-s3-copy/lambda/summarise-copy-lambda (mounted as /asset-input)
+              // outputDir === /asset-output
+              return [
+                `cp "${inputDir}/report_template.html" "${outputDir}/report_template.html"`,
+              ];
+            },
+            afterBundling() {
+              return [];
+            },
+            beforeInstall() {
+              return [];
+            },
+          },
         },
         // in practice we hit the limits when using default values here - so we have set these to very generous
         // amounts
