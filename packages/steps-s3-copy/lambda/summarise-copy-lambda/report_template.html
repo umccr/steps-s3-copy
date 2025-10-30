@@ -348,49 +348,49 @@
       </div>
     </div>
     <!-- /container -->
+
+    <script>
+      (function () {
+        function highlightRow(id) {
+          const row = document.getElementById(id);
+          if (!row) return;
+          row.classList.add("hl");
+          row.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => row.classList.remove("hl"), 2000);
+        }
+
+        // Click on any file in the tree → highlight the matching row
+        document.addEventListener(
+          "click",
+          function (e) {
+            const a = e.target.closest && e.target.closest("a.file-link");
+            if (!a) return;
+            e.preventDefault();
+            const id =
+              a.dataset.target ||
+              (a.getAttribute("href") || "").replace(/^#/, "");
+            if (id) {
+              highlightRow(id);
+              history.replaceState(null, "", "#" + id);
+            }
+          },
+          { passive: false },
+        );
+
+        // If page loads with a #hash, highlight that row
+        if (location.hash) {
+          const id = location.hash.slice(1);
+          setTimeout(() => highlightRow(id), 50);
+        }
+      })();
+    </script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        document
+          .querySelectorAll('[data-bs-toggle="popover"]')
+          .forEach((el) => new bootstrap.Popover(el));
+      });
+    </script>
   </body>
-
-  <script>
-    (function () {
-      function highlightRow(id) {
-        const row = document.getElementById(id);
-        if (!row) return;
-        row.classList.add("hl");
-        row.scrollIntoView({ behavior: "smooth", block: "center" });
-        setTimeout(() => row.classList.remove("hl"), 2000);
-      }
-
-      // Click on any file in the tree → highlight the matching row
-      document.addEventListener(
-        "click",
-        function (e) {
-          const a = e.target.closest && e.target.closest("a.file-link");
-          if (!a) return;
-          e.preventDefault();
-          const id =
-            a.dataset.target ||
-            (a.getAttribute("href") || "").replace(/^#/, "");
-          if (id) {
-            highlightRow(id);
-            history.replaceState(null, "", "#" + id);
-          }
-        },
-        { passive: false },
-      );
-
-      // If page loads with a #hash, highlight that row
-      if (location.hash) {
-        const id = location.hash.slice(1);
-        setTimeout(() => highlightRow(id), 50);
-      }
-    })();
-  </script>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      document
-        .querySelectorAll('[data-bs-toggle="popover"]')
-        .forEach((el) => new bootstrap.Popover(el));
-    });
-  </script>
 </html>
