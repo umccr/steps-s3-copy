@@ -1,5 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+
+// Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
   join(__dirname, "report_template.html"),
   "utf8",
