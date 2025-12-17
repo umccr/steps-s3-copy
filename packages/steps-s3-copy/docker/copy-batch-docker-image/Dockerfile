@@ -23,7 +23,7 @@ ADD https://github.com/umccr/cloud-checksum/releases/download/0.2.5/cloud-checks
 RUN gzip -dc cloud-checksum-aarch64-unknown-linux-gnu.tar.gz | tar xf -
 
 
-FROM bitnami/aws-cli:latest AS fargate
+FROM amazon/aws-cli:latest AS fargate
 
 WORKDIR /work
 
@@ -40,7 +40,7 @@ ENV CB_COPY_BINARY="/work/cloud-checksum"
 # (we used to install tini and execute it ourselves but no longer do that)
 ENTRYPOINT ["/work/copy-batch-fargate"]
 
-FROM bitnami/aws-cli:latest AS lambda
+FROM amazon/aws-cli:latest AS lambda
 
 WORKDIR /work
 
@@ -52,7 +52,7 @@ ENV CB_COPY_BINARY="/work/cloud-checksum"
 ENTRYPOINT ["/work/copy-batch-lambda"]
 
 
-FROM bitnami/aws-cli:latest AS wontbuild
+FROM amazon/aws-cli:latest AS wontbuild
 
 # we very explicitly don't want a "default" build - we ALWAYS want to specify a target (fargate or lambda)
 # so this line will make any build without a --target fail
