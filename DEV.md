@@ -1,6 +1,6 @@
 # Development
 
-On check-out (once only) (note that `pre-commit` is presumed installed externally)
+On check-out (once only) (note that `pre-commit` is presumed installed externally e.g. by `brew`, `apt` etc)
 
 ```shell
 pre-commit install
