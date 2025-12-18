@@ -31,6 +31,9 @@ importers:
       constructs:
         specifier: 10.4.2
         version: 10.4.2
+      dev-constants:
+        specifier: link:../dev-constants
+        version: link:../dev-constants
       steps-s3-copy:
         specifier: link:../packages/steps-s3-copy
         version: link:../packages/steps-s3-copy
@@ -38,6 +41,12 @@ importers:
       aws-cdk:
         specifier: 2.1012.0
         version: 2.1012.0
+
+  dev-constants:
+    devDependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.3
 
   dev-testsuite:
     dependencies:

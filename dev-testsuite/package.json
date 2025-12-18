@@ -5,21 +5,25 @@
   "description": "A test suite that runs on a dev deployed version of Steps S3 Copy",
   "type": "module",
   "scripts": {
-    "//see parent package.json for test invokes": ""
+    "test-e2e-dryrun": "bun test ./test-e2e-dryrun.ts",
+    "test-e2e-koalas": "bun test ./test-e2e-koalas.ts",
+    "test-e2e-realistic": "bun test ./test-e2e-realistic.ts",
+    "test-e2e-thawing": "bun test ./test-e2e-thawing.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "3.777.0",
-    "@aws-sdk/client-s3": "3.779.0",
-    "@aws-sdk/client-sfn": "3.777.0",
-    "@aws-sdk/crc64-nvme-crt": "3.775.0",
-    "@smithy/util-waiter": "4.0.3",
-    "aws-crt": "1.26.2",
+    "@aws-sdk/client-cloudformation": "3.954.0",
+    "@aws-sdk/client-s3": "3.954.0",
+    "@aws-sdk/client-sfn": "3.954.0",
+    "@aws-sdk/client-sts": "3.954.0",
+    "@aws-sdk/crc64-nvme-crt": "3.954.0",
+    "@smithy/util-waiter": "4.2.6",
+    "aws-crt": "1.28.1",
     "crc": "4.3.2",
-    "p-limit": "6.2.0"
+    "p-limit": "7.2.0"
   },
   "devDependencies": {
-    "@aws-sdk/client-sso-oidc": "3.777.0",
-    "@aws-sdk/client-sts": "3.777.0",
-    "tsx": "4.19.3"
+    "@tsconfig/bun": "1.0.10",
+    "@types/bun": "1.3.4",
+    "typescript": "5.9.3"
   }
 }

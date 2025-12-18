@@ -24,6 +24,10 @@ To remove entirely
 pnpm run dev-destroy
 ```
 
+## Graph
+
+![Graph](stepfunctions_graph.svg)
+
 ## Testing (WIP)
 
 There is a basic test suite that exercises some functionality though the

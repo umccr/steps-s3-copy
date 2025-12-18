@@ -12,11 +12,7 @@
     "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
     "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy",
     "dev-test-step": "cd dev-testsuite && pnpx tsx --test --test-concurrency=1 test-step-*.ts",
-    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts",
-    "dev-test-e2e-dryrun": "cd dev-testsuite && pnpx tsx --test test-e2e-dryrun.ts",
-    "dev-test-e2e-koalas": "cd dev-testsuite && pnpx tsx --test test-e2e-koalas.ts",
-    "dev-test-e2e-realistic": "cd dev-testsuite && pnpx tsx --test test-e2e-realistic.ts",
-    "dev-test-e2e-thawing": "cd dev-testsuite && pnpx tsx --test test-e2e-thawing.ts"
+    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts"
   },
   "keywords": [],
   "author": {

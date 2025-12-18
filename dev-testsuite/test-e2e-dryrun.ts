@@ -1,14 +1,12 @@
 import { ChecksumAlgorithm, StorageClass } from "@aws-sdk/client-s3";
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
-import { getPaths, makeObjectDictionaryJsonl } from "./util.mjs";
-import path from "node:path/posix";
 import { WaiterState } from "@smithy/util-waiter";
+import { makeObjectDictionaryJsonl } from "./util.mjs";
 import { testSetup, TestSetupState } from "./setup";
 import { before, test } from "node:test";
 import { createTestObject, TestObject } from "./lib/create-test-object";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import assert from "node:assert";
-import { assertDestinations } from "./lib/assert-destinations.mjs";
 
 // this does no copying so should finish quick
 const TEST_EXPECTED_SECONDS = 60;
@@ -28,13 +26,6 @@ type TestObjectParams = {
 
 test("dryrun", { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
   const sfnClient = new SFNClient({});
-
-  const {
-    testFolderSrc,
-    testFolderDest,
-    testFolderObjectsTsvAbsolute,
-    testFolderObjectsTsvRelative,
-  } = getPaths(state.workingBucketPrefixKey, state.uniqueTestId);
 
   const SMALL_SIZE = 1024; // 1 KiB
   const PREFIX1 = "production/primary_data/ABCDEFGHIJ";
@@ -76,8 +67,8 @@ test("dryrun", { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
 
   for (const [n, params] of Object.entries(sourceObjects)) {
     testObjects[n] = await createTestObject(
-      state.sourceBucket,
-      `${testFolderSrc}${n}`,
+      state.workingBucket,
+      `${state.testSrcPrefix}${n}`,
       params.sizeInBytes,
       0,
       params.partSizeInBytes,
@@ -87,24 +78,26 @@ test("dryrun", { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
 
   await makeObjectDictionaryJsonl(
     {
-      [state.sourceBucket]: [
-        `${testFolderSrc}${PREFIX1}/*`,
-        `${testFolderSrc}${PREFIX2}/*`,
-        `${testFolderSrc}${ACTUAL3}`,
+      [state.workingBucket]: [
+        `${state.testSrcPrefix}${PREFIX1}/*`,
+        `${state.testSrcPrefix}${PREFIX2}/*`,
+        `${state.testSrcPrefix}${ACTUAL3}`,
       ],
     },
     state.workingBucket,
-    testFolderObjectsTsvAbsolute,
+    state.testInstructionsAbsolute,
   );
+
+  const DEST = "a-destination-folder/";
 
   const executionStartResult = await sfnClient.send(
     new StartExecutionCommand({
       stateMachineArn: state.smArn,
       name: state.uniqueTestId,
       input: JSON.stringify({
-        sourceFilesCsvKey: testFolderObjectsTsvRelative,
-        destinationBucket: state.destinationBucket,
-        destinationFolderKey: testFolderDest + "a-destination-folder/",
+        sourceFilesCsvKey: state.testInstructionsRelative,
+        destinationBucket: state.workingBucket,
+        destinationFolderKey: `${state.testDestPrefix}${DEST}`,
         maxItemsPerBatch: 3,
         dryRun: true,
       }),

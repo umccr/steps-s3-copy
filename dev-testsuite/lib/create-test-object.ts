@@ -1,13 +1,11 @@
 import {
   AbortMultipartUploadCommand,
-  ChecksumAlgorithm,
   CompleteMultipartUploadCommand,
-  CopyPartResult,
   CreateMultipartUploadCommand,
   PutObjectCommand,
   S3Client,
   StorageClass,
-  CompletedPart,
+  type CompletedPart,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import pLimit from "p-limit";
@@ -22,6 +20,12 @@ import { CrtCrc64Nvme } from "@aws-sdk/crc64-nvme-crt";
  */
 export type TestObjectParams = {
   sizeInBytes: number;
+
+  // the normal expectation is that test objects will be copied
+  // as an immediate child of the destination, but if this is set
+  // we indicate that we expect it to end at a different relative key
+  overrideExpectedDestinationRelativeKey?: string;
+
   partSizeInBytes?: number;
   storageClass?: StorageClass;
 };
@@ -37,7 +41,7 @@ export type TestObject = {
   // the key of the object
   sourceKey: string;
 
-  // information about how the object was split into parts (if multi-part uploaded)
+  // information about how the object was split into parts (if multipart uploaded)
   bufferSplit: BufferSplit;
 
   // checksums calculated locally for the test object
