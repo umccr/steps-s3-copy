@@ -24,18 +24,13 @@ To remove entirely
 pnpm run dev-destroy
 ```
 
-## Testing (WIP)
+## Graph
 
-There is a basic test suite that exercises some functionality though the
-output leaves a lot to be desired. This is definitely work in progress.
+![Graph](stepfunctions_graph.svg)
 
-NOTE: this test suite runs against _the deployed_ stack in AWS.
+## Testing
 
-See `package.json` for the test suites. As an example, run
-
-```shell
-pnpm run dev-test-e2e
-```
+See [README](./dev-testsuite/README.md).
 
 ## Learnings (out of date)
 

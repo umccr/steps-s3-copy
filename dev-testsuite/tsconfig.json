@@ -1,7 +1,6 @@
 {
-  "extends": "@tsconfig/node22/tsconfig.json",
+  "extends": "@tsconfig/bun/tsconfig.json",
   "compilerOptions": {
-    "moduleResolution": "bundler"
-  },
-  "exclude": ["node_modules", "cdk.out"]
+    "types": ["bun"]
+  }
 }

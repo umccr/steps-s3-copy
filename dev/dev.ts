@@ -1,4 +1,5 @@
 import { StepsS3CopyConstruct } from "steps-s3-copy";
+import { TEST_BUCKET_ONE_DAY_PREFIX } from "../dev-constants/constants";
 import { SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import {
   App,
@@ -54,11 +55,19 @@ class StepsS3CopyStack extends Stack {
     const workingBucket = new Bucket(this, "Working", {
       versioned: false,
       lifecycleRules: [
+        // the working bucket holds manifests and reports of copies - which all tend to be small files
+        // so we find it useful to keep them around for a bit
         {
-          // the working bucket holds manifests and reports of copies - which all tend to be small files
-          // so we find it useful to keep them around for a bit
           enabled: true,
           expiration: Duration.days(30),
+          abortIncompleteMultipartUploadAfter: Duration.days(1),
+        },
+        // if we do some testing we may create objects in the working bucket
+        // so we have a prefix that ensures they don't hang around
+        {
+          enabled: true,
+          prefix: TEST_BUCKET_ONE_DAY_PREFIX,
+          expiration: Duration.days(1),
           abortIncompleteMultipartUploadAfter: Duration.days(1),
         },
       ],
@@ -113,6 +122,9 @@ class StepsS3CopyStack extends Stack {
     });
     new CfnOutput(this, "WorkingBucket", {
       value: workingBucket.bucketName,
+    });
+    new CfnOutput(this, "WorkingBucketPrefix", {
+      value: WORKING_BUCKET_PREFIX,
     });
     new CfnOutput(this, "DestinationBucket", {
       value: destinationBucket.bucketName,
