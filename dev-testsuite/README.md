@@ -2,14 +2,17 @@
 
 ## Setup
 
+All testing expects the user's current directory is
+the `dev-testsuite` directory.
+
 Requires bun >= 1.3.5 installed externally (via brew etc).
 
 ```
 bun install --frozen-lockfile
 ```
 
-We have chosen to pivot this to Bun as a runtime - in anticipation
-of moving the rest over to Bun at some point. Bun makes the
+We have chosen to pivot testing to Bun as a runtime - in anticipation
+of moving the rest of the stack over to Bun at some point. Bun makes the
 setup all easier as it can directly execute Typescript and has a
 built-in test runner.
 

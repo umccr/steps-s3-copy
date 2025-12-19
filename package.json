@@ -10,9 +10,7 @@
     "package": "pnpm --stream --filter \"./packages/**\" run package",
     "clean": "git clean -fXd",
     "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
-    "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy",
-    "dev-test-step": "cd dev-testsuite && pnpx tsx --test --test-concurrency=1 test-step-*.ts",
-    "dev-test-e2e": "cd dev-testsuite && pnpx tsx --test test-e2e-*.ts"
+    "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy"
   },
   "keywords": [],
   "author": {

@@ -28,18 +28,9 @@ pnpm run dev-destroy
 
 ![Graph](stepfunctions_graph.svg)
 
-## Testing (WIP)
+## Testing
 
-There is a basic test suite that exercises some functionality though the
-output leaves a lot to be desired. This is definitely work in progress.
-
-NOTE: this test suite runs against _the deployed_ stack in AWS.
-
-See `package.json` for the test suites. As an example, run
-
-```shell
-pnpm run dev-test-e2e
-```
+See [README](./dev-testsuite/README.md).
 
 ## Learnings (out of date)
 
