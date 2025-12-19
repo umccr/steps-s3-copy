@@ -16,11 +16,9 @@ let unitState: UnitTestSetupState;
 beforeAll(async () => {
   state = await testSetup();
   unitState = await unitTestSetup();
-
-  console.log(JSON.stringify(unitState, null, 2));
 });
 
-test.serial("basic", async (t) => {
+test.serial("basic", async () => {
   const testStateResult = await sfnClient.send(
     new TestStateCommand({
       definition: unitState.smCanWriteLambdaAslStateString,
@@ -39,10 +37,10 @@ test.serial("basic", async (t) => {
     }),
   );
 
-  console.log(testStateResult);
+  expect(testStateResult.status === "SUCCEEDED");
 });
 
-test.serial("destination bucket in different region", async (t) => {
+test.serial("destination bucket in different region", async () => {
   const testStateResult = await sfnClient.send(
     new TestStateCommand({
       definition: unitState.smCanWriteLambdaAslStateString,

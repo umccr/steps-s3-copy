@@ -9,7 +9,9 @@
     "e2e-koalas": "bun test ./test-e2e-koalas.ts",
     "e2e-realistic": "bun test ./test-e2e-realistic.ts",
     "e2e-thawing": "bun test ./test-e2e-thawing.ts",
-    "unit-step-can-write": "bun test --timeout 30000 ./test-step-can-write-lambda.ts"
+    "step-all": "bun test ./test-step-*.ts",
+    "step-can-write": "bun test ./test-step-can-write-lambda.ts",
+    "step-head-objects": "bun test ./test-step-head-objects-lambda.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "3.954.0",

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, test, expect } from "bun:test";
+import { afterEach, beforeAll, test, expect } from "bun:test";
 import { equal, ok } from "node:assert/strict";
 import { SFNClient, TestStateCommand } from "@aws-sdk/client-sfn";
 import {
@@ -43,7 +43,7 @@ afterEach(async () => await new Promise((r) => setTimeout(r, 500)));
 
 // note this happens once for the entire suite - given our head objects step is read-only - we can run the
 // tests against a single S3 store and the tests will not interfere with each other
-beforeEach(async () => {
+beforeAll(async () => {
   state = await testSetup();
   unitState = await unitTestSetup();
 
@@ -110,7 +110,7 @@ beforeEach(async () => {
   }
 });
 
-test("basic functionality", async (t) => {
+test.serial("basic functionality", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
       destinationFolderKey: DESTINATION_PREFIX,
@@ -161,118 +161,130 @@ test("basic functionality", async (t) => {
   ok(outputArray[1].lastModifiedISOString);
 });
 
-test("sourceRoot places objects retaining original folder structure", async (t) => {
-  const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
-    Items: [
-      {
-        sourceBucket: state.workingBucket,
-        sourceKey: `${state.uniqueTestId}/${PATH5}`,
-        sourceRootFolderKey: `${state.uniqueTestId}/`,
+test.serial(
+  "sourceRoot places objects retaining original folder structure",
+  async () => {
+    const input: HeadObjectsLambdaInvokeEvent = {
+      BatchInput: {
+        destinationFolderKey: DESTINATION_PREFIX,
+        maximumExpansion: 5,
       },
-      {
-        sourceBucket: state.workingBucket,
-        sourceKey: `${state.uniqueTestId}/${PATH6}`,
-        sourceRootFolderKey: `${state.uniqueTestId}/`,
+      Items: [
+        {
+          sourceBucket: state.workingBucket,
+          sourceKey: `${state.uniqueTestId}/${PATH5}`,
+          sourceRootFolderKey: `${state.uniqueTestId}/`,
+        },
+        {
+          sourceBucket: state.workingBucket,
+          sourceKey: `${state.uniqueTestId}/${PATH6}`,
+          sourceRootFolderKey: `${state.uniqueTestId}/`,
+        },
+      ],
+    };
+
+    const testStateResult = await sfnClient.send(
+      new TestStateCommand({
+        definition: unitState.smHeadObjectsLambdaAslStateString,
+        roleArn: unitState.smRoleArn,
+        input: JSON.stringify(input),
+        variables: "{}",
+      }),
+    );
+
+    equal(testStateResult.status, "SUCCEEDED");
+    ok(testStateResult.output);
+
+    const outputArray = JSON.parse(testStateResult.output);
+
+    equal(outputArray.length, 2);
+
+    // note our array ordering here may differ from the order of the inputs (there is no requirement for inputs
+    // to be sorted)
+
+    equal(outputArray[0].sourceBucket, state.workingBucket);
+    equal(outputArray[0].sourceKey, `${state.uniqueTestId}/${PATH6}`);
+    equal(
+      outputArray[0].destinationKey,
+      `${DESTINATION_PREFIX}${FOLDER_BB}${FOLDER_CCC}${FILE6}`,
+    );
+
+    equal(outputArray[1].sourceBucket, state.workingBucket);
+    equal(outputArray[1].sourceKey, `${state.uniqueTestId}/${PATH5}`);
+    equal(
+      outputArray[1].destinationKey,
+      `${DESTINATION_PREFIX}${FOLDER_BB}${FILE5}`,
+    );
+  },
+);
+
+test.serial(
+  "destinationRelativeFolderKey places objects in arbitrary locations",
+  async () => {
+    const DEST1 = "xxx/";
+    const DEST2 = "yyy/";
+
+    const input: HeadObjectsLambdaInvokeEvent = {
+      BatchInput: {
+        destinationFolderKey: DESTINATION_PREFIX,
+        maximumExpansion: 5,
       },
-    ],
-  };
+      Items: [
+        {
+          sourceBucket: state.workingBucket,
+          sourceKey: `${state.uniqueTestId}/${PATH4}`,
+          destinationRelativeFolderKey: `${DEST1}`,
+        },
+        {
+          sourceBucket: state.workingBucket,
+          sourceKey: `${state.uniqueTestId}/${PATH5}`,
+          destinationRelativeFolderKey: `${DEST2}`,
+        },
+        {
+          sourceBucket: state.workingBucket,
+          sourceKey: `${state.uniqueTestId}/${PATH6}`,
+          destinationRelativeFolderKey: `${DEST2}${DEST1}`,
+        },
+      ],
+    };
 
-  const testStateResult = await sfnClient.send(
-    new TestStateCommand({
-      definition: unitState.smHeadObjectsLambdaAslStateString,
-      roleArn: unitState.smRoleArn,
-      input: JSON.stringify(input),
-      variables: "{}",
-    }),
-  );
+    const testStateResult = await sfnClient.send(
+      new TestStateCommand({
+        definition: unitState.smHeadObjectsLambdaAslStateString,
+        roleArn: unitState.smRoleArn,
+        input: JSON.stringify(input),
+        variables: "{}",
+      }),
+    );
 
-  equal(testStateResult.status, "SUCCEEDED");
-  ok(testStateResult.output);
+    equal(testStateResult.status, "SUCCEEDED");
+    ok(testStateResult.output);
 
-  const outputArray = JSON.parse(testStateResult.output);
+    const outputArray = JSON.parse(testStateResult.output);
 
-  equal(outputArray.length, 2);
+    equal(outputArray.length, 3);
 
-  // note our array ordering here may differ from the order of the inputs (there is no requirement for inputs
-  // to be sorted)
+    equal(outputArray[0].sourceKey, `${state.uniqueTestId}/${PATH4}`);
+    equal(
+      outputArray[0].destinationKey,
+      `${DESTINATION_PREFIX}${DEST1}${FILE4}`,
+    );
 
-  equal(outputArray[0].sourceBucket, state.workingBucket);
-  equal(outputArray[0].sourceKey, `${state.uniqueTestId}/${PATH6}`);
-  equal(
-    outputArray[0].destinationKey,
-    `${DESTINATION_PREFIX}${FOLDER_BB}${FOLDER_CCC}${FILE6}`,
-  );
+    equal(outputArray[1].sourceKey, `${state.uniqueTestId}/${PATH5}`);
+    equal(
+      outputArray[1].destinationKey,
+      `${DESTINATION_PREFIX}${DEST2}${FILE5}`,
+    );
 
-  equal(outputArray[1].sourceBucket, state.workingBucket);
-  equal(outputArray[1].sourceKey, `${state.uniqueTestId}/${PATH5}`);
-  equal(
-    outputArray[1].destinationKey,
-    `${DESTINATION_PREFIX}${FOLDER_BB}${FILE5}`,
-  );
-});
+    equal(outputArray[2].sourceKey, `${state.uniqueTestId}/${PATH6}`);
+    equal(
+      outputArray[2].destinationKey,
+      `${DESTINATION_PREFIX}${DEST2}${DEST1}${FILE6}`,
+    );
+  },
+);
 
-test("destinationRelativeFolderKey places objects in arbitrary locations", async (t) => {
-  const DEST1 = "xxx/";
-  const DEST2 = "yyy/";
-
-  const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
-    Items: [
-      {
-        sourceBucket: state.workingBucket,
-        sourceKey: `${state.uniqueTestId}/${PATH4}`,
-        destinationRelativeFolderKey: `${DEST1}`,
-      },
-      {
-        sourceBucket: state.workingBucket,
-        sourceKey: `${state.uniqueTestId}/${PATH5}`,
-        destinationRelativeFolderKey: `${DEST2}`,
-      },
-      {
-        sourceBucket: state.workingBucket,
-        sourceKey: `${state.uniqueTestId}/${PATH6}`,
-        destinationRelativeFolderKey: `${DEST2}${DEST1}`,
-      },
-    ],
-  };
-
-  const testStateResult = await sfnClient.send(
-    new TestStateCommand({
-      definition: unitState.smHeadObjectsLambdaAslStateString,
-      roleArn: unitState.smRoleArn,
-      input: JSON.stringify(input),
-      variables: "{}",
-    }),
-  );
-
-  equal(testStateResult.status, "SUCCEEDED");
-  ok(testStateResult.output);
-
-  const outputArray = JSON.parse(testStateResult.output);
-
-  equal(outputArray.length, 3);
-
-  equal(outputArray[0].sourceKey, `${state.uniqueTestId}/${PATH4}`);
-  equal(outputArray[0].destinationKey, `${DESTINATION_PREFIX}${DEST1}${FILE4}`);
-
-  equal(outputArray[1].sourceKey, `${state.uniqueTestId}/${PATH5}`);
-  equal(outputArray[1].destinationKey, `${DESTINATION_PREFIX}${DEST2}${FILE5}`);
-
-  equal(outputArray[2].sourceKey, `${state.uniqueTestId}/${PATH6}`);
-  equal(
-    outputArray[2].destinationKey,
-    `${DESTINATION_PREFIX}${DEST2}${DEST1}${FILE6}`,
-  );
-});
-
-test("wildcard expansion with destination prefix", async (t) => {
+test.serial("wildcard expansion with destination prefix", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
       destinationFolderKey: DESTINATION_PREFIX,
@@ -334,7 +346,7 @@ test("wildcard expansion with destination prefix", async (t) => {
   equal(outputArray[3].destinationKey, `${DESTINATION_PREFIX}${FILE5}`);
 });
 
-test("sums data is passed through", async (t) => {
+test.serial("sums data is passed through", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
       destinationFolderKey: DESTINATION_PREFIX,
@@ -370,7 +382,7 @@ test("sums data is passed through", async (t) => {
   equal(outputArray[0].sums, `{v:1}`);
 });
 
-test("missing object will fail", async (t) => {
+test.serial("missing object will fail", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
       destinationFolderKey: DESTINATION_PREFIX,
@@ -397,7 +409,7 @@ test("missing object will fail", async (t) => {
   equal(testStateResult.error, "SourceObjectNotFound");
 });
 
-test("wildcard expansion will fail if too many", async (t) => {
+test("wildcard expansion will fail if too many", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
       destinationFolderKey: DESTINATION_PREFIX,
@@ -424,7 +436,7 @@ test("wildcard expansion will fail if too many", async (t) => {
   equal(testStateResult.error, "WildcardExpansionMaximumError");
 });
 
-test("wildcard expansion will fail if none", async (t) => {
+test.serial("wildcard expansion will fail if none", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
       destinationFolderKey: DESTINATION_PREFIX,

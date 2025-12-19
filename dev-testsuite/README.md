@@ -15,7 +15,27 @@ built-in test runner.
 
 ## Unit tests
 
-WIP!
+A collection of unit(ish) tests that exercise a single stage of the Steps ASL using
+the AWS Test State API thereby executing the _actual_ lambdas that are
+deployed.
+
+NOTE: THESE TESTS RUN AGAINST A _DEPLOYED_ INSTANCE - they do not run against
+the local code base. However, unlike the end-to-end testing - they do not actually
+invoke an orchestration, and test just a single step directly.
+
+| Test                           |
+| ------------------------------ |
+| `bun run step-all` (all tests) |
+| `bun run step-can-write`       |
+| `bun run step-head-objects`    |
+
+THOUGHTS: This was an attempt to utilise the AWS provided Test State API. It
+offers _some_ useful features in that it exercises the code in AWS and hence
+does not require mocking of S3 etc. However it is a bit unwieldy to use - because
+it requires testing the raw ASL, which is text that we do not construct manually
+(because we use CDK constructs). So we fetch the ASL direct from the deployed
+state machine using some possibly overly convoluted mechanisms. It is possible
+this would all be better as some actual unit tests in each lambda.
 
 ## End-to-end tests
 
