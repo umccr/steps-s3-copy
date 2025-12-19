@@ -81,7 +81,6 @@ export async function assertCopiedObject(
   );
 
   console.info(
-    `✅ Copied ${expectedSize} byte object to s3://<working>/${destinationKey}` +
-      (to.storageClass ? ` from storage class ${to.storageClass}` : ""),
+    `✅ Copied ${expectedSize} byte object to s3://<working>/${destinationKey}`,
   );
 }

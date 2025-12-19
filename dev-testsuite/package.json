@@ -5,10 +5,11 @@
   "description": "A test suite that runs on a dev deployed version of Steps S3 Copy",
   "type": "module",
   "scripts": {
-    "test-e2e-dryrun": "bun test ./test-e2e-dryrun.ts",
-    "test-e2e-koalas": "bun test ./test-e2e-koalas.ts",
-    "test-e2e-realistic": "bun test ./test-e2e-realistic.ts",
-    "test-e2e-thawing": "bun test ./test-e2e-thawing.ts"
+    "e2e-dryrun": "bun test ./test-e2e-dryrun.ts",
+    "e2e-koalas": "bun test ./test-e2e-koalas.ts",
+    "e2e-realistic": "bun test ./test-e2e-realistic.ts",
+    "e2e-thawing": "bun test ./test-e2e-thawing.ts",
+    "unit-step-can-write": "bun test --timeout 30000 ./test-step-can-write-lambda.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "3.954.0",

@@ -29,8 +29,6 @@ test(
   async () => {
     const sfnClient = new SFNClient({});
 
-    console.info("Creating test objects");
-
     // these are the templates for the objects we are going to create as source objects
     const sourceObjectParams: Record<string, TestObjectParams> = {
       [`glacier-single-part.bin`]: {
@@ -63,6 +61,8 @@ test(
           "GLACIER_IR" /* Glacier IR should behave like normal S3, but we want to ensure that it works */,
       },
     };
+
+    console.info("Creating test objects");
 
     const testObjects: Record<string, TestObject> = {};
 

@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client, StorageClass } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
   // requestHandler: {
@@ -24,6 +24,8 @@ export async function makeObjectDictionaryJsonl(
 
   // for each bucket of sources
   for (const b of Object.keys(objects)) {
+    if (!objects[b]) continue;
+
     // for each key
     for (const k of objects[b]) {
       const jsonLine = JSON.stringify(
@@ -48,6 +50,14 @@ export async function makeObjectDictionaryJsonl(
   );
 }
 
+/**
+ * Take an array of instruction objects, and convert them to JSONL
+ * and upload the JSONL to a bucket.
+ *
+ * @param instructions
+ * @param bucket
+ * @param key
+ */
 export async function makeInstructionsJsonl(
   instructions: any[],
   bucket: string,
@@ -69,84 +79,3 @@ export async function makeInstructionsJsonl(
     }),
   );
 }
-
-/**
- * Makes an S3 object of a certain size and storage class - and
- * filled with basically blank data
- *
- * @param bucket the sourceBucket of the object
- * @param key the sourceKey of the object
- * @param sizeInBytes the size in bytes of the object to make
- * @param storageClass the storage class for the object, defaults to STANDARD
- * @param forceContentByte force a content byte if the default needs to be overridden
- * @returns the byte value that is the content of the created file
- */
-export async function makeTestObject(
-  bucket: string,
-  key: string,
-  sizeInBytes: number,
-  storageClass: StorageClass = "STANDARD",
-  forceContentByte: number | undefined = undefined,
-) {
-  const contentByte =
-    forceContentByte === undefined ? sizeInBytes % 256 : forceContentByte;
-
-  const response = await s3Client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      // so rather than make every file filled with 0s - we fill
-      // with a value that depends on the size... no particular
-      // point other than we can I guess assert content has been
-      // successfully copied by looking at the destination content after copy
-      Body: Buffer.alloc(sizeInBytes, contentByte),
-      StorageClass: storageClass,
-    }),
-  );
-  return contentByte;
-}
-
-/*
-(async () => {
-  const sourceBucket = "steps-s3-copy-testing";
-
-  const empty = makeBlob(0, 0);
-
-  const tiny = makeBlob(6, 0);
-
-  console.log(calcPartDetails(tiny, 1));
-  console.log(calcPartDetails(tiny, 2));
-  console.log(calcPartDetails(tiny, 3));
-  console.log(calcPartDetails(tiny, 4));
-  console.log(calcPartDetails(tiny, 5));
-  console.log(calcPartDetails(tiny, 6));
-  console.log(calcPartDetails(tiny, 7));
-  console.log(calcPartDetails(tiny, 8));
-
-  const small = makeBlob(64, 6);
-
-  calcHashes(small, 5 * 1024 * 1024);
-
-  await multiPartUpload(sourceBucket, "small.bin", small, 5*1024*1024);
-
-
-  // make a "large" blob that is multiple 5 MiB parts AND is an uneven number of bytes (there may be edge cases
-  // for objects not multiples of 2)
-  const large = makeBlob(19 * 1024 * 1024 + 223, 8);
-  calcHashes(large, 6 * 1024 * 1024);
-
-
-  await multiPartUpload(sourceBucket, "large.bin", large, 6*1024*1024);
-
-  const r = await s3Client.send(new GetObjectAttributesCommand({
-    Bucket: sourceBucket,
-    Key: "large.bin",
-    ObjectAttributes: [
-      "ETag", "Checksum", "ObjectParts", "ObjectSize", "StorageClass"
-    ]
-  }));
-  console.log(JSON.stringify(r, null, 2));
-
-
-})();
-*/

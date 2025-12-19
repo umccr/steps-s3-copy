@@ -8,6 +8,12 @@ import { randomBytes } from "node:crypto";
 import { TEST_BUCKET_ONE_DAY_PREFIX } from "../dev-constants/constants.ts";
 import { GetCallerIdentityCommand, STSClient } from "@aws-sdk/client-sts";
 
+/**
+ * The test setup state is derived from settings of a deployed
+ * Steps copier - alongside a random unique test id.
+ * Together these settings are all that is needed to run an isolated
+ * test.
+ */
 export type TestSetupState = {
   // we use a short random hex string for naming folders - as we create objects
   // in a shared bucket where we don't want them to clash
@@ -20,12 +26,18 @@ export type TestSetupState = {
   workingBucket: string;
   workingBucketPrefixKey: string;
 
+  // paths for creating various test artefacts
   testInstructionsRelative: string;
   testInstructionsAbsolute: string;
   testSrcPrefix: string;
   testDestPrefix: string;
 };
 
+/**
+ * The unit test setup state returns access to internal
+ * ASL state machine data. It will only work in dev deployed
+ * steps machines and is only used for some unit testing.
+ */
 export type UnitTestSetupState = {
   smRoleArn: string;
   smCanWriteLambdaAslStateString: string;
@@ -33,15 +45,35 @@ export type UnitTestSetupState = {
 };
 
 /**
+ * Allows the test suite to run in designated accounts - where the
+ * name of the deployed cloud formation is different.
+ * Defaults to "StepsS3Copy".
+ */
+async function getStackName(): Promise<string> {
+  const stsClient = new STSClient({});
+
+  const idResult = await stsClient.send(new GetCallerIdentityCommand({}));
+
+  switch (idResult.Account) {
+    case "455634345446":
+      return "Stg-StepsS3CopyStack";
+    case "472057503814":
+      return "Prod-StepsS3CopyStack";
+    default:
+      return "StepsS3Copy";
+  }
+}
+
+/**
  * Find a Steps copier stack by name and return a function that
  * can fetch output values from the stack (used to configure the testing).
  *
  * @param stackName
  */
-async function findStack(stackName: string): {
+async function findStack(stackName: string): Promise<{
   stack: Stack;
   getMandatoryOutputValue: (s: string) => string;
-} {
+}> {
   const cloudFormationClient = new CloudFormationClient({});
   const foundStack = await cloudFormationClient.send(
     new DescribeStacksCommand({
@@ -72,7 +104,9 @@ async function findStack(stackName: string): {
 
       const output = s.Outputs.find((o) => o.OutputKey === name);
 
-      if (!output || !output.OutputValue) {
+      // note that the outputvalue for working prefix can be the empty string (as a valid value) - so we
+      // do not use "!" here...
+      if (!output || output.OutputValue === undefined) {
         throw Error(
           `Deployed stack ${stackName} must have set named outputs - missing ${name}`,
         );
@@ -81,21 +115,6 @@ async function findStack(stackName: string): {
       return output.OutputValue;
     },
   };
-}
-
-async function getStackName(): string {
-  const stsClient = new STSClient({});
-
-  const idResult = await stsClient.send(new GetCallerIdentityCommand({}));
-
-  switch (idResult.Account) {
-    case "843407916570":
-      return "StepsS3Copy";
-    case "455634345446":
-      return "Stg-StepsS3CopyStack";
-    default:
-      throw new Error("Unsupported account for steps copier testing");
-  }
 }
 
 /**
@@ -112,7 +131,7 @@ export async function testSetup(): Promise<TestSetupState> {
   //  process.exit(1);
   // }
 
-  const stackInstance = findStack(getStackName());
+  const stackInstance = await findStack(await getStackName());
 
   const smArn = stackInstance.getMandatoryOutputValue("StateMachineArn");
   const workingBucket = stackInstance.getMandatoryOutputValue("WorkingBucket");
@@ -150,8 +169,9 @@ export async function testSetup(): Promise<TestSetupState> {
 export async function unitTestSetup(): Promise<UnitTestSetupState> {
   const sfnClient = new SFNClient({});
 
-  const stackInstance = findStack(getStackName());
+  const stackInstance = await findStack(await getStackName());
 
+  const smArn = stackInstance.getMandatoryOutputValue("StateMachineArn");
   const smRoleArn = stackInstance.getMandatoryOutputValue(
     "StateMachineRoleArn",
   );
