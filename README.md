@@ -182,3 +182,73 @@ _that is relative_ to the working folder.
 
 For instance if we uploaded the JSONL to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
 specify a `sourceFilesCsvKey` of `instructions.jsonl`.
+
+## Thawing objects from cold storage
+
+S3 objects stored in cold or archival tiers (Glacier, Deep Archive, or Intelligent-Tiering archive tiers)
+cannot be copied immediately, so the orchestration can request a restore (thaw) before attempting the copy.
+
+Whether thawing is required is determined during the coordinate / classification phase of the workflow.
+The CoordinateCopy step classifies each object by size (using a 5 MiB threshold, the minimum S3 multipart
+upload part size) and storage class. Each group is written as a separate copy set (JSONL file) in the
+working bucket, with objects requiring restore placed into dedicated sets:
+
+- `smallThaw` / `largeThaw`: must be thawed first, then copied
+- `small` / `large`: can be copied immediately
+
+The workflow then runs four distributed maps in parallel (small/large plus thawed variants), and the thawed copy paths execute a thaw step before copying.
+
+### Thawing behaviour
+
+The same thawing logic is applied to both small and large objects. Thawing is handled by a
+single Lambda step (implemented by `ThawObjectsLambdaStepConstruct` and reused by both
+`smallThaw` and `largeThaw` copy paths), which, for each object:
+
+1. checks whether the object is currently readable / available in active storage
+2. if not available, triggers an S3 restore request (`RestoreObject`)
+3. if the object is still thawing, the Lambda throws `IsThawingError`
+
+Step Functions is configured to **retry** on `IsThawingError`, which effectively turns this into
+a polling loop until the object become available.
+
+### Restore settings
+
+Restore requests are submitted with **conservative defaults** intended to minimise cost. With the
+exception of `aggressiveTimes` (see below), restore-related settings are **not currently configurable**
+via the state machine input. A future enhancement will expose these parameters so callers can
+customise restore behaviour.
+
+**Retry / polling behaviour**
+
+Retry cadence when handling `IsThawingError` is controlled by the `aggressiveTimes` construct property:
+
+- `aggressiveTimes = false` (default): retry every **1 hour**, up to **50** attempts (≈ 50 hours)
+- `aggressiveTimes = true`: retry every **1 minute**, up to **3** attempts
+
+Note that `aggressiveTimes` is enable for **development and testing only**, where restores are
+expected to complete quickly and faster feedback is desirable.
+
+**Retrieval tier (speed)**
+
+S3 restore requests support different retrieval tiers with typical restore times:
+
+- **Bulk**: hours to days
+
+  - ~5–12 hours (Glacier Flexible Retrieval)
+  - ~24–48 hours (Glacier Deep Archive)
+
+- **Standard**: a few hours (Intelligent-Tiering archive classes)
+
+- **Expedited**: typically **1–5 minutes** for small objects.
+
+The current default retrieval tiers are:
+
+- **Glacier Flexible Retrieval**: `Bulk` (default) / `Expedited` (`aggressiveTimes`)
+- **Glacier Deep Archive**: `Bulk` (default) / `Expedited` (`aggressiveTimes`)
+- **Intelligent-Tiering Archive Access**: `Bulk` (default) / `Standard` (`aggressiveTimes`)
+- **Intelligent-Tiering Deep Archive Access**: `Bulk` (default) / `Standard` (`aggressiveTimes`)
+
+**Restore duration (days)**
+
+All restore requests currently use a restore duration of **1 day** for all supported cold storage
+classes.
