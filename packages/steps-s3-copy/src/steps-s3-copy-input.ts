@@ -1,5 +1,3 @@
-import { Tier } from "@aws-sdk/client-s3";
-
 /**
  * The type that matches our expected input to the state machine.
  * This is more for internal consistency - it is not directly
@@ -59,16 +57,16 @@ export type StepsS3CopyInvokeArguments = {
 
   readonly thawParams?: {
     readonly glacierFlexibleRetrievalThawDays?: number;
-    readonly glacierFlexibleRetrievalThawSpeed?: Tier;
+    readonly glacierFlexibleRetrievalThawSpeed?: string;
 
     readonly glacierDeepArchiveThawDays?: number;
-    readonly glacierDeepArchiveThawSpeed?: Tier;
+    readonly glacierDeepArchiveThawSpeed?: string;
 
     readonly intelligentTieringArchiveThawDays?: number;
-    readonly intelligentTieringArchiveThawSpeed?: Tier;
+    readonly intelligentTieringArchiveThawSpeed?: string;
 
     readonly intelligentTieringDeepArchiveThawDays?: number;
-    readonly intelligentTieringDeepArchiveThawSpeed?: Tier;
+    readonly intelligentTieringDeepArchiveThawSpeed?: string;
   };
 };
 
