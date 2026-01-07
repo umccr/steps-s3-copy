@@ -167,6 +167,8 @@ export class StepsS3CopyConstruct extends Construct {
       // these are the default objects that will be created in the destination prefix area
       destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "STARTED_COPY.txt" ][0] %}`,
       destinationEndCopyRelativeKey: `{% [ $states.input.destinationEndCopyRelativeKey, "ENDED_COPY.csv" ][0] %}`,
+      // if thawParams is not passed in, we use an empty object
+      thawParams: `{% $exists($states.input.thawParams) ? $states.input.thawParams : {} %}`,
 
       // typecast any input to a boolean, if left blank or not passed in, we will end up with false
       [DRY_RUN_KEY_FIELD_NAME]: `{% [ $states.input.${DRY_RUN_KEY_FIELD_NAME}, false ][0] %}`,
@@ -424,7 +426,7 @@ export class StepsS3CopyConstruct extends Construct {
     // Allow the task definition role ecr access to the guardduty agent
     // https://docs.aws.amazon.com/guardduty/latest/ug/prereq-runtime-monitoring-ecs-support.html#before-enable-runtime-monitoring-ecs
     // Which is in another account - 005257825471.dkr.ecr.ap-southeast-2.amazonaws.com/aws-guardduty-agent-fargate
-      writerRole.addManagedPolicy(
+    writerRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName(
         "service-role/AmazonECSTaskExecutionRolePolicy",
       ),

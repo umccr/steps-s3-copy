@@ -97,7 +97,8 @@ test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
   );
 
   console.info("Triggering copy");
-
+  // NOTE: Dev uses `aggressiveTimes=true` (short thaw polling/retry window). We set fast restore tiers
+  // here so the test doesn’t time out. Using slow tiers (e.g. Bulk) may fail despite restores working.
   const executionStartResult = await sfnClient.send(
     new StartExecutionCommand({
       stateMachineArn: state.smArn,
@@ -106,6 +107,20 @@ test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
         sourceFilesCsvKey: testFolderObjectsTsvRelative,
         destinationBucket: state.destinationBucket,
         destinationFolderKey: testFolderDest,
+        thawParams: {
+          // Glacier Flexible Retrieval  -->  Expedited
+          glacierFlexibleRetrievalThawDays: 1,
+          glacierFlexibleRetrievalThawSpeed: "Expedited",
+          // Glacier Deep Archive  -->  Expedited
+          glacierDeepArchiveThawDays: 1,
+          glacierDeepArchiveThawSpeed: "Expedited",
+          // Intelligent Tiering Archive  -->  Standard
+          intelligentTieringArchiveThawDays: 1,
+          intelligentTieringArchiveThawSpeed: "Standard",
+          // Intelligent Tiering Deep Archive  -->  Standard
+          intelligentTieringDeepArchiveThawDays: 1,
+          intelligentTieringDeepArchiveThawSpeed: "Standard",
+        },
       }),
     }),
   );

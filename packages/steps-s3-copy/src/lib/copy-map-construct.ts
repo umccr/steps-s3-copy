@@ -94,17 +94,17 @@ export class CopyMapConstruct extends Construct {
       const interval = props.aggressiveTimes
         ? Duration.minutes(1)
         : Duration.hours(1);
-      const backoffRate = props.aggressiveTimes ? 1 : 1;
       const maxAttempts = props.aggressiveTimes ? 3 : 50;
 
       thawStep.invocableLambda.addRetry({
         errors: ["IsThawingError"],
         interval: interval,
-        backoffRate: backoffRate,
+        backoffRate: 1,
         maxAttempts: maxAttempts,
       });
 
       thawStep.invocableLambda.next(delayStep);
+
       entryState = thawStep.invocableLambda;
     } else {
       entryState = delayStep;
@@ -191,22 +191,7 @@ export class CopyMapConstruct extends Construct {
       maxItemsPerBatch: props.maxItemsPerBatch,
       maxConcurrency: props.maxConcurrency,
       batchInput: {
-        glacierFlexibleRetrievalThawDays: 1,
-        glacierFlexibleRetrievalThawSpeed: props.aggressiveTimes
-          ? "Expedited"
-          : "Bulk",
-        glacierDeepArchiveThawDays: 1,
-        glacierDeepArchiveThawSpeed: props.aggressiveTimes
-          ? "Expedited"
-          : "Bulk",
-        intelligentTieringArchiveThawDays: 1,
-        intelligentTieringArchiveThawSpeed: props.aggressiveTimes
-          ? "Standard"
-          : "Bulk",
-        intelligentTieringDeepArchiveThawDays: 1,
-        intelligentTieringDeepArchiveThawSpeed: props.aggressiveTimes
-          ? "Standard"
-          : "Bulk",
+        "thawParams.$": "$invokeArguments.thawParams",
       },
       inputPath: props.inputPath,
       itemReader: {

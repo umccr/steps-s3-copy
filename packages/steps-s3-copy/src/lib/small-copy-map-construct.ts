@@ -62,13 +62,16 @@ export class SmallObjectsCopyMapConstruct extends Construct {
         },
       );
 
+      const interval = props.aggressiveTimes
+        ? Duration.minutes(1)
+        : Duration.hours(1);
+      const maxAttempts = props.aggressiveTimes ? 3 : 50;
+
       thawStep.invocableLambda.addRetry({
         errors: ["IsThawingError"],
-        interval: props.aggressiveTimes
-          ? Duration.minutes(1)
-          : Duration.hours(1),
+        interval: interval,
         backoffRate: 1,
-        maxAttempts: props.aggressiveTimes ? 3 : 50,
+        maxAttempts: maxAttempts,
       });
 
       thawStep.invocableLambda.next(copyStep.invocableLambda);
@@ -82,31 +85,15 @@ export class SmallObjectsCopyMapConstruct extends Construct {
 
     this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
-      maxItemsPerBatch: 128,
+      maxItemsPerBatch: props.maxItemsPerBatch,
       batchInput: {
-        glacierFlexibleRetrievalThawDays: 1,
-        glacierFlexibleRetrievalThawSpeed: props.aggressiveTimes
-          ? "Expedited"
-          : "Bulk",
-        glacierDeepArchiveThawDays: 1,
-        glacierDeepArchiveThawSpeed: props.aggressiveTimes
-          ? "Expedited"
-          : "Bulk",
-        intelligentTieringArchiveThawDays: 1,
-        intelligentTieringArchiveThawSpeed: props.aggressiveTimes
-          ? "Standard"
-          : "Bulk",
-        intelligentTieringDeepArchiveThawDays: 1,
-        intelligentTieringDeepArchiveThawSpeed: props.aggressiveTimes
-          ? "Standard"
-          : "Bulk",
+        "thawParams.$": "$invokeArguments.thawParams",
       },
       inputPath: props.inputPath,
       itemReader: {
         "Bucket.$": `$.bucket`,
         "Key.$": `$.key`,
       },
-      iterator: graph,
       itemSelector: {
         "bucket.$": JsonPath.stringAt("$$.Map.Item.Value.sourceBucket"),
         "key.$": JsonPath.stringAt("$$.Map.Item.Value.sourceKey"),
@@ -123,6 +110,8 @@ export class SmallObjectsCopyMapConstruct extends Construct {
           JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
         ),
       },
+      iterator: graph,
+      // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
         "Bucket.$": "$invokeSettings.workingBucket",
         "Prefix.$": JsonPath.format(

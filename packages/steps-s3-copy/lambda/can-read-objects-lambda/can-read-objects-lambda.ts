@@ -7,24 +7,25 @@ import {
 } from "@aws-sdk/client-s3";
 import { IsThawingError } from "./errors";
 
+interface ThawParams {
+  glacierFlexibleRetrievalThawDays?: number;
+  glacierFlexibleRetrievalThawSpeed?: Tier;
+
+  glacierDeepArchiveThawDays?: number;
+  glacierDeepArchiveThawSpeed?: Tier;
+
+  intelligentTieringArchiveThawDays?: number;
+  intelligentTieringArchiveThawSpeed?: Tier;
+
+  intelligentTieringDeepArchiveThawDays?: number;
+  intelligentTieringDeepArchiveThawSpeed?: Tier;
+}
+
 interface ThawObjectsEvent {
-  Items: {
-    bucket: string;
-    key: string;
-  }[];
-
+  Items: { bucket: string; key: string }[];
   BatchInput: {
-    glacierFlexibleRetrievalThawDays: number;
-    glacierFlexibleRetrievalThawSpeed: Tier;
-
-    glacierDeepArchiveThawDays: number;
-    glacierDeepArchiveThawSpeed: Tier;
-
-    intelligentTieringArchiveThawDays: number;
-    intelligentTieringArchiveThawSpeed: Tier;
-
-    intelligentTieringDeepArchiveThawDays: number;
-    intelligentTieringDeepArchiveThawSpeed: Tier;
+    thawParams: ThawParams;
+    aggressiveTimes: boolean;
   };
 }
 
@@ -77,28 +78,39 @@ export async function handler(event: ThawObjectsEvent) {
         headResult.StorageClass == "DEEP_ARCHIVE" ||
         headResult.StorageClass == "INTELLIGENT_TIERING"
       ) {
-        // some sensible defaults - that we retain if any of the expected parameter values is not present
+        // Default to 1 day and Bulk tier unless overridden in thawParams
         let days: number = 1;
         let tier: Tier = "Bulk";
 
         if (headResult.StorageClass == "GLACIER") {
-          days = event.BatchInput.glacierFlexibleRetrievalThawDays ?? days;
-          tier = event.BatchInput.glacierFlexibleRetrievalThawSpeed ?? tier;
+          days =
+            event.BatchInput.thawParams.glacierFlexibleRetrievalThawDays ??
+            days;
+          tier =
+            event.BatchInput.thawParams.glacierFlexibleRetrievalThawSpeed ??
+            tier;
         }
         if (headResult.StorageClass == "DEEP_ARCHIVE") {
-          days = event.BatchInput.glacierDeepArchiveThawDays ?? days;
-          tier = event.BatchInput.glacierDeepArchiveThawSpeed ?? tier;
+          days = event.BatchInput.thawParams.glacierDeepArchiveThawDays ?? days;
+          tier =
+            event.BatchInput.thawParams.glacierDeepArchiveThawSpeed ?? tier;
         }
         if (headResult.StorageClass == "INTELLIGENT_TIERING") {
           if (headResult.ArchiveStatus == "ARCHIVE_ACCESS") {
-            days = event.BatchInput.intelligentTieringArchiveThawDays ?? days;
-            tier = event.BatchInput.intelligentTieringArchiveThawSpeed ?? tier;
+            days =
+              event.BatchInput.thawParams.intelligentTieringArchiveThawDays ??
+              days;
+            tier =
+              event.BatchInput.thawParams.intelligentTieringArchiveThawSpeed ??
+              tier;
           }
           if (headResult.ArchiveStatus == "DEEP_ARCHIVE_ACCESS") {
             days =
-              event.BatchInput.intelligentTieringDeepArchiveThawDays ?? days;
+              event.BatchInput.thawParams
+                .intelligentTieringDeepArchiveThawDays ?? days;
             tier =
-              event.BatchInput.intelligentTieringDeepArchiveThawSpeed ?? tier;
+              event.BatchInput.thawParams
+                .intelligentTieringDeepArchiveThawSpeed ?? tier;
           }
         }
 
