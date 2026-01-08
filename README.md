@@ -174,6 +174,24 @@ export type StepsS3CopyInvokeArguments = {
    * actually perform the copy.
    */
   readonly dryRun?: boolean;
+
+  /**
+   * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
+   * and per-field defaults are applied by the thaw step Lambda (`*ThawDays` = 1, `*ThawSpeed` = "Bulk").
+   */
+  readonly thawParams?: {
+    readonly glacierFlexibleRetrievalThawDays?: number;
+    readonly glacierFlexibleRetrievalThawSpeed?: string;
+
+    readonly glacierDeepArchiveThawDays?: number;
+    readonly glacierDeepArchiveThawSpeed?: string;
+
+    readonly intelligentTieringArchiveThawDays?: number;
+    readonly intelligentTieringArchiveThawSpeed?: string;
+
+    readonly intelligentTieringDeepArchiveThawDays?: number;
+    readonly intelligentTieringDeepArchiveThawSpeed?: string;
+  };
 };
 ```
 
@@ -209,28 +227,13 @@ single Lambda step (implemented by `ThawObjectsLambdaStepConstruct` and reused b
 3. if the object is still thawing, the Lambda throws `IsThawingError`
 
 Step Functions is configured to **retry** on `IsThawingError`, which effectively turns this into
-a polling loop until the object become available.
+a polling loop until the object becomes available.
+
+See [Restore settings](#restore-settings) for `thawParams`.
 
 ### Restore settings
 
-Restore requests are submitted with **conservative defaults** intended to minimise cost. With the
-exception of `aggressiveTimes` (see below), restore-related settings are **not currently configurable**
-via the state machine input. A future enhancement will expose these parameters so callers can
-customise restore behaviour.
-
-**Retry / polling behaviour**
-
-Retry cadence when handling `IsThawingError` is controlled by the `aggressiveTimes` construct property:
-
-- `aggressiveTimes = false` (default): retry every **1 hour**, up to **50** attempts (≈ 50 hours)
-- `aggressiveTimes = true`: retry every **1 minute**, up to **3** attempts
-
-Note that `aggressiveTimes` is enable for **development and testing only**, where restores are
-expected to complete quickly and faster feedback is desirable.
-
-**Retrieval tier (speed)**
-
-S3 restore requests support different retrieval tiers with typical restore times:
+S3 restore requests support different **restore duration** and **retrieval tiers** with typical restore times:
 
 - **Bulk**: hours to days
 
@@ -241,14 +244,23 @@ S3 restore requests support different retrieval tiers with typical restore times
 
 - **Expedited**: typically **1–5 minutes** for small objects.
 
-The current default retrieval tiers are:
+Restore requests use **conservative defaults** intended to minimise cost, but callers can optionally
+override restore duration (days) and retrieval tier (speed) via the `thawParams` state machine input.
 
-- **Glacier Flexible Retrieval**: `Bulk` (default) / `Expedited` (`aggressiveTimes`)
-- **Glacier Deep Archive**: `Bulk` (default) / `Expedited` (`aggressiveTimes`)
-- **Intelligent-Tiering Archive Access**: `Bulk` (default) / `Standard` (`aggressiveTimes`)
-- **Intelligent-Tiering Deep Archive Access**: `Bulk` (default) / `Standard` (`aggressiveTimes`)
+If a field is not provided in `thawParams`, the thaw step Lambda applies defaults at runtime:
 
-**Restore duration (days)**
+- restore duration defaults to **1 day**
+- retrieval tier defaults to **Bulk**
 
-All restore requests currently use a restore duration of **1 day** for all supported cold storage
-classes.
+If `thawParams` itself is omitted, it is normalised to `{}` by the state machine and all restore
+settings fall back to these defaults.
+
+**Retry / polling behaviour**
+
+Retry cadence when handling `IsThawingError` is controlled by the `aggressiveTimes` construct property:
+
+- `aggressiveTimes = false` (default): retry every **1 hour**, up to **50** attempts (≈ 50 hours)
+- `aggressiveTimes = true`: retry every **1 minute**, up to **3** attempts
+
+Note that `aggressiveTimes` is enabled for **development and testing only**, where restores are
+expected to complete quickly and faster feedback is desirable. However, if `aggressiveTimes: true` and a caller selects a slow retrieval tier (e.g. `Bulk`) via `thawParams`, retries may be exhausted and the workflow can fail while the restore is still in progress.

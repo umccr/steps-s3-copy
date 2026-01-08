@@ -52,7 +52,8 @@ export type StepsS3CopyInvokeArguments = {
   readonly dryRun?: boolean;
 
   /**
-   * Parameters for thawing objects before copying.
+   * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
+   * and per-field defaults are applied by the thaw step Lambda (`*ThawDays` = 1, `*ThawSpeed` = "Bulk").
    */
 
   readonly thawParams?: {
