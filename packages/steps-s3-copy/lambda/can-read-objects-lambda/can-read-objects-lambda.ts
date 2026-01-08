@@ -113,6 +113,17 @@ export async function handler(event: ThawObjectsEvent) {
                 .intelligentTieringDeepArchiveThawSpeed ?? tier;
           }
         }
+        // DEBUG: Log restore settings chosen
+        console.log(
+          JSON.stringify({
+            msg: "Chosen restore settings",
+            bucket: o.bucket,
+            key: o.key,
+            storageClass: headResult.StorageClass,
+            days,
+            tier,
+          }),
+        );
 
         const restoreObjectCommand = new RestoreObjectCommand({
           Bucket: o.bucket,
