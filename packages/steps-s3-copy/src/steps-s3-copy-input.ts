@@ -3,6 +3,7 @@
  * This is more for internal consistency - it is not directly
  * used to define the "schema" of the state machine.
  */
+
 export type StepsS3CopyInvokeArguments = {
   /**
    * The region that source buckets MUST be in.
@@ -58,16 +59,22 @@ export type StepsS3CopyInvokeArguments = {
 
   readonly thawParams?: {
     readonly glacierFlexibleRetrievalThawDays?: number;
-    readonly glacierFlexibleRetrievalThawSpeed?: string;
+    readonly glacierFlexibleRetrievalThawSpeed?:
+      | "Bulk"
+      | "Standard"
+      | "Expedited";
 
     readonly glacierDeepArchiveThawDays?: number;
-    readonly glacierDeepArchiveThawSpeed?: string;
+    readonly glacierDeepArchiveThawSpeed?: "Bulk" | "Standard";
 
     readonly intelligentTieringArchiveThawDays?: number;
-    readonly intelligentTieringArchiveThawSpeed?: string;
+    readonly intelligentTieringArchiveThawSpeed?:
+      | "Bulk"
+      | "Standard"
+      | "Expedited";
 
     readonly intelligentTieringDeepArchiveThawDays?: number;
-    readonly intelligentTieringDeepArchiveThawSpeed?: string;
+    readonly intelligentTieringDeepArchiveThawSpeed?: "Bulk" | "Standard";
   };
 };
 
