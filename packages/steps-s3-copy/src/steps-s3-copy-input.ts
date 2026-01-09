@@ -3,6 +3,7 @@
  * This is more for internal consistency - it is not directly
  * used to define the "schema" of the state machine.
  */
+
 export type StepsS3CopyInvokeArguments = {
   /**
    * The region that source buckets MUST be in.
@@ -50,6 +51,31 @@ export type StepsS3CopyInvokeArguments = {
    * actually perform the copy.
    */
   readonly dryRun?: boolean;
+
+  /**
+   * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
+   * and per-field defaults are applied by the thaw step Lambda (`*ThawDays` = 1, `*ThawSpeed` = "Bulk").
+   */
+
+  readonly thawParams?: {
+    readonly glacierFlexibleRetrievalThawDays?: number;
+    readonly glacierFlexibleRetrievalThawSpeed?:
+      | "Bulk"
+      | "Standard"
+      | "Expedited";
+
+    readonly glacierDeepArchiveThawDays?: number;
+    readonly glacierDeepArchiveThawSpeed?: "Bulk" | "Standard";
+
+    readonly intelligentTieringArchiveThawDays?: number;
+    readonly intelligentTieringArchiveThawSpeed?:
+      | "Bulk"
+      | "Standard"
+      | "Expedited";
+
+    readonly intelligentTieringDeepArchiveThawDays?: number;
+    readonly intelligentTieringDeepArchiveThawSpeed?: "Bulk" | "Standard";
+  };
 };
 
 export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
