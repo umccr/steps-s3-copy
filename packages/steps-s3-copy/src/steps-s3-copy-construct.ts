@@ -21,6 +21,7 @@ import {
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
+import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
   DRY_RUN_KEY_FIELD_NAME,
   StepsS3CopyInvokeArguments,
@@ -138,6 +139,12 @@ export class StepsS3CopyConstruct extends Construct {
     const success = new Succeed(this, "Succeed");
     const fail = new Fail(this, "Fail Wrong Bucket Region");
 
+    const invalidThawParamsFail = new Fail(this, "Fail Invalid Thaw Params", {
+      error: "InvalidThawParamsError",
+      cause:
+        'Invalid thaw parameters (unsupported restore tier). See the "Validate Thaw Params" task failure details for the specific field and value.',
+    });
+
     // jsonata representing all input values to the state machine but with defaults for absent fields
     const jsonataInvokeArgumentsWithDefaults: {
       [K in keyof StepsS3CopyInvokeArguments]: string;
@@ -202,6 +209,16 @@ export class StepsS3CopyConstruct extends Construct {
         writerRole: this._workingRole,
       },
     );
+
+    const validateThawParamsStep = new ValidateThawParamsLambdaStepConstruct(
+      this,
+      "ValidateThawParams",
+      { writerRole: this._workingRole },
+    );
+
+    validateThawParamsStep.invocableLambda.addCatch(invalidThawParamsFail, {
+      errors: ["InvalidThawParamsError"],
+    });
 
     const canWriteStep = this._canWriteLambdaStep.invocableLambda;
 
@@ -319,6 +336,7 @@ export class StepsS3CopyConstruct extends Construct {
 
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
+        .next(validateThawParamsStep.invocableLambda)
         .next(canWriteStep)
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)

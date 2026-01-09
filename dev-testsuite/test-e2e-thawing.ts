@@ -111,12 +111,12 @@ test('thawing"', { timeout: TEST_EXPECTED_SECONDS * 1000 }, async (t) => {
           // Glacier Flexible Retrieval  -->  Expedited
           glacierFlexibleRetrievalThawDays: 1,
           glacierFlexibleRetrievalThawSpeed: "Expedited",
-          // Glacier Deep Archive  -->  Expedited
+          // Glacier Deep Archive  -->  Standard
           glacierDeepArchiveThawDays: 1,
-          glacierDeepArchiveThawSpeed: "Expedited",
-          // Intelligent Tiering Archive  -->  Standard
+          glacierDeepArchiveThawSpeed: "Standard",
+          // Intelligent Tiering Archive  -->  Expedited
           intelligentTieringArchiveThawDays: 1,
-          intelligentTieringArchiveThawSpeed: "Standard",
+          intelligentTieringArchiveThawSpeed: "Expedited",
           // Intelligent Tiering Deep Archive  -->  Standard
           intelligentTieringDeepArchiveThawDays: 1,
           intelligentTieringDeepArchiveThawSpeed: "Standard",
