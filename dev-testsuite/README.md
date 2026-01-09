@@ -1,11 +1,58 @@
 # Test suite
 
-WIP!!!
+## Setup
 
-Trying to create a test suite that produces a variety of objects in the test buckets
-and then exhibits copies between them.
+All testing expects the user's current directory is
+the `dev-testsuite` directory.
 
-Is stuck half way between a useful test suite and some random experiments
-on S3 multipart uploads - so apologies for that.
+Requires bun >= 1.3.5 installed externally (via brew etc).
 
-Not really ready for running out of the box.
+```
+bun install --frozen-lockfile
+```
+
+We have chosen to pivot testing to Bun as a runtime - in anticipation
+of moving the rest of the stack over to Bun at some point. Bun makes the
+setup all easier as it can directly execute Typescript and has a
+built-in test runner.
+
+## Unit tests
+
+A collection of unit(ish) tests that exercise a single stage of the Steps ASL using
+the AWS Test State API thereby executing the _actual_ lambdas that are
+deployed.
+
+NOTE: THESE TESTS RUN AGAINST A _DEPLOYED_ INSTANCE - they do not run against
+the local code base. However, unlike the end-to-end testing - they do not actually
+invoke an orchestration, and test just a single step directly.
+
+| Test                           |
+| ------------------------------ |
+| `bun run step-all` (all tests) |
+| `bun run step-can-write`       |
+| `bun run step-head-objects`    |
+
+THOUGHTS: This was an attempt to utilise the AWS provided Test State API. It
+offers _some_ useful features in that it exercises the code in AWS and hence
+does not require mocking of S3 etc. However it is a bit unwieldy to use - because
+it requires testing the raw ASL, which is text that we do not construct manually
+(because we use CDK constructs). So we fetch the ASL direct from the deployed
+state machine using some possibly overly convoluted mechanisms. It is possible
+this would all be better as some actual unit tests in each lambda.
+
+## End-to-end tests
+
+A collection of tests that exercise full end to end functionality. These can be run in
+any AWS account with Steps installed - and will attempt to detect configuration/settings
+by looking up the installed CloudFormation.
+
+These tests will establish a source or destination (per test) folder in the working
+bucket and copy from one to the other. The test objects should expire after 1 day
+(using lifecycle rules in a folder called "1day/").
+
+| Test                    | Time Est | Rationale                                                                |
+| ----------------------- | -------- | ------------------------------------------------------------------------ |
+| `bun run e2e-dryrun`    | < 1min   | Creates a few files and executes in dryrun mode (does no actual copying) |
+| `bun run e2e-thawing`   | hours    | Creates a variety of sized files in cold storage and restore/copies them |
+| `bun run e2e-koalas`    | < 5min   | Copies some external data (AWS OpenData koala genomes)                   |
+| `bun run e2e-realistic` | < 5min   | Generates a realistic set of files and copies them including wildcards   |
