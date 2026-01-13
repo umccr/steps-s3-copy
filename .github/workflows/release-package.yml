@@ -17,7 +17,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
@@ -37,6 +37,9 @@ jobs:
       - run: pnpm run package
 
       # if all the builds have completed - we can publish the package
+      # publib-npm needs newest NPM 11 to have trusted publisher mode
+
+      - run: npm install -g npm@next-11
 
       - run: pnpm exec publib-npm
         working-directory: packages/steps-s3-copy
