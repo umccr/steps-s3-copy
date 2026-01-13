@@ -32,6 +32,14 @@ pnpm run dev-destroy
 
 See [README](./dev-testsuite/README.md).
 
+## Release
+
+After development and testing of the construct - a package of it can be released to
+the `npm` registry with a defined release version.
+
+This is performed in GitHub by creating a release and specifying an appropriate tag (following
+basic semantic versioning rules).
+
 ## Learnings (out of date)
 
 Some learnings from actual copies.

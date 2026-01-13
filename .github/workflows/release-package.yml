@@ -4,6 +4,10 @@ on:
   release:
     types: [released]
 
+permissions:
+  id-token: write # Required for OIDC
+  contents: read
+
 jobs:
   publish-to-npm-registry:
     runs-on: ubuntu-latest
@@ -15,12 +19,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
+          registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
 
       - run: pnpm install
 
-      # first set the versions of our package to the release version
+      # first set the version tag of our package to the release version
 
       - run: pnpm version ${{github.ref_name}}
         working-directory: packages/steps-s3-copy
@@ -36,5 +41,5 @@ jobs:
       - run: pnpm exec publib-npm
         working-directory: packages/steps-s3-copy
         env:
-          NPM_TOKEN: ${{secrets.NPM_PUBLISH_TOKEN}}
+          NPM_TRUSTED_PUBLISHER: true
           NPM_ACCESS_LEVEL: public

@@ -1,6 +1,12 @@
 # Steps S3 Copy
 
-A CDK construct which enables large scale parallel copying of objects between object stores.
+A CDK construct which creates a standalone service for large-scale parallel
+copying of objects between object stores.
+
+The origin of the service is the world of genomic datasets, which involve
+transferring terabytes of large (10 GiB+) objects between object stores.
+However, there is nothing inherently restricting the service from working
+with all types of objects, big or small.
 
 ## Development
 
@@ -81,8 +87,10 @@ export interface StepsS3CopyConstructProps {
 
 ### Create the set of "copy instructions"
 
-In order to allow copying objects at the scale we expect - the input list of objects to copy (the "copy instructions")
-is created as a JSONL formatted object that is stored in the `workingBucket`/`workingBucketPrefixKey`.
+In order to allow copying objects at the scale we expect (potentially millions of objects) - the input
+list of objects to copy (the "copy instructions")
+is created as a JSONL formatted text file. That file must be
+stored in `workingBucket`/`workingBucketPrefixKey`/... .
 
 Each individual "copy instruction" meets the following schema
 
@@ -198,13 +206,14 @@ export type StepsS3CopyInvokeArguments = {
 Note that the `sourceFilesCsvKey` is actually the JSONL of copy instructions - and is a path
 _that is relative_ to the working folder.
 
-For instance if we uploaded the JSONL to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
+For instance if we uploaded the JSONL copy
+instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
 specify a `sourceFilesCsvKey` of `instructions.jsonl`.
 
 ## Thawing objects from cold storage
 
 S3 objects stored in cold or archival tiers (Glacier, Deep Archive, or Intelligent-Tiering archive tiers)
-cannot be copied immediately, so the orchestration can request a restore (thaw) before attempting the copy.
+cannot be copied immediately, so the service can request a restore (thaw) before attempting the copy.
 
 Whether thawing is required is determined during the coordinate / classification phase of the workflow.
 The CoordinateCopy step classifies each object by size (using a 5 MiB threshold, the minimum S3 multipart
@@ -263,4 +272,6 @@ Retry cadence when handling `IsThawingError` is controlled by the `aggressiveTim
 - `aggressiveTimes = true`: retry every **1 minute**, up to **3** attempts
 
 Note that `aggressiveTimes` is enabled for **development and testing only**, where restores are
-expected to complete quickly and faster feedback is desirable. However, if `aggressiveTimes: true` and a caller selects a slow retrieval tier (e.g. `Bulk`) via `thawParams`, retries may be exhausted and the workflow can fail while the restore is still in progress.
+expected to complete quickly and faster feedback is desirable. However, if `aggressiveTimes: true` and
+a caller selects a slow retrieval tier (e.g. `Bulk`) via `thawParams`, retries may be exhausted
+and the workflow can fail while the restore is still in progress.
