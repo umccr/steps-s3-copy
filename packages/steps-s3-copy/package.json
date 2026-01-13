@@ -41,9 +41,9 @@
   "devDependencies": {
     "aws-cdk-lib": "2.192.0",
     "constructs": "10.4.2",
-    "jsii": "5.8.5",
-    "jsii-pacmak": "1.111.0",
-    "jsii-rosetta": "5.8.4",
-    "publib": "0.2.968"
+    "jsii": "5.9.22",
+    "jsii-pacmak": "1.125.0",
+    "jsii-rosetta": "5.9.26",
+    "publib": "0.2.1028"
   }
 }
