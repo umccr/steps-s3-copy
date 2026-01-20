@@ -76,6 +76,12 @@ export type StepsS3CopyInvokeArguments = {
     readonly intelligentTieringDeepArchiveThawDays?: number;
     readonly intelligentTieringDeepArchiveThawSpeed?: "Bulk" | "Standard";
   };
+
+  /**
+   * If true, generate html copy report artefacts  in the destination.
+   * If omitted, defaults to false.
+   */
+  readonly generateCopyReport?: boolean;
 };
 
 export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
@@ -100,3 +106,6 @@ export const DESTINATION_END_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineIn
   "destinationEndCopyRelativeKey";
 
 export const DRY_RUN_KEY_FIELD_NAME: CopyOutStateMachineInputKeys = "dryRun";
+
+export const GENERATE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "generateCopyReport";

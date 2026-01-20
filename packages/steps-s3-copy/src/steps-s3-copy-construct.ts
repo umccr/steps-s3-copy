@@ -24,6 +24,7 @@ import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-constru
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
   DRY_RUN_KEY_FIELD_NAME,
+  GENERATE_COPY_REPORT_FIELD_NAME,
   StepsS3CopyInvokeArguments,
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
@@ -180,6 +181,8 @@ export class StepsS3CopyConstruct extends Construct {
 
       // typecast any input to a boolean, if left blank or not passed in, we will end up with false
       [DRY_RUN_KEY_FIELD_NAME]: `{% [ $states.input.${DRY_RUN_KEY_FIELD_NAME}, false ][0] %}`,
+      // if not passed, default to false
+      [GENERATE_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${GENERATE_COPY_REPORT_FIELD_NAME}, false ][0] %}`,
     };
     const jsonataInvokeSettings: {
       [K in keyof StepsS3CopyInvokeSettings]: string;

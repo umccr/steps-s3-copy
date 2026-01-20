@@ -28,6 +28,7 @@ interface InvokeEvent {
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
+  generateCopyReport?: boolean;
 }
 
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
@@ -252,26 +253,30 @@ export async function handler(event: InvokeEvent) {
       Body: output,
     });
 
-    // We uses this key by now for simplicitym, but we sould use a dedicated key for the HTML report.
-    const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
-    const htmlKey = csvKey.replace("ENDED_COPY.csv", "copy_report.html");
+    // Generate HTML report if requested
 
-    // Build HTML
-    const html = createHtmlReport({
-      title: "Copy Results Report",
-      records: Object.values(fileResults) as FileResult[],
-      destinationBucket: event.destinationBucket,
-      destinationFolderKey: event.destinationPrefixKey,
-    });
-    // Save the HTML report
-    await client.send(
-      new PutObjectCommand({
-        Bucket: event.destinationBucket,
-        Key: htmlKey,
-        Body: html,
-        ContentType: "text/html; charset=utf-8",
-      }),
-    );
+    if (event.generateCopyReport) {
+      // We uses this key by now for simplicitym, but we sould use a dedicated key for the HTML report.
+      const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
+      const htmlKey = csvKey.replace("ENDED_COPY.csv", "copy_report.html");
+
+      // Build HTML
+      const html = createHtmlReport({
+        title: "Copy Results Report",
+        records: Object.values(fileResults) as FileResult[],
+        destinationBucket: event.destinationBucket,
+        destinationFolderKey: event.destinationPrefixKey,
+      });
+      // Save the HTML report
+      await client.send(
+        new PutObjectCommand({
+          Bucket: event.destinationBucket,
+          Key: htmlKey,
+          Body: html,
+          ContentType: "text/html; charset=utf-8",
+        }),
+      );
+    }
 
     await client.send(putCommand);
     return output;
