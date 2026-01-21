@@ -46,20 +46,16 @@ interface FileResult {
   // source: string;
   // copyMode: string;
 }
-// Parses an S3 URI and returns the bucket and key.
+// Helper to parses and S3 URI and returns the bucket and key.
+// TODO: Fail fast! Add upstream validation in the future initial validation Lambda.
 function parseS3Uri(s3Uri: string): {
   bucket: string | null;
   key: string | null;
 } {
   try {
-    // The URL constructor can parse the 's3:' scheme.
     const parsedUrl = new URL(s3Uri);
-
-    // The 'host' part is the bucket name (e.g., 'my-bucket').
     const bucket = parsedUrl.host;
-
-    // The 'pathname' part is the object key (e.g., '/path/to/object.txt').
-    // We remove the leading slash for the key.
+    // Remove the leading slash for the key.
     const key = parsedUrl.pathname.startsWith("/")
       ? parsedUrl.pathname.substring(1)
       : parsedUrl.pathname;
@@ -111,7 +107,7 @@ export async function handler(event: InvokeEvent) {
   const failedFiles: any[] = [];
   const succeededFiles: any[] = [];
 
-  // Iterate over each manifest key to fetch and parse the manifest.
+  // Iterate over the manifest key produced by each map.
   for (const manifestKey of manifestKeys) {
     const getManifestCommand = new GetObjectCommand({
       Bucket: event.workingBucket,
@@ -151,20 +147,24 @@ export async function handler(event: InvokeEvent) {
       "AWS Steps Distributed map manifest.json is missing an expected array for PENDING, FAILED or SUCCEEDED",
     );
 
-  // Fail fast if any work is still pending. By the time this Lambda runs,
+  // Fail if PENDING.
+  // By the time this Lambda runs,
   // the Distributed Map should have fully completed (no partial results).
   if (pendingFiles.length > 0)
     throw new Error(
       "AWS Steps Distributed map manifest.json indicates there are PENDING results which is not a state we are expecting",
     );
 
+  // Fail if FAILED.
   // This Lambda is only expected to be run when the copy has fully succeeded.
   // Maybe in future we want to handle partial success.
   if (failedFiles.length > 0)
     throw new Error("Copy is meant to succeed - but it had failed results");
 
+  // fileResults will hold the final collated results for all files.
   const fileResults: Record<string, FileResult> = {};
 
+  // Process each SUCCEEDED result file to extract stats.
   for (const succeededFile of succeededFiles) {
     const getSuccessCommand = new GetObjectCommand({
       Bucket: event.workingBucket,
@@ -277,9 +277,12 @@ export async function handler(event: InvokeEvent) {
     }
   }
 
-  // debug results before we create the CSV
+  // debug results before we createting files
   console.debug(JSON.stringify(fileResults, null, 2));
 
+  // --------------------------------------------------
+  // CVS ended copy generation and storage
+  // --------------------------------------------------
   const output = stringify(Object.values(fileResults), {
     header: true,
     columns: {
@@ -295,22 +298,25 @@ export async function handler(event: InvokeEvent) {
     },
   });
 
+  // Write the CSV ended copy to the destination S3 bucket/folder
+  const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
   const putCommand = new PutObjectCommand({
     Bucket: event.destinationBucket,
-    Key: `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`,
+    Key: csvKey,
     Body: output,
   });
+
+  // --------------------------------------------------
+  // HTML ended copy report generation and storage
+  // --------------------------------------------------
 
   // Determine if we need to generate and store the HTML report(s)
   const includeReport = event.includeCopyReport === true;
   const retainUri = (event.retainCopyReportS3Uri ?? "").trim();
   const retainReport = retainUri.length > 0;
 
-  const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
-  const htmlKey = csvKey.replace("ENDED_COPY.csv", "copy_report.html");
-
   if (includeReport || retainReport) {
-    // generate the HTML report
+    // Generate the HTML report
     const html = createHtmlReport({
       title: "Copy Results Report",
       records: Object.values(fileResults) as FileResult[],
@@ -320,6 +326,12 @@ export async function handler(event: InvokeEvent) {
 
     // 1) Copy to the destination bucket/folder
     if (includeReport) {
+      // TODO: define a better naming scheme for the HTML report (?)
+      const htmlKey = csvKey.replace(
+        "ENDED_COPY.csv",
+        "ENDED_COPY_REPORT.html",
+      );
+
       await client.send(
         new PutObjectCommand({
           Bucket: event.destinationBucket,
