@@ -91,7 +91,8 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         rcloneResultsLarge: "{% $states.input[type='Large'] %}",
         rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
         rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
-        generateCopyReport: "{% $invokeArguments.generateCopyReport %}",
+        includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
+        retainCopyReportS3Uri: "{% $invokeArguments.retainCopyReportS3Uri %}",
       }),
       payloadResponseOnly: true,
     });

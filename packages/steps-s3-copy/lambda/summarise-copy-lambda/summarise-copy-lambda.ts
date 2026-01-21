@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
+import { URL } from "url";
 import { createHtmlReport } from "./create-html-report.ts";
 
 interface InvokeEvent {
@@ -28,7 +29,8 @@ interface InvokeEvent {
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
-  generateCopyReport?: boolean;
+  includeCopyReport?: boolean;
+  retainCopyReportS3Uri?: string;
 }
 
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
@@ -44,6 +46,31 @@ interface FileResult {
   // source: string;
   // copyMode: string;
 }
+
+function parseS3Uri(s3Uri: string): {
+  bucket: string | null;
+  key: string | null;
+} {
+  try {
+    // The URL constructor can parse the 's3:' scheme.
+    const parsedUrl = new URL(s3Uri);
+
+    // The 'host' part is the bucket name (e.g., 'my-bucket').
+    const bucket = parsedUrl.host;
+
+    // The 'pathname' part is the object key (e.g., '/path/to/object.txt').
+    // We remove the leading slash for the key.
+    const key = parsedUrl.pathname.startsWith("/")
+      ? parsedUrl.pathname.substring(1)
+      : parsedUrl.pathname;
+
+    return { bucket, key };
+  } catch (error) {
+    console.error(`Invalid S3 URI: ${s3Uri}`, error);
+    return { bucket: null, key: null };
+  }
+}
+
 /**
  * A handler that process the Steps CSV result (which should have a bunch
  * of rclone stats) - and converts that into a CSV report for the
@@ -253,31 +280,52 @@ export async function handler(event: InvokeEvent) {
       Body: output,
     });
 
-    // Generate HTML report if requested
+    const includeReport = event.includeCopyReport === true;
+    const retainUri = (event.retainCopyReportS3Uri ?? "").trim();
+    const retainReport = retainUri.length > 0;
 
-    if (event.generateCopyReport) {
-      // We uses this key by now for simplicitym, but we sould use a dedicated key for the HTML report.
-      const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
-      const htmlKey = csvKey.replace("ENDED_COPY.csv", "copy_report.html");
+    const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
+    const htmlKey = csvKey.replace("ENDED_COPY.csv", "copy_report.html");
 
-      // Build HTML
+    if (includeReport || retainReport) {
+      // generate the HTML report
       const html = createHtmlReport({
         title: "Copy Results Report",
         records: Object.values(fileResults) as FileResult[],
         destinationBucket: event.destinationBucket,
         destinationFolderKey: event.destinationPrefixKey,
       });
-      // Save the HTML report
-      await client.send(
-        new PutObjectCommand({
-          Bucket: event.destinationBucket,
-          Key: htmlKey,
-          Body: html,
-          ContentType: "text/html; charset=utf-8",
-        }),
-      );
-    }
 
+      // 1) Copy to the destination bucket/folder
+      if (includeReport) {
+        await client.send(
+          new PutObjectCommand({
+            Bucket: event.destinationBucket,
+            Key: htmlKey,
+            Body: html,
+            ContentType: "text/html; charset=utf-8",
+          }),
+        );
+      }
+
+      // 2) Extra copy to a specific S3 URI (sender retention)
+      if (retainReport) {
+        const { bucket, key } = parseS3Uri(retainUri);
+
+        if (!bucket || !key) {
+          throw new Error(`Invalid retainCopyReportS3Uri: ${retainUri}`);
+        }
+
+        await client.send(
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: key,
+            Body: html,
+            ContentType: "text/html; charset=utf-8",
+          }),
+        );
+      }
+    }
     await client.send(putCommand);
     return output;
   }

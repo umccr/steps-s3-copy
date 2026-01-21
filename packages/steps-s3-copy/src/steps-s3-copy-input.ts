@@ -81,7 +81,15 @@ export type StepsS3CopyInvokeArguments = {
    * If true, generate html copy report artefacts  in the destination.
    * If omitted, defaults to false.
    */
-  readonly generateCopyReport?: boolean;
+  readonly includeCopyReport?: boolean;
+
+  /**
+   * If set, write an extra copy of the HTML copy report to this S3 URI
+   * (e.g. s3://bucket/path/to/copy_report.html).
+   *
+   * Independent of includeCopyReport.
+   */
+  readonly retainCopyReportS3Uri?: string;
 };
 
 export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
@@ -107,5 +115,8 @@ export const DESTINATION_END_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineIn
 
 export const DRY_RUN_KEY_FIELD_NAME: CopyOutStateMachineInputKeys = "dryRun";
 
-export const GENERATE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "generateCopyReport";
+export const INCLUDE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "includeCopyReport";
+
+export const RETAIN_COPY_REPORT_S3_URI_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "retainCopyReportS3Uri";
