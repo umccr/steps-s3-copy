@@ -99,10 +99,10 @@ function buildDestinationTree(
   items: { destination: string; rowId: string }[],
   destinationRoot: string,
 ): TreeNode {
-  const rootLabel = destinationRoot.replace(/\/+$/, "");
+  const rootLabel = destinationRoot.slice(0, -1);
   const root = makeNode(rootLabel);
 
-  const prefix = rootLabel + "/";
+  const prefix = destinationRoot;
   for (const it of items) {
     const full = it.destination;
     if (!full.startsWith(prefix)) continue;
