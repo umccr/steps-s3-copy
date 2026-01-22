@@ -87,8 +87,8 @@ const insertPath = (root: TreeNode, parts: string[], rowId: string) => {
 };
 
 /**
- * destinationRoot is like "s3://umccr-temp-dev/fji/"
- * items[].destination is like "s3://umccr-temp-dev/fji/fastq/…/file.ext"
+ * destinationRoot is like "s3://a-bucket/a/give/path/"
+ * items[].destination is like "s3://a-bucket/a/give/path/fastq/…/file.fastq"
  * We:
  *   - label the root as destinationRoot without trailing slash
  *   - strip destinationRoot from each destination
@@ -106,7 +106,7 @@ function buildDestinationTree(
   for (const it of items) {
     const full = it.destination;
     if (!full.startsWith(prefix)) continue;
-    const rel = full.slice(prefix.length); // "fastq/.../file.ext"
+    const rel = full.slice(prefix.length);
     if (!rel) continue;
 
     const parts = rel.split("/").filter(Boolean);
