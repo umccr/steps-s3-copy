@@ -133,7 +133,7 @@ test(
     console.info("Copy finished");
 
     // debug
-    console.log(executionResult);
+    // console.log(executionResult);
 
     assert(
       executionResult.state === WaiterState.SUCCESS,
