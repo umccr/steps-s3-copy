@@ -184,16 +184,15 @@ export type StepsS3CopyInvokeArguments = {
   readonly dryRun?: boolean;
 
   /**
-   * If present and true, generate html copy report artefacts  in the destination.
+   * If present and true, generate html copy report (COPY_REPORT.html)  in the destination.
    * If omitted, defaults to false.
    */
   readonly includeCopyReport?: boolean;
 
   /**
-   * If set, write an extra copy of the HTML copy report to this S3 URI
-   * (e.g. s3://bucket/path/to/copy_report.html). By default no retain copy is made.
+   * If set, also save a copy report (COPY_REPORT.html) in the same bucket and prefix as the source file.
    */
-  readonly retainCopyReportS3Uri?: string;
+  readonly retainCopyReport?: boolean;
 
   /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,

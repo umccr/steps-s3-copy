@@ -25,7 +25,7 @@ import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-param
 import {
   DRY_RUN_KEY_FIELD_NAME,
   INCLUDE_COPY_REPORT_FIELD_NAME,
-  RETAIN_COPY_REPORT_S3_URI_FIELD_NAME,
+  RETAIN_COPY_REPORT_FIELD_NAME,
   StepsS3CopyInvokeArguments,
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
@@ -187,7 +187,7 @@ export class StepsS3CopyConstruct extends Construct {
       [INCLUDE_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${INCLUDE_COPY_REPORT_FIELD_NAME}, false ][0] %}`,
 
       // if not passed, default to ""
-      [RETAIN_COPY_REPORT_S3_URI_FIELD_NAME]: `{% [ $states.input.${RETAIN_COPY_REPORT_S3_URI_FIELD_NAME}, "" ][0] %}`,
+      [RETAIN_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${RETAIN_COPY_REPORT_FIELD_NAME}, "" ][0] %}`,
     };
     const jsonataInvokeSettings: {
       [K in keyof StepsS3CopyInvokeSettings]: string;

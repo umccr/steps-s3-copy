@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
-import { URL } from "url";
+import { dirname } from "path/posix";
 import { createHtmlReport } from "./create-html-report.ts";
 
 interface InvokeEvent {
@@ -29,8 +29,9 @@ interface InvokeEvent {
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
+  sourceFilesCsvKey: string;
   includeCopyReport?: boolean;
-  retainCopyReportS3Uri?: string;
+  retainCopyReport?: boolean;
 }
 
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
@@ -45,26 +46,6 @@ interface FileResult {
   elapsedSeconds: number;
   // source: string;
   // copyMode: string;
-}
-// Helper to parses and S3 URI and returns the bucket and key.
-// TODO: Fail fast! Add upstream validation in the future initial validation Lambda.
-function parseS3Uri(s3Uri: string): {
-  bucket: string | null;
-  key: string | null;
-} {
-  try {
-    const parsedUrl = new URL(s3Uri);
-    const bucket = parsedUrl.host;
-    // Remove the leading slash for the key.
-    const key = parsedUrl.pathname.startsWith("/")
-      ? parsedUrl.pathname.substring(1)
-      : parsedUrl.pathname;
-
-    return { bucket, key };
-  } catch (error) {
-    console.error(`Invalid S3 URI: ${s3Uri}`, error);
-    return { bucket: null, key: null };
-  }
 }
 
 /**
@@ -311,11 +292,12 @@ export async function handler(event: InvokeEvent) {
   // --------------------------------------------------
 
   // Determine if we need to generate and store the HTML report(s)
-  const includeReport = event.includeCopyReport === true;
-  const retainUri = (event.retainCopyReportS3Uri ?? "").trim();
-  const retainReport = retainUri.length > 0;
+  const includeReport = event.includeCopyReport;
+  const retainReport = event.retainCopyReport;
 
   if (includeReport || retainReport) {
+    const htmlReportName = "ENDED_COPY_REPORT.html";
+
     // Generate the HTML report
     const html = createHtmlReport({
       title: "Copy Results Report",
@@ -327,10 +309,7 @@ export async function handler(event: InvokeEvent) {
     // 1) Copy to the destination bucket/folder
     if (includeReport) {
       // TODO: define a better naming scheme for the HTML report (?)
-      const htmlKey = csvKey.replace(
-        "ENDED_COPY.csv",
-        "ENDED_COPY_REPORT.html",
-      );
+      const htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
 
       await client.send(
         new PutObjectCommand({
@@ -344,16 +323,13 @@ export async function handler(event: InvokeEvent) {
 
     // 2) Extra copy to a specific S3 URI (sender retention)
     if (retainReport) {
-      const { bucket, key } = parseS3Uri(retainUri);
-
-      if (!bucket || !key) {
-        throw new Error(`Invalid retainCopyReportS3Uri: ${retainUri}`);
-      }
+      const sourceFilePrefix = dirname(event.sourceFilesCsvKey) + "/";
+      const retainReportKey = sourceFilePrefix + htmlReportName;
 
       await client.send(
         new PutObjectCommand({
-          Bucket: bucket,
-          Key: key,
+          Bucket: event.workingBucket,
+          Key: retainReportKey,
           Body: html,
           ContentType: "text/html; charset=utf-8",
         }),
