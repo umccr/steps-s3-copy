@@ -72,7 +72,7 @@ export async function testPublicObject(
       stateMachineArn: stateMachineArn,
       name: uniqueTestId,
       input: JSON.stringify({
-        sourceFilesCsvKey: testFolderObjectsTsvRelative,
+        sourceFilesKey: testFolderObjectsTsvRelative,
         destinationBucket: destinationBucket,
         destinationPrefixKey: testFolderDest,
         maxItemsPerBatch: 1,

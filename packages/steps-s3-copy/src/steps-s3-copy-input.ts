@@ -23,10 +23,8 @@ export type StepsS3CopyInvokeArguments = {
    * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
    * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
    * according to a
-   *
-   * TODO: NOTE: we need to rename this field!!!
    */
-  readonly sourceFilesCsvKey: string;
+  readonly sourceFilesKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -93,8 +91,8 @@ export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
 // this odd construct just makes sure that the JSON paths we specify
 // here correspond with fields in the master "input" schema for the
 // overall Steps function
-export const SOURCE_FILES_CSV_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "sourceFilesCsvKey";
+export const SOURCE_FILES_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "sourceFilesKey";
 
 export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
   "maxItemsPerBatch";

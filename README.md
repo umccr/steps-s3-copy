@@ -154,10 +154,8 @@ export type StepsS3CopyInvokeArguments = {
    * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
    * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
    * according to a
-   *
-   * TODO: NOTE: we need to rename this field!!!
    */
-  readonly sourceFilesCsvKey: string;
+  readonly sourceFilesKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -214,12 +212,12 @@ export type StepsS3CopyInvokeArguments = {
 };
 ```
 
-Note that the `sourceFilesCsvKey` is actually the JSONL of copy instructions - and is a path
+Note that the `sourceFilesKey` is actually the JSONL of copy instructions - and is a path
 _that is relative_ to the working folder.
 
 For instance if we uploaded the JSONL copy
 instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
-specify a `sourceFilesCsvKey` of `instructions.jsonl`.
+specify a `sourceFilesKey` of `instructions.jsonl`.
 
 ## Thawing objects from cold storage
 
