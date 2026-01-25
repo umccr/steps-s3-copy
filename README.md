@@ -151,13 +151,10 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationRequiredRegion?: string;
 
   /**
-   * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
-   * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
-   * according to a
-   *
-   * TODO: NOTE: we need to rename this field!!!
+   * The relative path (relative to `workingBucketPrefixKey`) to the copy-instructions input file.
+   * This file is JSONL: one `CopyInstruction` per line.
    */
-  readonly sourceFilesCsvKey: string;
+  readonly copyInstructionsKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -184,6 +181,17 @@ export type StepsS3CopyInvokeArguments = {
   readonly dryRun?: boolean;
 
   /**
+   * If present and true, generate html copy report (COPY_REPORT.html)  in the destination.
+   * If omitted, defaults to false.
+   */
+  readonly includeCopyReport?: boolean;
+
+  /**
+   * If set, also save a copy report (COPY_REPORT.html) in the same bucket and prefix as the source file.
+   */
+  readonly retainCopyReport?: boolean;
+
+  /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
    * and per-field defaults are applied by the thaw step Lambda (`*ThawDays` = 1, `*ThawSpeed` = "Bulk").
    */
@@ -203,12 +211,7 @@ export type StepsS3CopyInvokeArguments = {
 };
 ```
 
-Note that the `sourceFilesCsvKey` is actually the JSONL of copy instructions - and is a path
-_that is relative_ to the working folder.
-
-For instance if we uploaded the JSONL copy
-instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
-specify a `sourceFilesCsvKey` of `instructions.jsonl`.
+Note that the `copyInstructionsKey` points to the JSONL copy-instructions file (relative to the working folder). For instance if we uploaded the JSONL copy instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would specify a `copyInstructionsKey` of `instructions.jsonl`.
 
 ## Thawing objects from cold storage
 

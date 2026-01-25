@@ -9,3 +9,7 @@ cdk.out/
 
 .DS_Store
 /.fleet/
+
+
+# Local HTML preview for summarise-copy report
+**/dev_copy_report.html

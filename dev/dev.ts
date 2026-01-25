@@ -16,9 +16,9 @@ const app = new App();
 
 const description = "A steps orchestration for S3 object copying";
 
-// our working sourceBucket can perform in a sub-folder so we do that to test that
-// functionality out
-const WORKING_BUCKET_PREFIX = "a-working-folder/";
+// Our working sourceBucket can perform in a sub-folder. You can test that
+// functionality out with e.g. const WORKING_BUCKET_PREFIX = "a-working-folder/";
+const WORKING_BUCKET_PREFIX = "";
 
 /**
  * Development test deployment of the Steps S3 Copy functionality.

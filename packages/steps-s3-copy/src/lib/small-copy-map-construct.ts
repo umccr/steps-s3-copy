@@ -2,7 +2,7 @@ import { Construct } from "constructs";
 import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
 import {
   DESTINATION_BUCKET_FIELD_NAME,
-  SOURCE_FILES_CSV_KEY_FIELD_NAME,
+  COPY_INSTRUCTIONS_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
@@ -118,7 +118,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
           "{}{}",
           JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
           JsonPath.stringAt(
-            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
           ),
         ),
       },

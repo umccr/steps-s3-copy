@@ -100,23 +100,23 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          sourceFilesCsvKey: state.testInstructionsRelative,
+          copyInstructionsKey: state.testInstructionsRelative,
           destinationBucket: state.workingBucket,
           destinationFolderKey: state.testDestPrefix,
           thawParams: {
-              // Glacier Flexible Retrieval  -->  Expedited
-              glacierFlexibleRetrievalThawDays: 1,
-              glacierFlexibleRetrievalThawSpeed: "Expedited",
-              // Glacier Deep Archive  -->  Standard
-              glacierDeepArchiveThawDays: 1,
-              glacierDeepArchiveThawSpeed: "Standard",
-              // Intelligent Tiering Archive  -->  Expedited
-              intelligentTieringArchiveThawDays: 1,
-              intelligentTieringArchiveThawSpeed: "Expedited",
-              // Intelligent Tiering Deep Archive  -->  Standard
-              intelligentTieringDeepArchiveThawDays: 1,
-              intelligentTieringDeepArchiveThawSpeed: "Standard",
-            },
+            // Glacier Flexible Retrieval  -->  Expedited
+            glacierFlexibleRetrievalThawDays: 1,
+            glacierFlexibleRetrievalThawSpeed: "Expedited",
+            // Glacier Deep Archive  -->  Standard
+            glacierDeepArchiveThawDays: 1,
+            glacierDeepArchiveThawSpeed: "Standard",
+            // Intelligent Tiering Archive  -->  Expedited
+            intelligentTieringArchiveThawDays: 1,
+            intelligentTieringArchiveThawSpeed: "Expedited",
+            // Intelligent Tiering Deep Archive  -->  Standard
+            intelligentTieringDeepArchiveThawDays: 1,
+            intelligentTieringDeepArchiveThawSpeed: "Standard",
+          },
         }),
       }),
     );
@@ -133,7 +133,7 @@ test(
     console.info("Copy finished");
 
     // debug
-    console.log(executionResult);
+    // console.log(executionResult);
 
     assert(
       executionResult.state === WaiterState.SUCCESS,
