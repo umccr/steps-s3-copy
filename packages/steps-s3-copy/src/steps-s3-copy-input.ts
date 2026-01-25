@@ -20,9 +20,8 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationRequiredRegion?: string;
 
   /**
-   * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
-   * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
-   * according to a
+   * The relative path (relative to `workingBucketPrefixKey`) to the copy-instructions input file.
+   * This file is JSONL: one `CopyInstruction` per line.
    */
   readonly copyInstructionsKey: string;
 
