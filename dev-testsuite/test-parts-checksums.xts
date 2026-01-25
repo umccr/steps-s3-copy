@@ -148,7 +148,7 @@ export async function testPartsChecksums(
       stateMachineArn: stateMachineArn,
       name: uniqueTestId,
       input: JSON.stringify({
-        sourceFilesKey: testFolderObjectsTsvRelative,
+        copyInstructionsKey: testFolderObjectsTsvRelative,
         destinationBucket: destinationBucket,
         destinationPrefixKey: testFolderDest,
         maxItemsPerBatch: 1,

@@ -155,7 +155,7 @@ export type StepsS3CopyInvokeArguments = {
    * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
    * according to a
    */
-  readonly sourceFilesKey: string;
+  readonly copyInstructionsKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -212,12 +212,12 @@ export type StepsS3CopyInvokeArguments = {
 };
 ```
 
-Note that the `sourceFilesKey` is actually the JSONL of copy instructions - and is a path
+Note that the `copyInstructionsKey` is actually the JSONL of copy instructions - and is a path
 _that is relative_ to the working folder.
 
 For instance if we uploaded the JSONL copy
 instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would
-specify a `sourceFilesKey` of `instructions.jsonl`.
+specify a `copyInstructionsKey` of `instructions.jsonl`.
 
 ## Thawing objects from cold storage
 

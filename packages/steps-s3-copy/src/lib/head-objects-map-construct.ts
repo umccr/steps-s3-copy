@@ -5,7 +5,7 @@ import {
   StateGraph,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
-import { SOURCE_FILES_KEY_FIELD_NAME } from "../steps-s3-copy-input";
+import { COPY_INSTRUCTIONS_KEY_FIELD_NAME } from "../steps-s3-copy-input";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
@@ -58,7 +58,7 @@ export class HeadObjectsMapConstruct extends Construct {
           "{}{}",
           JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
           JsonPath.stringAt(
-            `$invokeArguments.${SOURCE_FILES_KEY_FIELD_NAME}`,
+            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
           ),
         ),
       }),
@@ -82,7 +82,9 @@ export class HeadObjectsMapConstruct extends Construct {
         "Key.$": JsonPath.format(
           "{}{}",
           JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(`$invokeArguments.${SOURCE_FILES_KEY_FIELD_NAME}`),
+          JsonPath.stringAt(
+            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
+          ),
         ),
       },
       iterator: graph,
@@ -91,7 +93,9 @@ export class HeadObjectsMapConstruct extends Construct {
         "Prefix.$": JsonPath.format(
           "{}{}",
           JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(`$invokeArguments.${SOURCE_FILES_KEY_FIELD_NAME}`),
+          JsonPath.stringAt(
+            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
+          ),
         ),
       },
       assign: {

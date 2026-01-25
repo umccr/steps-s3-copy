@@ -169,7 +169,7 @@ export class StepsS3CopyConstruct extends Construct {
       copyConcurrency:
         "{% [ $number($states.input.copyConcurrency), 80 ][0] %}",
 
-      sourceFilesKey: `{% $exists($states.input.sourceFilesKey) ? $states.input.sourceFilesKey : $error("Missing sourceFilesKey") %}`,
+      copyInstructionsKey: `{% $exists($states.input.copyInstructionsKey) ? $states.input.copyInstructionsKey : $error("Missing copyInstructionsKey") %}`,
       destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
       // set a slash terminated folder to copy into, or by default we just copy into the top level of the destination bucket
       destinationFolderKey: `{% [ $states.input.destinationFolderKey, "" ][0] %}`,

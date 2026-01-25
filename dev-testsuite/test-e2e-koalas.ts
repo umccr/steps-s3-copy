@@ -71,7 +71,7 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          sourceFilesKey: state.testInstructionsRelative,
+          copyInstructionsKey: state.testInstructionsRelative,
           destinationBucket: state.workingBucket,
           destinationFolderKey: state.testDestPrefix,
         }),

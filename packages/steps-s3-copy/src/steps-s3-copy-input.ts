@@ -24,7 +24,7 @@ export type StepsS3CopyInvokeArguments = {
    * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
    * according to a
    */
-  readonly sourceFilesKey: string;
+  readonly copyInstructionsKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -91,8 +91,8 @@ export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
 // this odd construct just makes sure that the JSON paths we specify
 // here correspond with fields in the master "input" schema for the
 // overall Steps function
-export const SOURCE_FILES_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "sourceFilesKey";
+export const COPY_INSTRUCTIONS_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "copyInstructionsKey";
 
 export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
   "maxItemsPerBatch";
