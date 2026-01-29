@@ -23,7 +23,7 @@ import {
 import {
   DESTINATION_BUCKET_FIELD_NAME,
   MAX_ITEMS_PER_BATCH_FIELD_NAME,
-  SOURCE_FILES_CSV_KEY_FIELD_NAME,
+  COPY_INSTRUCTIONS_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
 import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
@@ -176,7 +176,7 @@ export class CopyMapConstruct extends Construct {
           "{}{}",
           JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
           JsonPath.stringAt(
-            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
           ),
         ),
         writerConfig: new WriterConfig({
@@ -222,7 +222,7 @@ export class CopyMapConstruct extends Construct {
           "{}{}",
           JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
           JsonPath.stringAt(
-            `$invokeArguments.${SOURCE_FILES_CSV_KEY_FIELD_NAME}`,
+            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
           ),
         ),
       },

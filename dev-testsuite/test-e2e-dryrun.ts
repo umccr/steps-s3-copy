@@ -97,7 +97,7 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          sourceFilesCsvKey: state.testInstructionsRelative,
+          copyInstructionsKey: state.testInstructionsRelative,
           destinationBucket: state.workingBucket,
           destinationFolderKey: `${state.testDestPrefix}${DEST}`,
           maxItemsPerBatch: 3,

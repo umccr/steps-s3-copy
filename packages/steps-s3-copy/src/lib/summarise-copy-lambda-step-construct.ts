@@ -53,6 +53,21 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           forceDockerBundling: true,
           // and these are the modules we need to install
           nodeModules: ["csv-stringify"],
+          commandHooks: {
+            beforeBundling(inputDir: string, outputDir: string) {
+              // inputDir === packages/steps-s3-copy/lambda/summarise-copy-lambda (mounted as /asset-input)
+              // outputDir === /asset-output
+              return [
+                `cp "${inputDir}/report_template.html" "${outputDir}/report_template.html"`,
+              ];
+            },
+            afterBundling() {
+              return [];
+            },
+            beforeInstall() {
+              return [];
+            },
+          },
         },
         // in practice we hit the limits when using default values here - so we have set these to very generous
         // amounts
@@ -67,8 +82,18 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       payload: TaskInput.fromObject({
         invokeArguments: "{% $invokeArguments %}",
         invokeSettings: "{% $invokeSettings %}",
-        rcloneResultsSmall: "{% $rcloneResultsSmall %}",
-        rcloneResultsLarge: "{% $rcloneResultsLarge %}",
+        destinationBucket: "{% $invokeArguments.destinationBucket %}",
+        destinationPrefixKey: "{% $invokeArguments.destinationFolderKey %}",
+        destinationEndCopyRelativeKey:
+          "{% $invokeArguments.destinationEndCopyRelativeKey %}",
+        workingBucket: "{% $invokeSettings.workingBucket %}",
+        rcloneResultsSmall: "{% $states.input[type='Small'] %}",
+        rcloneResultsLarge: "{% $states.input[type='Large'] %}",
+        rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
+        rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
+        includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
+        retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
+        copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",
       }),
       payloadResponseOnly: true,
     });

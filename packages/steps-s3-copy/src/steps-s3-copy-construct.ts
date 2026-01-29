@@ -24,12 +24,15 @@ import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-constru
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
   DRY_RUN_KEY_FIELD_NAME,
+  INCLUDE_COPY_REPORT_FIELD_NAME,
+  RETAIN_COPY_REPORT_FIELD_NAME,
   StepsS3CopyInvokeArguments,
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
+import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
 import {
   AssetImage,
   AwsLogDriverMode,
@@ -166,7 +169,7 @@ export class StepsS3CopyConstruct extends Construct {
       copyConcurrency:
         "{% [ $number($states.input.copyConcurrency), 80 ][0] %}",
 
-      sourceFilesCsvKey: `{% $exists($states.input.sourceFilesCsvKey) ? $states.input.sourceFilesCsvKey : $error("Missing sourceFilesCsvKey") %}`,
+      copyInstructionsKey: `{% $exists($states.input.copyInstructionsKey) ? $states.input.copyInstructionsKey : $error("Missing copyInstructionsKey") %}`,
       destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
       // set a slash terminated folder to copy into, or by default we just copy into the top level of the destination bucket
       destinationFolderKey: `{% [ $states.input.destinationFolderKey, "" ][0] %}`,
@@ -179,6 +182,12 @@ export class StepsS3CopyConstruct extends Construct {
 
       // typecast any input to a boolean, if left blank or not passed in, we will end up with false
       [DRY_RUN_KEY_FIELD_NAME]: `{% [ $states.input.${DRY_RUN_KEY_FIELD_NAME}, false ][0] %}`,
+
+      // if not passed, default to false
+      [INCLUDE_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${INCLUDE_COPY_REPORT_FIELD_NAME}, false ][0] %}`,
+
+      // if not passed, default to ""
+      [RETAIN_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${RETAIN_COPY_REPORT_FIELD_NAME}, "" ][0] %}`,
     };
     const jsonataInvokeSettings: {
       [K in keyof StepsS3CopyInvokeSettings]: string;
@@ -317,13 +326,13 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    //const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
-    //  this,
-    //  "SummariseCopy",
-    //  {
-    //    writerRole: this._workingRole,
-    //  },
-    //);
+    const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
+      this,
+      "SummariseCopy",
+      {
+        writerRole: this._workingRole,
+      },
+    );
 
     // we construct a set of independent copiers that handle different types of objects
     // we can tune the copiers for their object types
@@ -341,7 +350,7 @@ export class StepsS3CopyConstruct extends Construct {
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
         .next(copiers)
-        //.next(summariseCopyLambdaStep.invocableLambda)
+        .next(summariseCopyLambdaStep.invocableLambda)
         .next(success),
     );
 

@@ -20,13 +20,10 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationRequiredRegion?: string;
 
   /**
-   * The relative path name (relative to the `workingBucketPrefixKey` of the CDK construct)
-   * to a JSONL of "copy instructions". Each "copy instruction" is a JSONL line
-   * according to a
-   *
-   * TODO: NOTE: we need to rename this field!!!
+   * The relative path (relative to `workingBucketPrefixKey`) to the copy-instructions input file.
+   * This file is JSONL: one `CopyInstruction` per line.
    */
-  readonly sourceFilesCsvKey: string;
+  readonly copyInstructionsKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -53,10 +50,20 @@ export type StepsS3CopyInvokeArguments = {
   readonly dryRun?: boolean;
 
   /**
+   * If present and true, generate html copy report (COPY_REPORT.html)  in the destination.
+   * If omitted, defaults to false.
+   */
+  readonly includeCopyReport?: boolean;
+
+  /**
+   * If set, also save a copy report (COPY_REPORT.html) in the same bucket and prefix as the source file.
+   */
+  readonly retainCopyReport?: boolean;
+
+  /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
    * and per-field defaults are applied by the thaw step Lambda (`*ThawDays` = 1, `*ThawSpeed` = "Bulk").
    */
-
   readonly thawParams?: {
     readonly glacierFlexibleRetrievalThawDays?: number;
     readonly glacierFlexibleRetrievalThawSpeed?:
@@ -83,8 +90,8 @@ export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
 // this odd construct just makes sure that the JSON paths we specify
 // here correspond with fields in the master "input" schema for the
 // overall Steps function
-export const SOURCE_FILES_CSV_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "sourceFilesCsvKey";
+export const COPY_INSTRUCTIONS_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "copyInstructionsKey";
 
 export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
   "maxItemsPerBatch";
@@ -100,3 +107,9 @@ export const DESTINATION_END_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineIn
   "destinationEndCopyRelativeKey";
 
 export const DRY_RUN_KEY_FIELD_NAME: CopyOutStateMachineInputKeys = "dryRun";
+
+export const INCLUDE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "includeCopyReport";
+
+export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "retainCopyReport";
