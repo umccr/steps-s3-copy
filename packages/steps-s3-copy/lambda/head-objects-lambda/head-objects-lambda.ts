@@ -7,6 +7,20 @@ import {
 } from "@aws-sdk/client-s3";
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
+import {
+  // SIZE_THRESHOLD_BYTES,
+  COLD_STORAGE_CLASSES,
+} from "../common/constants";
+
+/**
+ * Cost estimate
+ */
+export type CostEstimate = {
+  getCostAUD: number; // Cost to READ from source
+  putCostAUD: number; // Cost to WRITE to destination
+  coldStorageRetrievalCostAUD: number; // Thawing from Glacier/Deep Archive
+  computeCostAUD: number; // Lambda execution cost
+};
 
 /**
  * The way this lambda will be invoked. We expect to be part of a Distributed Map -
@@ -75,6 +89,9 @@ export type HeadObjectsLambdaResultItem = Omit<
 
   // last modified date rendered as ISO string
   lastModifiedISOString: string;
+
+  // the cost estimate for copying this object
+  costEstimate: CostEstimate;
 };
 
 /**
@@ -256,6 +273,14 @@ export async function handler(
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
             sums: undefined,
+
+            // dummy, hardcoded for now.
+            costEstimate: {
+              getCostAUD: 0.001,
+              putCostAUD: 0.0005,
+              coldStorageRetrievalCostAUD: 0.01,
+              computeCostAUD: 0.002,
+            },
           });
         }
       }
@@ -300,6 +325,14 @@ export async function handler(
         storageClass: headResult.StorageClass ?? "STANDARD",
         lastModifiedISOString: headResult.LastModified.toISOString(),
         sums: o.sums,
+
+        // dummy, hardcoded for now.
+        costEstimate: {
+          getCostAUD: 0.001,
+          putCostAUD: 0.0005,
+          coldStorageRetrievalCostAUD: 0.01,
+          computeCostAUD: 0.002,
+        },
       });
     } catch (e: any) {
       // this is an error we kind of might expect - we turn it into our own exception type

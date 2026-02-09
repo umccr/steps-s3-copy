@@ -94,6 +94,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
         retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
         copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",
+        inputCopySets: "{% $coordinateCopyResults.copySets %}",
       }),
       payloadResponseOnly: true,
     });

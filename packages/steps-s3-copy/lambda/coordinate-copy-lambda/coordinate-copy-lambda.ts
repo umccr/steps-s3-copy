@@ -221,9 +221,26 @@ async function createJsonlFromDataFrame(
  * @param df
  */
 async function computeStats(df: pl.DataFrame) {
+  // Extract cost estimate fields from the dataframe and compute their sums
+  const costEstimates = df.getColumn("costEstimate");
+  const totalGetCostAUD = costEstimates.struct.field("getCostAUD").sum();
+  const totalPutCostAUD = costEstimates.struct.field("putCostAUD").sum();
+  const totalColdStorageRetrievalCostAUD = costEstimates.struct
+    .field("coldStorageRetrievalCostAUD")
+    .sum();
+  const totalComputeCostAUD = costEstimates.struct
+    .field("computeCostAUD")
+    .sum();
+
   return {
     objectToCopyCount: df.getColumn("sourceKey").len(),
     objectToCopySizeInBytes: df.getColumn("size").sum(),
+    totalCostEstimateAUD: {
+      totalGetCostAUD: totalGetCostAUD,
+      totalPutCostAUD: totalPutCostAUD,
+      totalColdStorageRetrievalCostAUD: totalColdStorageRetrievalCostAUD,
+      totalComputeCostAUD: totalComputeCostAUD,
+    },
   };
 }
 

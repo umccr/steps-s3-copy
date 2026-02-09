@@ -19,6 +19,13 @@ export interface FileResult {
   elapsedSeconds?: number;
 }
 
+export interface CostEstimate {
+  getCostAUD: number;
+  putCostAUD: number;
+  coldStorageRetrievalCostAUD: number;
+  computeCostAUD: number;
+}
+
 // Convert number of bytes into human-readable format
 function formatBytes(n?: number) {
   if (n === undefined) return "-";
@@ -175,6 +182,10 @@ export function createHtmlReport(opts: {
   records: FileResult[];
   destinationBucket: string;
   destinationFolderKey: string;
+  costsSmall?: CostEstimate;
+  costsLarge?: CostEstimate;
+  costsSmallThaw?: CostEstimate;
+  costsLargeThaw?: CostEstimate;
 }): string {
   const { title, records, destinationBucket, destinationFolderKey } = opts;
 
@@ -189,6 +200,43 @@ export function createHtmlReport(opts: {
   const avgSpeed = total
     ? rows.reduce((a, r) => a + (r.speed || 0), 0) / total
     : 0;
+
+  // Calculate total costs
+  const totalGetCost =
+    (opts.costsSmall?.getCostAUD || 0) +
+    (opts.costsLarge?.getCostAUD || 0) +
+    (opts.costsSmallThaw?.getCostAUD || 0) +
+    (opts.costsLargeThaw?.getCostAUD || 0);
+  const totalPutCost =
+    (opts.costsSmall?.putCostAUD || 0) +
+    (opts.costsLarge?.putCostAUD || 0) +
+    (opts.costsSmallThaw?.putCostAUD || 0) +
+    (opts.costsLargeThaw?.putCostAUD || 0);
+  const totalColdCost =
+    (opts.costsSmall?.coldStorageRetrievalCostAUD || 0) +
+    (opts.costsLarge?.coldStorageRetrievalCostAUD || 0) +
+    (opts.costsSmallThaw?.coldStorageRetrievalCostAUD || 0) +
+    (opts.costsLargeThaw?.coldStorageRetrievalCostAUD || 0);
+  const totalComputeCost =
+    (opts.costsSmall?.computeCostAUD || 0) +
+    (opts.costsLarge?.computeCostAUD || 0) +
+    (opts.costsSmallThaw?.computeCostAUD || 0) +
+    (opts.costsLargeThaw?.computeCostAUD || 0);
+  const totalCost =
+    totalGetCost + totalPutCost + totalColdCost + totalComputeCost;
+
+  const costHtml = `
+    <h4>💰 Cost Estimates (AUD)</h4>
+    <ul>
+      <li><strong>GET requests:</strong> $${totalGetCost.toFixed(4)}</li>
+      <li><strong>PUT requests:</strong> $${totalPutCost.toFixed(4)}</li>
+      <li><strong>Cold storage retrieval:</strong> $${totalColdCost.toFixed(
+        4,
+      )}</li>
+      <li><strong>Compute:</strong> $${totalComputeCost.toFixed(4)}</li>
+      <li><strong>TOTAL:</strong> $${totalCost.toFixed(4)}</li>
+    </ul>
+  `;
 
   const copyTable = `
 <div class="table-responsive">
@@ -287,5 +335,6 @@ export function createHtmlReport(opts: {
     COPY_TABLE: copyTable,
     S3_DESTINATION_PATH:
       "s3://" + destinationBucket + "/" + destinationFolderKey,
+    COST_HTML: costHtml,
   });
 }
