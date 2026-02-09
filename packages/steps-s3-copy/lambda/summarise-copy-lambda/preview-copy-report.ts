@@ -52,8 +52,32 @@ const html = createHtmlReport({
   records,
   destinationBucket: "dest-bucket",
   destinationFolderKey: "some/long/path/to/test/popover/behaviour/",
+  // Add mock cost data
+  costsSmall: {
+    getCostAUD: 0.0012,
+    putCostAUD: 0.0008,
+    coldStorageRetrievalCostAUD: 0.0,
+    computeCostAUD: 0.0003,
+  },
+  costsLarge: {
+    getCostAUD: 0.0045,
+    putCostAUD: 0.0032,
+    coldStorageRetrievalCostAUD: 0.0,
+    computeCostAUD: 0.0011,
+  },
+  costsSmallThaw: {
+    getCostAUD: 0.0008,
+    putCostAUD: 0.0005,
+    coldStorageRetrievalCostAUD: 0.015,
+    computeCostAUD: 0.0002,
+  },
+  costsLargeThaw: {
+    getCostAUD: 0.0021,
+    putCostAUD: 0.0015,
+    coldStorageRetrievalCostAUD: 0.038,
+    computeCostAUD: 0.0007,
+  },
 });
-
 const outPath = join(__dirname, "dev_copy_report.html");
 writeFileSync(outPath, html, "utf-8");
 console.log(`dev_copy_report.html written: ${outPath}`);
