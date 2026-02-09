@@ -5,6 +5,10 @@ import { createReadStream, rmSync } from "node:fs";
 import { chdir } from "node:process";
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
+import {
+  SIZE_THRESHOLD_BYTES,
+  COLD_STORAGE_CLASSES,
+} from "../common/constants";
 import { tmpNameSync } from "tmp";
 import * as path from "node:path/posix";
 
@@ -24,18 +28,6 @@ interface LambdaEvent {
     manifestAbsoluteKey: string;
   };
 }
-
-// we should pass this in from above
-// set to 5 MiB as that is the definitional minimum size of a multipart part
-const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
-
-// These are the storage classes requiring thaw before copying
-const COLD_STORAGE_CLASSES = [
-  "GLACIER",
-  "DEEP_ARCHIVE",
-  "INTELLIGENT_TIERING_ARCHIVE_ACCESS",
-  "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
-];
 
 /**
  * A handler that processes the list/head of all the objects that we are
