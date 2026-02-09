@@ -222,7 +222,7 @@ export async function handler(
           assert.ok(item.Key);
           assert.ok(item.ETag);
           assert.ok(item.LastModified);
-          assert.equal(typeof item.Size, "number");
+          assert.ok(typeof item.Size === "number");
 
           // we skip directory markers in S3
           // note: we do this _before_ incrementing expansionCount - so if it
@@ -282,7 +282,7 @@ export async function handler(
 
       assert.ok(headResult.ETag);
       assert.ok(headResult.LastModified);
-      assert.equal(typeof headResult.ContentLength, "number");
+      assert.ok(typeof headResult.ContentLength === "number");
 
       resultObjects.push({
         sourceBucket: o.sourceBucket,
