@@ -56,8 +56,8 @@ interface FileResult {
 
 // This is the shape of the cost estimate metadata.
 interface CostEstimate {
-  getCostAUD: number;
-  putCostAUD: number;
+  s3ReadCostAUD: number;
+  s3WriteCostAUD: number;
   coldStorageRetrievalCostAUD: number;
   computeCostAUD: number;
 }
@@ -70,8 +70,8 @@ async function readCostsFromJsonl(
   key: string,
 ): Promise<CostEstimate> {
   const costs: CostEstimate = {
-    getCostAUD: 0,
-    putCostAUD: 0,
+    s3ReadCostAUD: 0,
+    s3WriteCostAUD: 0,
     coldStorageRetrievalCostAUD: 0,
     computeCostAUD: 0,
   };
@@ -92,8 +92,8 @@ async function readCostsFromJsonl(
     const cost = obj.costEstimate;
 
     if (cost) {
-      costs.getCostAUD += cost.getCostAUD || 0;
-      costs.putCostAUD += cost.putCostAUD || 0;
+      costs.s3ReadCostAUD += cost.s3ReadCostAUD || 0;
+      costs.s3WriteCostAUD += cost.s3WriteCostAUD || 0;
       costs.coldStorageRetrievalCostAUD +=
         cost.coldStorageRetrievalCostAUD || 0;
       costs.computeCostAUD += cost.computeCostAUD || 0;

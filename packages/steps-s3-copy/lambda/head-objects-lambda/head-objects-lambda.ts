@@ -16,8 +16,8 @@ import {
  * Cost estimate
  */
 export type CostEstimate = {
-  getCostAUD: number; // Cost to READ from source
-  putCostAUD: number; // Cost to WRITE to destination
+  s3ReadCostAUD: number; // Cost to READ from source
+  s3WriteCostAUD: number; // Cost to WRITE to destination
   coldStorageRetrievalCostAUD: number; // Thawing from Glacier/Deep Archive
   computeCostAUD: number; // Lambda execution cost
 };
@@ -276,8 +276,8 @@ export async function handler(
 
             // dummy, hardcoded for now.
             costEstimate: {
-              getCostAUD: 0.001,
-              putCostAUD: 0.0005,
+              s3ReadCostAUD: 0.001,
+              s3WriteCostAUD: 0.0005,
               coldStorageRetrievalCostAUD: 0.01,
               computeCostAUD: 0.002,
             },
@@ -328,8 +328,8 @@ export async function handler(
 
         // dummy, hardcoded for now.
         costEstimate: {
-          getCostAUD: 0.001,
-          putCostAUD: 0.0005,
+          s3ReadCostAUD: 0.001,
+          s3WriteCostAUD: 0.0005,
           coldStorageRetrievalCostAUD: 0.01,
           computeCostAUD: 0.002,
         },

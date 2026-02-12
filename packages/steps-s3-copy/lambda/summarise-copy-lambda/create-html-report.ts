@@ -20,8 +20,8 @@ export interface FileResult {
 }
 
 export interface CostEstimate {
-  getCostAUD: number;
-  putCostAUD: number;
+  s3ReadCostAUD: number;
+  s3WriteCostAUD: number;
   coldStorageRetrievalCostAUD: number;
   computeCostAUD: number;
 }
@@ -202,16 +202,16 @@ export function createHtmlReport(opts: {
     : 0;
 
   // Calculate total costs
-  const totalGetCost =
-    (opts.costsSmall?.getCostAUD || 0) +
-    (opts.costsLarge?.getCostAUD || 0) +
-    (opts.costsSmallThaw?.getCostAUD || 0) +
-    (opts.costsLargeThaw?.getCostAUD || 0);
-  const totalPutCost =
-    (opts.costsSmall?.putCostAUD || 0) +
-    (opts.costsLarge?.putCostAUD || 0) +
-    (opts.costsSmallThaw?.putCostAUD || 0) +
-    (opts.costsLargeThaw?.putCostAUD || 0);
+  const totalS3ReadCost =
+    (opts.costsSmall?.s3ReadCostAUD || 0) +
+    (opts.costsLarge?.s3ReadCostAUD || 0) +
+    (opts.costsSmallThaw?.s3ReadCostAUD || 0) +
+    (opts.costsLargeThaw?.s3ReadCostAUD || 0);
+  const totalS3WriteCost =
+    (opts.costsSmall?.s3WriteCostAUD || 0) +
+    (opts.costsLarge?.s3WriteCostAUD || 0) +
+    (opts.costsSmallThaw?.s3WriteCostAUD || 0) +
+    (opts.costsLargeThaw?.s3WriteCostAUD || 0);
   const totalColdCost =
     (opts.costsSmall?.coldStorageRetrievalCostAUD || 0) +
     (opts.costsLarge?.coldStorageRetrievalCostAUD || 0) +
@@ -223,7 +223,7 @@ export function createHtmlReport(opts: {
     (opts.costsSmallThaw?.computeCostAUD || 0) +
     (opts.costsLargeThaw?.computeCostAUD || 0);
   const totalCost =
-    totalGetCost + totalPutCost + totalColdCost + totalComputeCost;
+    totalS3ReadCost + totalS3WriteCost + totalColdCost + totalComputeCost;
 
   const costHtml = `
   <div class="row align-items-start">
@@ -232,13 +232,13 @@ export function createHtmlReport(opts: {
   <ul class="list-unstyled mb-0 flex-grow-1 d-flex flex-column justify-content-center">
     <li class="mb-2">
       <span style="display: inline-block; width: 12px; height: 12px; background-color: #527FFF; border-radius: 2px; margin-right: 8px;"></span>
-      <strong>GET requests:</strong>
-      <span class="text-muted">$${totalGetCost.toFixed(4)} AUD</span>
+      <strong>Read from source S3:</strong>
+      <span class="text-muted">$${totalS3ReadCost.toFixed(4)} AUD</span>
     </li>
     <li class="mb-2">
       <span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
-      <strong>PUT requests:</strong>
-      <span class="text-muted">$${totalPutCost.toFixed(4)} AUD</span>
+      <strong>Write to destination S3:</strong>
+      <span class="text-muted">$${totalS3WriteCost.toFixed(4)} AUD</span>
     </li>
     <li class="mb-2">
       <span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
@@ -270,11 +270,11 @@ export function createHtmlReport(opts: {
         </h6>
         <ul class="small text-secondary mb-0 ps-3">
           <li class="mb-2">
-            <strong>GET:</strong>
+            <strong>Read from source S3:</strong>
             <code>XXX</code> per 1k requests + <code>XXX</code> per GB retrieved
           </li>
           <li class="mb-2">
-            <strong>PUT:</strong>
+            <strong>Write to destination S3:</strong>
             <code>XXX</code> per 1k requests
           </li>
           <li class="mb-2">
@@ -299,9 +299,9 @@ export function createHtmlReport(opts: {
     new Chart(ctx, {
       type: 'pie',
       data: {
-        labels: ['GET Requests', 'PUT Requests', 'Cold Storage Retrieval', 'Compute'],
+        labels: ['Read from source S3', 'Write to destination S3', 'Cold Storage Retrieval', 'Compute'],
         datasets: [{
-          data: [${totalGetCost}, ${totalPutCost}, ${totalColdCost}, ${totalComputeCost}],
+          data: [${totalS3ReadCost}, ${totalS3WriteCost}, ${totalColdCost}, ${totalComputeCost}],
           backgroundColor: ['#527FFF', '#FF9900', '#1EA591', '#687078'],
           borderWidth: 2,
           borderColor: '#fff'

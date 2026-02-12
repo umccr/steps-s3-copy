@@ -223,8 +223,10 @@ async function createJsonlFromDataFrame(
 async function computeStats(df: pl.DataFrame) {
   // Extract cost estimate fields from the dataframe and compute their sums
   const costEstimates = df.getColumn("costEstimate");
-  const totalGetCostAUD = costEstimates.struct.field("getCostAUD").sum();
-  const totalPutCostAUD = costEstimates.struct.field("putCostAUD").sum();
+  const totalS3ReadCostAUD = costEstimates.struct.field("s3ReadCostAUD").sum();
+  const totalS3WriteCostAUD = costEstimates.struct
+    .field("s3WriteCostAUD")
+    .sum();
   const totalColdStorageRetrievalCostAUD = costEstimates.struct
     .field("coldStorageRetrievalCostAUD")
     .sum();
@@ -236,8 +238,8 @@ async function computeStats(df: pl.DataFrame) {
     objectToCopyCount: df.getColumn("sourceKey").len(),
     objectToCopySizeInBytes: df.getColumn("size").sum(),
     totalCostEstimateAUD: {
-      totalGetCostAUD: totalGetCostAUD,
-      totalPutCostAUD: totalPutCostAUD,
+      totalS3ReadCostAUD: totalS3ReadCostAUD,
+      totalS3WriteCostAUD: totalS3WriteCostAUD,
       totalColdStorageRetrievalCostAUD: totalColdStorageRetrievalCostAUD,
       totalComputeCostAUD: totalComputeCostAUD,
     },
