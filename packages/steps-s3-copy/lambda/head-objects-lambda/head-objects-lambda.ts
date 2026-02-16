@@ -8,16 +8,16 @@ import {
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
 import {
-  // SIZE_THRESHOLD_BYTES,
-  COLD_STORAGE_CLASSES,
+  estimateS3CrossRegionReadWriteCost,
+  estimateColdStorageRetrievalCost,
+  estimateComputeCost,
 } from "../common/constants";
 
 /**
  * Cost estimate
  */
 export type CostEstimate = {
-  s3ReadCostAUD: number; // Cost to READ from source
-  s3WriteCostAUD: number; // Cost to WRITE to destination
+  s3CrossRegionReadWriteCostAUD: number; // Cost to copy S3 objects across regions (per object)
   coldStorageRetrievalCostAUD: number; // Thawing from Glacier/Deep Archive
   computeCostAUD: number; // Lambda execution cost
 };
@@ -276,10 +276,12 @@ export async function handler(
 
             // dummy, hardcoded for now.
             costEstimate: {
-              s3ReadCostAUD: 0.001,
-              s3WriteCostAUD: 0.0005,
-              coldStorageRetrievalCostAUD: 0.01,
-              computeCostAUD: 0.002,
+              s3CrossRegionReadWriteCostAUD: 0.001,
+              coldStorageRetrievalCostAUD: estimateColdStorageRetrievalCost(
+                item.Size,
+                item.StorageClass ?? "STANDARD",
+              ),
+              computeCostAUD: estimateComputeCost(item.Size),
             },
           });
         }
@@ -328,8 +330,7 @@ export async function handler(
 
         // dummy, hardcoded for now.
         costEstimate: {
-          s3ReadCostAUD: 0.001,
-          s3WriteCostAUD: 0.0005,
+          s3CrossRegionReadWriteCostAUD: 0.0005,
           coldStorageRetrievalCostAUD: 0.01,
           computeCostAUD: 0.002,
         },

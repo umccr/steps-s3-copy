@@ -1,5 +1,16 @@
 import { readFileSync } from "fs";
 import { join } from "path";
+import {
+  S3_CROSS_REGION_COPY_COST_PER_GB_AUD,
+  GLACIER_RETRIEVAL_COSTS,
+  LAMBDA_GB_SECOND_COST_AUD,
+  LAMBDA_INVOCATION_COST_AUD,
+  FARGATE_VCPU_COST_PER_HOUR_AUD,
+  FARGATE_MEMORY_COST_PER_HOUR_AUD,
+  FARGATE_MIN_BILLING_SECONDS,
+  COST_LAST_UPDATED,
+  COST_CHECK_URL,
+} from "../common/constants";
 
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
@@ -20,8 +31,7 @@ export interface FileResult {
 }
 
 export interface CostEstimate {
-  s3ReadCostAUD: number;
-  s3WriteCostAUD: number;
+  s3CrossRegionReadWriteCostAUD: number;
   coldStorageRetrievalCostAUD: number;
   computeCostAUD: number;
 }
@@ -202,16 +212,11 @@ export function createHtmlReport(opts: {
     : 0;
 
   // Calculate total costs
-  const totalS3ReadCost =
-    (opts.costsSmall?.s3ReadCostAUD || 0) +
-    (opts.costsLarge?.s3ReadCostAUD || 0) +
-    (opts.costsSmallThaw?.s3ReadCostAUD || 0) +
-    (opts.costsLargeThaw?.s3ReadCostAUD || 0);
-  const totalS3WriteCost =
-    (opts.costsSmall?.s3WriteCostAUD || 0) +
-    (opts.costsLarge?.s3WriteCostAUD || 0) +
-    (opts.costsSmallThaw?.s3WriteCostAUD || 0) +
-    (opts.costsLargeThaw?.s3WriteCostAUD || 0);
+  const totalS3CrossRegionReadWriteCost =
+    (opts.costsSmall?.s3CrossRegionReadWriteCostAUD || 0) +
+    (opts.costsLarge?.s3CrossRegionReadWriteCostAUD || 0) +
+    (opts.costsSmallThaw?.s3CrossRegionReadWriteCostAUD || 0) +
+    (opts.costsLargeThaw?.s3CrossRegionReadWriteCostAUD || 0);
   const totalColdCost =
     (opts.costsSmall?.coldStorageRetrievalCostAUD || 0) +
     (opts.costsLarge?.coldStorageRetrievalCostAUD || 0) +
@@ -223,39 +228,36 @@ export function createHtmlReport(opts: {
     (opts.costsSmallThaw?.computeCostAUD || 0) +
     (opts.costsLargeThaw?.computeCostAUD || 0);
   const totalCost =
-    totalS3ReadCost + totalS3WriteCost + totalColdCost + totalComputeCost;
+    totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
 
   const costHtml = `
   <div class="row align-items-start">
-<!-- Left: Cost values -->
-<div class="col-lg-3 col-md-4 mb-3 d-flex flex-column">
-  <ul class="list-unstyled mb-0 flex-grow-1 d-flex flex-column justify-content-center">
-    <li class="mb-2">
-      <span style="display: inline-block; width: 12px; height: 12px; background-color: #527FFF; border-radius: 2px; margin-right: 8px;"></span>
-      <strong>Read from source S3:</strong>
-      <span class="text-muted">$${totalS3ReadCost.toFixed(4)} AUD</span>
-    </li>
-    <li class="mb-2">
-      <span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
-      <strong>Write to destination S3:</strong>
-      <span class="text-muted">$${totalS3WriteCost.toFixed(4)} AUD</span>
-    </li>
-    <li class="mb-2">
-      <span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
-      <strong>Cold storage retrieval:</strong>
-      <span class="text-muted">$${totalColdCost.toFixed(4)} AUD</span>
-    </li>
-    <li class="mb-2">
-      <span style="display: inline-block; width: 12px; height: 12px; background-color: #687078; border-radius: 2px; margin-right: 8px;"></span>
-      <strong>Compute:</strong>
-      <span class="text-muted">$${totalComputeCost.toFixed(4)} AUD</span>
-    </li>
-    <li class="pt-2 mt-2 border-top">
-      <strong class="h5">Total:</strong>
-      <span class="h5 text-primary">$${totalCost.toFixed(4)} AUD</span>
-    </li>
-  </ul>
-</div>
+    <!-- Left: Cost values -->
+    <div class="col-lg-3 col-md-4 mb-3 d-flex flex-column">
+      <ul class="list-unstyled mb-0 flex-grow-1 d-flex flex-column justify-content-center">
+        <li class="mb-2">
+          <span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
+          <strong>S3 cross-region read/write:</strong>
+          <span class="text-muted">$${totalS3CrossRegionReadWriteCost.toFixed(
+            4,
+          )} AUD</span>
+        </li>
+        <li class="mb-2">
+          <span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
+          <strong>Cold storage retrieval:</strong>
+          <span class="text-muted">$${totalColdCost.toFixed(4)} AUD</span>
+        </li>
+        <li class="mb-2">
+          <span style="display: inline-block; width: 12px; height: 12px; background-color: #527FFF; border-radius: 2px; margin-right: 8px;"></span>
+          <strong>Compute:</strong>
+          <span class="text-muted">$${totalComputeCost.toFixed(4)} AUD</span>
+        </li>
+        <li class="pt-2 mt-2 border-top">
+          <strong class="h5">Total:</strong>
+          <span class="h5 text-primary">$${totalCost.toFixed(4)} AUD</span>
+        </li>
+      </ul>
+    </div>
     <!-- Center: Pie chart -->
     <div class="col-lg-4 col-md-4 mb-3 d-flex justify-content-center">
       <canvas id="costChart" style="max-width: 280px; max-height: 280px;"></canvas>
@@ -268,26 +270,70 @@ export function createHtmlReport(opts: {
           <i class="bi bi-info-circle-fill text-info"></i>
           How are costs calculated?
         </h6>
+
         <ul class="small text-secondary mb-0 ps-3">
+          <!-- Cross Region Costs -->
           <li class="mb-2">
-            <strong>Read from source S3:</strong>
-            <code>XXX</code> per 1k requests + <code>XXX</code> per GB retrieved
+              <strong>S3 cross-region read/write:</strong>
+              <code>~$${S3_CROSS_REGION_COPY_COST_PER_GB_AUD} per GB transferred</code> between AWS regions (S3 in-region copies are free)
           </li>
+
+          <!-- Cold Storage Costs -->
           <li class="mb-2">
-            <strong>Write to destination S3:</strong>
-            <code>XXX</code> per 1k requests
+            <strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
+            <ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
+              <li>
+                <span style="color:#527FFF;"><strong>Glacier:</strong></span>
+                Bulk $${GLACIER_RETRIEVAL_COSTS.GLACIER.Bulk}/GB,
+                Standard $${GLACIER_RETRIEVAL_COSTS.GLACIER.Standard}/GB,
+                Expedited $${GLACIER_RETRIEVAL_COSTS.GLACIER.Expedited}/GB
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
+                Bulk $${GLACIER_RETRIEVAL_COSTS.DEEP_ARCHIVE.Bulk}/GB,
+                Standard $${GLACIER_RETRIEVAL_COSTS.DEEP_ARCHIVE.Standard}/GB
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
+                Bulk $${
+                  GLACIER_RETRIEVAL_COSTS.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                    .Bulk
+                }/GB,
+                Standard $${
+                  GLACIER_RETRIEVAL_COSTS.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                    .Standard
+                }/GB,
+                Expedited $${
+                  GLACIER_RETRIEVAL_COSTS.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                    .Expedited
+                }/GB
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
+                Bulk $${
+                  GLACIER_RETRIEVAL_COSTS
+                    .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk
+                }/GB,
+                Standard $${
+                  GLACIER_RETRIEVAL_COSTS
+                    .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard
+                }/GB
+              </li>
+            </ul>
           </li>
-          <li class="mb-2">
-            <strong>Cold storage:</strong>
-            <code>XXX</code> per GB for Glacier retrieval
-          </li>
+
+          <!-- Compute Costs -->
           <li class="mb-2">
             <strong>Compute:</strong>
-            <code>XXX</code> per GB-second × memory × duration
+            <br>
+            <code>
+              Lambda: $${LAMBDA_GB_SECOND_COST_AUD} per GB-second × memory × duration, plus $${LAMBDA_INVOCATION_COST_AUD} per invocation<br>
+              Fargate: $${FARGATE_VCPU_COST_PER_HOUR_AUD} per vCPU-hour, $${FARGATE_MEMORY_COST_PER_HOUR_AUD} per GB-hour (min ${FARGATE_MIN_BILLING_SECONDS}s)
+            </code>
           </li>
         </ul>
         <p class="small text-muted fst-italic mb-0 mt-3">
-          Estimates based on AWS pricing (ap-southeast-2). Actual costs may vary.
+          Based on official <a href="${COST_CHECK_URL}" target="_blank" rel="noopener">AWS pricing</a> (ap-southeast-2). Last updated: ${COST_LAST_UPDATED}.
         </p>
       </div>
     </div>
@@ -299,10 +345,10 @@ export function createHtmlReport(opts: {
     new Chart(ctx, {
       type: 'pie',
       data: {
-        labels: ['Read from source S3', 'Write to destination S3', 'Cold Storage Retrieval', 'Compute'],
+        labels: ['S3 Cross-Region Read/Write', 'Cold Storage Retrieval', 'Compute'],
         datasets: [{
-          data: [${totalS3ReadCost}, ${totalS3WriteCost}, ${totalColdCost}, ${totalComputeCost}],
-          backgroundColor: ['#527FFF', '#FF9900', '#1EA591', '#687078'],
+          data: [${totalS3CrossRegionReadWriteCost}, ${totalColdCost}, ${totalComputeCost}],
+          backgroundColor: ['#FF9900', '#1EA591', '#527FFF'],
           borderWidth: 2,
           borderColor: '#fff'
         }]
@@ -312,7 +358,7 @@ export function createHtmlReport(opts: {
         maintainAspectRatio: true,
         plugins: {
           legend: {
-            display: false  // Hide the legend
+            display: false
           },
           tooltip: {
             callbacks: {

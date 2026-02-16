@@ -45,6 +45,9 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         depsLockFilePath: join(lambdaRoot, "package-lock.json"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.X86_64,
+        // Set projectRoot to lambda/ directory to enable bundling of shared modules from lambda/common/
+        // for example allowing all lambdas to import the constant defined in ../common/constants
+        projectRoot: join(__dirname, "..", "..", "lambda"),
         handler: "handler",
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
@@ -58,7 +61,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
               // inputDir === packages/steps-s3-copy/lambda/summarise-copy-lambda (mounted as /asset-input)
               // outputDir === /asset-output
               return [
-                `cp "${inputDir}/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/summarise-copy-lambda/report_template.html" "${outputDir}/report_template.html"`,
               ];
             },
             afterBundling() {

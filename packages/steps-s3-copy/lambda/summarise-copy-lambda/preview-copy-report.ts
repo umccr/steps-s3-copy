@@ -54,26 +54,22 @@ const html = createHtmlReport({
   destinationFolderKey: "some/long/path/to/test/popover/behaviour/",
   // Add mock cost data
   costsSmall: {
-    s3ReadCostAUD: 0.0012,
-    s3WriteCostAUD: 0.0008,
+    s3CrossRegionReadWriteCostAUD: 0.002,
     coldStorageRetrievalCostAUD: 0.0,
     computeCostAUD: 0.0003,
   },
   costsLarge: {
-    s3ReadCostAUD: 0.0045,
-    s3WriteCostAUD: 0.0032,
+    s3CrossRegionReadWriteCostAUD: 0.0045,
     coldStorageRetrievalCostAUD: 0.0,
     computeCostAUD: 0.0011,
   },
   costsSmallThaw: {
-    s3ReadCostAUD: 0.0008,
-    s3WriteCostAUD: 0.0005,
+    s3CrossRegionReadWriteCostAUD: 0.0013,
     coldStorageRetrievalCostAUD: 0.015,
     computeCostAUD: 0.0002,
   },
   costsLargeThaw: {
-    s3ReadCostAUD: 0.0021,
-    s3WriteCostAUD: 0.0015,
+    s3CrossRegionReadWriteCostAUD: 0.0021,
     coldStorageRetrievalCostAUD: 0.038,
     computeCostAUD: 0.0007,
   },
