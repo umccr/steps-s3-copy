@@ -31,6 +31,8 @@ export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
     destinationFolderKey: string;
     maximumExpansion: number;
+    sourceRequiredRegion: string;
+    destinationRequiredRegion: string;
   };
   Items: HeadObjectsLambdaItem[];
 };
@@ -256,6 +258,14 @@ export async function handler(
               event.BatchInput.maximumExpansion,
             );
 
+          // size and storageClass variables foir use downstream
+          // in both the result object and cost estimation
+          const size = item.Size;
+          const storageClass = item.StorageClass ?? "STANDARD";
+          const sourceRegion = event.BatchInput.sourceRequiredRegion;
+          const destinationRegion = event.BatchInput.destinationRequiredRegion;
+          const iscrossRegion = sourceRegion !== destinationRegion;
+
           // we have the benefit that ListObjects actually returns the details we
           // need - so these do not need a further HEAD command
           resultObjects.push({
@@ -268,20 +278,23 @@ export async function handler(
               o.destinationRelativeFolderKey,
             ),
             etag: item.ETag,
-            size: item.Size,
-            storageClass: item.StorageClass ?? "STANDARD",
+            size: size,
+            storageClass: storageClass,
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
             sums: undefined,
 
-            // dummy, hardcoded for now.
+            // Cost estimation for wildcard expanded items
             costEstimate: {
-              s3CrossRegionReadWriteCostAUD: 0.001,
-              coldStorageRetrievalCostAUD: estimateColdStorageRetrievalCost(
-                item.Size,
-                item.StorageClass ?? "STANDARD",
+              s3CrossRegionReadWriteCostAUD: estimateS3CrossRegionReadWriteCost(
+                size,
+                iscrossRegion,
               ),
-              computeCostAUD: estimateComputeCost(item.Size),
+              coldStorageRetrievalCostAUD: estimateColdStorageRetrievalCost(
+                size,
+                storageClass,
+              ),
+              computeCostAUD: estimateComputeCost(size),
             },
           });
         }
@@ -311,6 +324,15 @@ export async function handler(
       assert.ok(headResult.LastModified);
       assert.ok(typeof headResult.ContentLength === "number");
 
+      // size and storageClass variables foir use downstream
+      // in both the result object and cost estimation
+      const size = headResult.ContentLength;
+      const storageClass = headResult.StorageClass ?? "STANDARD";
+
+      const sourceRegion = event.BatchInput.sourceRequiredRegion;
+      const destinationRegion = event.BatchInput.destinationRequiredRegion;
+      const iscrossRegion = sourceRegion !== destinationRegion;
+
       resultObjects.push({
         sourceBucket: o.sourceBucket,
         sourceKey: o.sourceKey,
@@ -321,18 +343,24 @@ export async function handler(
           o.destinationRelativeFolderKey,
         ),
         etag: headResult.ETag,
-        size: headResult.ContentLength,
+        size: size,
         // as per spec - storage class is always returned by head object EXCEPT for standard
         // for our downstream processing - we mind as well rectify this so it is always present
-        storageClass: headResult.StorageClass ?? "STANDARD",
+        storageClass: storageClass,
         lastModifiedISOString: headResult.LastModified.toISOString(),
         sums: o.sums,
 
-        // dummy, hardcoded for now.
+        // Cost estimation for non-wildcard items
         costEstimate: {
-          s3CrossRegionReadWriteCostAUD: 0.0005,
-          coldStorageRetrievalCostAUD: 0.01,
-          computeCostAUD: 0.002,
+          s3CrossRegionReadWriteCostAUD: estimateS3CrossRegionReadWriteCost(
+            size,
+            iscrossRegion,
+          ),
+          coldStorageRetrievalCostAUD: estimateColdStorageRetrievalCost(
+            size,
+            storageClass,
+          ),
+          computeCostAUD: estimateComputeCost(size),
         },
       });
     } catch (e: any) {

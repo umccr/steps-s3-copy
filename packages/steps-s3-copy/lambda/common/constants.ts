@@ -94,6 +94,7 @@ export function estimateColdStorageRetrievalCost(
   const classPricing = GLACIER_RETRIEVAL_COSTS[storageClass];
   if (!classPricing) return 0;
   const costPerGB = classPricing[retrievalSpeed] ?? classPricing["Standard"];
+  if (costPerGB === undefined) return 0;
   return bytesToGB(sizeBytes) * costPerGB;
 }
 

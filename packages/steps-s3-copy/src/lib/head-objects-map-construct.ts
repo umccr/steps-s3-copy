@@ -76,6 +76,12 @@ export class HeadObjectsMapConstruct extends Construct {
           "$invokeArguments.destinationFolderKey",
         ),
         maximumExpansion: 256,
+        "sourceRequiredRegion.$": JsonPath.stringAt(
+          "$invokeArguments.sourceRequiredRegion",
+        ),
+        "destinationRequiredRegion.$": JsonPath.stringAt(
+          "$invokeArguments.destinationRequiredRegion",
+        ),
       },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",
