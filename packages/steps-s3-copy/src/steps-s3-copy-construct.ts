@@ -18,6 +18,8 @@ import {
   Succeed,
   Wait,
   WaitTime,
+  Choice,
+  Condition,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
@@ -33,6 +35,8 @@ import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
+import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
+import { SummariseDryRunLambdaStepConstruct } from "./lib/summarise-dryrun-lambda-step-construct";
 import {
   AssetImage,
   AwsLogDriverMode,
@@ -45,7 +49,6 @@ import {
 import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -334,6 +337,14 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
+    const summariseDryRunLambdaStep = new SummariseDryRunLambdaStepConstruct(
+      this,
+      "SummariseDryRun",
+      {
+        writerRole: this._workingRole,
+      },
+    );
+
     // we construct a set of independent copiers that handle different types of objects
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
@@ -343,15 +354,26 @@ export class StepsS3CopyConstruct extends Construct {
       thawLargeCopierMap.distributedMap,
     );
 
+    const summariseCopy = summariseCopyLambdaStep.invocableLambda;
+    const summariseDryRun = summariseDryRunLambdaStep.invocableLambda;
+
+    // Setup Choice
+    // HARCODED dryRun condition. Need to se the proper whay of reading that.
+    const dryRunSkipWork = new Choice(this, "Is DryRun?")
+      .when(
+        Condition.isPresent("$$.Execution.Id"),
+        summariseDryRun.next(success),
+      )
+      .otherwise(copiers.next(summariseCopy).next(success));
+
+    // Top-level chain, stop at the Choice
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
         .next(validateThawParamsStep.invocableLambda)
         .next(canWriteStep)
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
-        .next(copiers)
-        .next(summariseCopyLambdaStep.invocableLambda)
-        .next(success),
+        .next(dryRunSkipWork),
     );
 
     // NOTE: we use a technique here to allow optional input parameters to the state machine
