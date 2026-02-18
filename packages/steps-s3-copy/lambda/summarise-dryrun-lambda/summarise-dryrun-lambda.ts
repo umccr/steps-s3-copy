@@ -6,7 +6,7 @@ import {
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
 import { dirname } from "path/posix";
-import { createHtmlReport } from "./create-dryrun-report.ts";
+import { createHtmlReport, FileSummary } from "./create-dryrun-report.ts";
 
 interface InvokeEvent {
   destinationBucket: string;
@@ -23,30 +23,18 @@ interface InvokeEvent {
   };
 }
 
-// This is the shape of the cost estimate metadata.
-interface CostEstimate {
-  s3CrossRegionReadWriteCostAUD: number;
-  coldStorageRetrievalCostAUD: number;
-  computeCostAUD: number;
-}
 /**
- * Reads the per-file cost estimates from the JSONL
+ * Reads the per-file Summaries from the JSONL
  */
-async function readCostsFromJsonl(
+export async function readFileSummariesFromJsonl(
   client: S3Client,
   bucket: string,
   key: string,
-): Promise<CostEstimate> {
-  const costs: CostEstimate = {
-    s3CrossRegionReadWriteCostAUD: 0,
-    coldStorageRetrievalCostAUD: 0,
-    computeCostAUD: 0,
-  };
-
+): Promise<FileSummary[]> {
   const getCommand = new GetObjectCommand({ Bucket: bucket, Key: key });
   const result = await client.send(getCommand);
 
-  if (!result.Body) return costs;
+  if (!result.Body) return [];
 
   const content = await result.Body.transformToString();
   const lines = content
@@ -54,48 +42,51 @@ async function readCostsFromJsonl(
     .split(/\r?\n/)
     .filter((l) => l.trim());
 
+  const out: FileSummary[] = [];
+
   for (const line of lines) {
     const obj = JSON.parse(line);
     const cost = obj.costEstimate;
-
     if (cost) {
-      costs.s3CrossRegionReadWriteCostAUD +=
-        cost.s3CrossRegionReadWriteCostAUD || 0;
-      costs.coldStorageRetrievalCostAUD +=
-        cost.coldStorageRetrievalCostAUD || 0;
-      costs.computeCostAUD += cost.computeCostAUD || 0;
+      out.push({
+        name: obj.sourceKey, // adjust as needed
+        size: obj.size || 0,
+        s3CrossRegionReadWriteCostAUD: cost.s3CrossRegionReadWriteCostAUD || 0,
+        coldStorageRetrievalCostAUD: cost.coldStorageRetrievalCostAUD || 0,
+        computeCostAUD: cost.computeCostAUD || 0,
+        // ... other fields as needed
+      });
     }
   }
-
-  return costs;
+  return out;
 }
 
 export async function handler(event: InvokeEvent) {
   const client = new S3Client({});
 
-  const costsSmall = await readCostsFromJsonl(
+  const summSmall = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.small.bucket,
     event.inputCopySets.small.key,
   );
-  const costsLarge = await readCostsFromJsonl(
+  const summLarge = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.large.bucket,
     event.inputCopySets.large.key,
   );
-  const costsSmallThaw = await readCostsFromJsonl(
+  const summSmallThaw = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.smallThaw.bucket,
     event.inputCopySets.smallThaw.key,
   );
-  const costsLargeThaw = await readCostsFromJsonl(
+  const summLargeThaw = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.largeThaw.bucket,
     event.inputCopySets.largeThaw.key,
   );
 
   // --------------------------------------------------
-  // HTML ended copy report generation and storage
+  // HTML report generation and storage
   // --------------------------------------------------
 
   // Determine if we need to generate and store the HTML report(s)
@@ -107,10 +98,10 @@ export async function handler(event: InvokeEvent) {
     // Generate the HTML report
     const html = createHtmlReport({
       title: "Dry Run Report",
-      costsSmall,
-      costsLarge,
-      costsSmallThaw,
-      costsLargeThaw,
+      summSmall: summSmall,
+      summLarge: summLarge,
+      summSmallThaw: summSmallThaw,
+      summLargeThaw: summLargeThaw,
     });
 
     const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";

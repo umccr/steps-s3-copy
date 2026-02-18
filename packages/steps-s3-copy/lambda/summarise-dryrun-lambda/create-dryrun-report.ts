@@ -18,18 +18,20 @@ const REPORT_TEMPLATE = readFileSync(
   "utf8",
 );
 
-export interface CostEstimate {
+export interface FileSummary {
+  name: string; // this is actually sourceKey, so need to filleter the valuer
+  size: number;
   s3CrossRegionReadWriteCostAUD: number;
   coldStorageRetrievalCostAUD: number;
   computeCostAUD: number;
 }
 
-export interface Files {
-  name: string;
-  size: number;
-  s3CrossRegionReadWriteCostAUD: number;
-  coldStorageRetrievalCostAUD: number;
-  computeCostAUD: number;
+export interface DryRunReportInput {
+  title: string;
+  summSmall: FileSummary[];
+  summLarge: FileSummary[];
+  summSmallThaw: FileSummary[];
+  summLargeThaw: FileSummary[];
 }
 
 // Convert number of bytes into human-readable format
@@ -45,7 +47,10 @@ function formatBytes(n?: number) {
   return `${v.toFixed(2)} ${units[i]}`;
 }
 
-function createFilesTable(files: Files[]): string {
+function createFilesTable(...fileGroups: FileSummary[][]): string {
+  // Flatten into one array
+  const files: FileSummary[] = fileGroups.flat();
+  // Now generate the table as before
   return `
     <div class="table-responsive">
       <table class="table table-sm table-hover align-middle table-fixed">
@@ -71,20 +76,20 @@ function createFilesTable(files: Files[]): string {
             .sort((a, b) => a.name.localeCompare(b.name))
             .map(
               (f) => `
-                  <tr>
-                    <td class="cell-scroll">
-                      <div class="cell-inner" title="${f.name}">${f.name}</div>
-                    </td>
-                    <td class="text-center">${formatBytes(f.size)}</td>
-                    <td class="text-center">${f.s3CrossRegionReadWriteCostAUD.toFixed(
-                      6,
-                    )}</td>
-                    <td class="text-center">${f.coldStorageRetrievalCostAUD.toFixed(
-                      6,
-                    )}</td>
-                    <td class="text-center">${f.computeCostAUD.toFixed(6)}</td>
-                  </tr>
-                `,
+                <tr>
+                  <td class="cell-scroll">
+                    <div class="cell-inner" title="${f.name}">${f.name}</div>
+                  </td>
+                  <td class="text-center">${formatBytes(f.size)}</td>
+                  <td class="text-center">${f.s3CrossRegionReadWriteCostAUD.toFixed(
+                    6,
+                  )}</td>
+                  <td class="text-center">${f.coldStorageRetrievalCostAUD.toFixed(
+                    6,
+                  )}</td>
+                  <td class="text-center">${f.computeCostAUD.toFixed(6)}</td>
+                </tr>
+              `,
             )
             .join("")}
         </tbody>
@@ -92,44 +97,14 @@ function createFilesTable(files: Files[]): string {
     </div>
   `;
 }
-// Template filling: replaces {{TOKENS}} (UPPERCASE letters, digits, underscores) with values from `vars`
-function fill(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k) => vars[k] ?? "");
-}
 
-//
-
-// Create the HTML report
-export function createHtmlReport(opts: {
-  title: string;
-  costsSmall?: CostEstimate;
-  costsLarge?: CostEstimate;
-  costsSmallThaw?: CostEstimate;
-  costsLargeThaw?: CostEstimate;
-  files?: Files[];
-}): string {
-  const { title } = opts;
-
-  // Calculate total costs
-  const totalS3CrossRegionReadWriteCost =
-    (opts.costsSmall?.s3CrossRegionReadWriteCostAUD || 0) +
-    (opts.costsLarge?.s3CrossRegionReadWriteCostAUD || 0) +
-    (opts.costsSmallThaw?.s3CrossRegionReadWriteCostAUD || 0) +
-    (opts.costsLargeThaw?.s3CrossRegionReadWriteCostAUD || 0);
-  const totalColdCost =
-    (opts.costsSmall?.coldStorageRetrievalCostAUD || 0) +
-    (opts.costsLarge?.coldStorageRetrievalCostAUD || 0) +
-    (opts.costsSmallThaw?.coldStorageRetrievalCostAUD || 0) +
-    (opts.costsLargeThaw?.coldStorageRetrievalCostAUD || 0);
-  const totalComputeCost =
-    (opts.costsSmall?.computeCostAUD || 0) +
-    (opts.costsLarge?.computeCostAUD || 0) +
-    (opts.costsSmallThaw?.computeCostAUD || 0) +
-    (opts.costsLargeThaw?.computeCostAUD || 0);
-  const totalCost =
-    totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
-
-  const costHtml = `
+function renderCostSummaryBlock(
+  totalS3CrossRegionReadWriteCost: number,
+  totalColdCost: number,
+  totalComputeCost: number,
+  totalCost: number,
+): string {
+  return `
   <div class="row align-items-start">
     <!-- Left: Cost values -->
     <div class="col-lg-3 col-md-4 mb-3 d-flex flex-column">
@@ -171,13 +146,10 @@ export function createHtmlReport(opts: {
         </h6>
 
         <ul class="small text-secondary mb-0 ps-3">
-          <!-- Cross Region Costs -->
           <li class="mb-2">
               <strong>S3 cross-region read/write:</strong>
               <code>~$${S3_CROSS_REGION_COPY_COST_PER_GB_AUD} per GB transferred</code> between AWS regions (S3 in-region copies are free)
           </li>
-
-          <!-- Cold Storage Costs -->
           <li class="mb-2">
             <strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
             <ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
@@ -220,8 +192,6 @@ export function createHtmlReport(opts: {
               </li>
             </ul>
           </li>
-
-          <!-- Compute Costs -->
           <li class="mb-2">
             <strong>Compute:</strong>
             <br>
@@ -275,12 +245,74 @@ export function createHtmlReport(opts: {
     });
   </script>
 `;
+}
 
-  const filesTable = createFilesTable(opts.files ?? []);
+// Template filling: replaces {{TOKENS}} with values from vars.
+function fill(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k) => vars[k] ?? "");
+}
+
+//
+
+// Create the HTML report
+export function createHtmlReport(opts: {
+  title: string;
+  summSmall?: FileSummary[];
+  summLarge?: FileSummary[];
+  summSmallThaw?: FileSummary[];
+  summLargeThaw?: FileSummary[];
+}): string {
+  const {
+    title,
+    summSmall = [],
+    summLarge = [],
+    summSmallThaw = [],
+    summLargeThaw = [],
+  } = opts;
+
+  // Combine all files for summary
+  const allFiles = [
+    ...summSmall,
+    ...summLarge,
+    ...summSmallThaw,
+    ...summLargeThaw,
+  ];
+
+  // Calculate total costs (from all files)
+  const totalS3CrossRegionReadWriteCost = allFiles.reduce(
+    (sum, f) => sum + f.s3CrossRegionReadWriteCostAUD,
+    0,
+  );
+  const totalColdCost = allFiles.reduce(
+    (sum, f) => sum + f.coldStorageRetrievalCostAUD,
+    0,
+  );
+  const totalComputeCost = allFiles.reduce(
+    (sum, f) => sum + f.computeCostAUD,
+    0,
+  );
+  const totalCost =
+    totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
+
+  // Cost summary block
+  const costHtml = renderCostSummaryBlock(
+    totalS3CrossRegionReadWriteCost,
+    totalColdCost,
+    totalComputeCost,
+    totalCost,
+  );
+
+  // Build tables for each group (only if non-empty)
+  const filesTables = createFilesTable(
+    summSmall,
+    summLarge,
+    summSmallThaw,
+    summLargeThaw,
+  );
 
   return fill(REPORT_TEMPLATE, {
     TITLE: title,
     COST_HTML: costHtml,
-    FILES_TABLE: filesTable,
+    FILES_TABLE: filesTables,
   });
 }

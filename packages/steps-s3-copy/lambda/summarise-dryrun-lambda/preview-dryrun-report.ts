@@ -2,7 +2,7 @@ import { writeFileSync } from "fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { createHtmlReport, type Files } from "./create-dryrun-report.ts";
+import { createHtmlReport, type FileSummary } from "./create-dryrun-report.ts";
 
 // Run:
 //   npx tsx packages/steps-s3-copy/lambda/summarise-dryrun-lambda/preview-dryrun-report.ts
@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, "..");
 
 // Mock copy files results
-const records: Files[] = [
+const records: FileSummary[] = [
   {
     name: "A.fastq.ora",
     size: 6291456,
@@ -21,7 +21,6 @@ const records: Files[] = [
     s3CrossRegionReadWriteCostAUD: 0.001,
     coldStorageRetrievalCostAUD: 0.0,
   },
-
   {
     name: "B.fastq.ora",
     size: 15728640,
@@ -29,7 +28,6 @@ const records: Files[] = [
     s3CrossRegionReadWriteCostAUD: 0.001,
     coldStorageRetrievalCostAUD: 0.0,
   },
-
   {
     name: "C.fastq.ora",
     size: 123456789,
@@ -46,32 +44,13 @@ const records: Files[] = [
   },
 ];
 
+// Now pass as summSmall ONLY, to mock just one section:
 const html = createHtmlReport({
   title: "Dry Run Results Report (local preview: dev_dryrun_report.html)",
-  // Add Files reocrds
-  files: records,
-  // Add mock cost data
-  costsSmall: {
-    s3CrossRegionReadWriteCostAUD: 0.002,
-    coldStorageRetrievalCostAUD: 0.0,
-    computeCostAUD: 0.0003,
-  },
-  costsLarge: {
-    s3CrossRegionReadWriteCostAUD: 0.0045,
-    coldStorageRetrievalCostAUD: 0.0,
-    computeCostAUD: 0.0011,
-  },
-  costsSmallThaw: {
-    s3CrossRegionReadWriteCostAUD: 0.0013,
-    coldStorageRetrievalCostAUD: 0.015,
-    computeCostAUD: 0.0002,
-  },
-  costsLargeThaw: {
-    s3CrossRegionReadWriteCostAUD: 0.0021,
-    coldStorageRetrievalCostAUD: 0.038,
-    computeCostAUD: 0.0007,
-  },
+  summSmall: records,
+  // summLarge, summSmallThaw, summLargeThaw could also be included as arrays if you want.
 });
+
 const outPath = join(__dirname, "dev_dryrun_report.html");
 writeFileSync(outPath, html, "utf-8");
 console.log(`dev_dryrun_report.html written: ${outPath}`);
