@@ -14,33 +14,125 @@ const __dirname = join(__filename, "..");
 
 // Mock copy files results
 const records: FileSummary[] = [
+  // Raw NGS reads
   {
-    name: "A.fastq.ora",
-    size: 6291456,
-    computeCostAUD: 0.0003,
-    s3CrossRegionReadWriteCostAUD: 0.001,
+    name: "HG001_R1.fastq.gz",
+    size: 7_110_549_504,
+    computeCostAUD: 0.00037,
+    s3CrossRegionReadWriteCostAUD: 0.1564,
     coldStorageRetrievalCostAUD: 0.0,
   },
   {
-    name: "B.fastq.ora",
-    size: 15728640,
-    computeCostAUD: 0.0003,
-    s3CrossRegionReadWriteCostAUD: 0.001,
+    name: "HG001_R2.fastq.gz",
+    size: 7_095_543_451,
+    computeCostAUD: 0.00037,
+    s3CrossRegionReadWriteCostAUD: 0.1559,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // BAM alignments
+  {
+    name: "HG001.sorted.bam",
+    size: 32_850_399_232,
+    computeCostAUD: 0.0013,
+    s3CrossRegionReadWriteCostAUD: 0.7231,
     coldStorageRetrievalCostAUD: 0.0,
   },
   {
-    name: "C.fastq.ora",
-    size: 123456789,
-    computeCostAUD: 0.0003,
-    s3CrossRegionReadWriteCostAUD: 0.001,
+    name: "HG002.sorted.bam",
+    size: 31_546_900_992,
+    computeCostAUD: 0.00128,
+    s3CrossRegionReadWriteCostAUD: 0.6943,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // BAM index files
+  {
+    name: "HG001.sorted.bam.bai",
+    size: 3_436_352,
+    computeCostAUD: 0.00001,
+    s3CrossRegionReadWriteCostAUD: 0.000075,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // Variant calls & index
+  {
+    name: "HG001.hc.vcf.gz",
+    size: 2_145_689,
+    computeCostAUD: 0.000005,
+    s3CrossRegionReadWriteCostAUD: 0.000047,
     coldStorageRetrievalCostAUD: 0.0,
   },
   {
-    name: "D.fastq.ora",
-    size: 123456789,
-    computeCostAUD: 0.0003,
-    s3CrossRegionReadWriteCostAUD: 0.001,
+    name: "HG001.hc.vcf.gz.tbi",
+    size: 52_651,
+    computeCostAUD: 0.000001,
+    s3CrossRegionReadWriteCostAUD: 0.000001,
     coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // Reference genome & index
+  {
+    name: "GRCh38_full_analysis_set.fa.gz",
+    size: 902_653_184,
+    computeCostAUD: 0.00011,
+    s3CrossRegionReadWriteCostAUD: 0.0199,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+  {
+    name: "GRCh38_full_analysis_set.fa.fai",
+    size: 21_000,
+    computeCostAUD: 0.0000003,
+    s3CrossRegionReadWriteCostAUD: 0.0000004,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // QC Reports
+  {
+    name: "fastqc/HG001_fastqc.html",
+    size: 234_112,
+    computeCostAUD: 0.000001,
+    s3CrossRegionReadWriteCostAUD: 0.000005,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+  {
+    name: "multiqc_report.html",
+    size: 1_823_440,
+    computeCostAUD: 0.02,
+    s3CrossRegionReadWriteCostAUD: 0.00004,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // Sample sheets, metadata, small text
+  {
+    name: "project_metadata.json",
+    size: 8_351,
+    computeCostAUD: 0.0000001,
+    s3CrossRegionReadWriteCostAUD: 0.0000002,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+  {
+    name: "samplesheet.csv",
+    size: 25_133,
+    computeCostAUD: 0.02,
+    s3CrossRegionReadWriteCostAUD: 0.0000005,
+    coldStorageRetrievalCostAUD: 0.0,
+  },
+
+  // Old/archive:
+  {
+    name: "archive/HG001_2016_LC.fastq.gz",
+    size: 6_845_449_728,
+    computeCostAUD: 0.00036,
+    s3CrossRegionReadWriteCostAUD: 0.1505,
+    coldStorageRetrievalCostAUD: 0.11,
+  },
+  {
+    name: "archive/HG001.sorted.deep.bam",
+    size: 31_012_773_888,
+    computeCostAUD: 0.0012,
+    s3CrossRegionReadWriteCostAUD: 0.6825,
+    coldStorageRetrievalCostAUD: 0.48,
   },
 ];
 
