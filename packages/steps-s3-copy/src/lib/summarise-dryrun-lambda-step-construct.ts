@@ -58,10 +58,8 @@ export class SummariseDryRunLambdaStepConstruct extends Construct {
           nodeModules: ["csv-stringify"],
           commandHooks: {
             beforeBundling(inputDir: string, outputDir: string) {
-              // inputDir === packages/steps-s3-copy/lambda/summarise-copy-lambda (mounted as /asset-input)
-              // outputDir === /asset-output
               return [
-                `cp "${inputDir}/summarise-dryrun-lambda/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/summarise-dryrun-lambda/dryrun_report_template.html" "${outputDir}/dryrun_report_template.html"`,
               ];
             },
             afterBundling() {

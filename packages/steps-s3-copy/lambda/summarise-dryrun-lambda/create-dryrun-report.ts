@@ -14,21 +14,9 @@ import {
 
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
-  join(__dirname, "report_template.html"),
+  join(__dirname, "dryrun_report_template.html"),
   "utf8",
 );
-
-export type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
-
-export interface FileResult {
-  name: string;
-  status: TransferStatus;
-  speed: number;
-  message: string | number;
-  destination: string;
-  bytesTransferred?: number;
-  elapsedSeconds?: number;
-}
 
 export interface CostEstimate {
   s3CrossRegionReadWriteCostAUD: number;
@@ -49,60 +37,6 @@ function formatBytes(n?: number) {
   return `${v.toFixed(2)} ${units[i]}`;
 }
 
-// Format seconds as HH:MM:SS
-const secondsToHMS = (sec?: number) => {
-  if (sec == null) return "-";
-  const s = Math.floor(sec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s / 60) % 60);
-  const r = s % 60;
-  return [h, m, r]
-    .map((v, i) => (i === 0 ? String(v) : String(v).padStart(2, "0")))
-    .join(":");
-};
-
-/* ---------- Stable, URL-safe row IDs ---------- */
-function djb2(str: string): number {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
-  // force unsigned 32-bit
-  return h >>> 0;
-}
-function rowIdFor(r: FileResult) {
-  // Use destination if present, else name; base36 keeps it compact
-  return `row-${djb2((r.destination || r.name || "").toLowerCase()).toString(
-    36,
-  )}`;
-}
-
-/* ---- Simple directry tree ---- */
-
-type TreeNode = {
-  name: string;
-  children: Map<string, TreeNode>;
-  files: { name: string; rowId: string }[];
-};
-
-const makeNode = (name: string): TreeNode => ({
-  name,
-  children: new Map(),
-  files: [],
-});
-
-const insertPath = (root: TreeNode, parts: string[], rowId: string) => {
-  let node = root;
-  for (let i = 0; i < parts.length; i++) {
-    const seg = parts[i];
-    const isFile = i === parts.length - 1;
-    if (isFile) {
-      node.files.push({ name: seg, rowId });
-    } else {
-      if (!node.children.has(seg)) node.children.set(seg, makeNode(seg));
-      node = node.children.get(seg)!;
-    }
-  }
-};
-
 /**
  * destinationRoot is like "s3://a-bucket/a/give/path/"
  * items[].destination is like "s3://a-bucket/a/give/path/fastq/…/file.fastq"
@@ -111,75 +45,6 @@ const insertPath = (root: TreeNode, parts: string[], rowId: string) => {
  *   - strip destinationRoot from each destination
  *   - insert remaining relative segments
  */
-
-function buildDestinationTree(
-  items: { destination: string; rowId: string }[],
-  destinationRoot: string,
-): TreeNode {
-  const rootLabel = destinationRoot.slice(0, -1);
-  const root = makeNode(rootLabel);
-
-  const prefix = destinationRoot;
-  for (const it of items) {
-    const full = it.destination;
-    if (!full.startsWith(prefix)) continue;
-    const rel = full.slice(prefix.length);
-    if (!rel) continue;
-
-    const parts = rel.split("/").filter(Boolean);
-    if (parts.length === 0) continue;
-
-    insertPath(root, parts, it.rowId);
-  }
-
-  return root;
-}
-
-function renderTree(node: TreeNode): string {
-  const files = node.files
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(
-      (f) => `
-      <li class="file">
-        <a class="file-link" href="#${f.rowId}" data-target="${f.rowId}">
-          <span class="file-name">${f.name}</span>
-        </a>
-      </li>`,
-    )
-    .join("");
-
-  const folders = Array.from(node.children.values())
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(
-      (ch) => `
-      <li class="folder">
-        <details open>
-          <summary>
-            <i class="bi bi-folder-fill folder-closed"></i>
-            <i class="bi bi-folder-fill folder-open"></i>
-            <span class="folder-name">${ch.name}</span>
-          </summary>
-          <ul>${renderTree(ch)}</ul>
-        </details>
-      </li>`,
-    )
-    .join("");
-
-  return `${folders}${files}`;
-}
-
-/** Render including the root line (bucket/prefix) */
-function renderTreeRooted(root: TreeNode): string {
-  return `
-    <ul class="tree">
-      <li class="folder">
-        <details open>
-          <summary><span class="folder-name">${root.name}</span></summary>
-          <ul>${renderTree(root)}</ul>
-        </details>
-      </li>
-    </ul>`.trim();
-}
 
 // Template filling: replaces {{TOKENS}} (UPPERCASE letters, digits, underscores) with values from `vars`
 function fill(template: string, vars: Record<string, string>): string {

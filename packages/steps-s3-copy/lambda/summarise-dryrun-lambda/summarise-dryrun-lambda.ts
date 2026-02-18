@@ -6,7 +6,7 @@ import {
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
 import { dirname } from "path/posix";
-import { createHtmlReport } from "./create-html-report.ts";
+import { createHtmlReport } from "./create-dryrun-report.ts";
 
 interface InvokeEvent {
   destinationBucket: string;
