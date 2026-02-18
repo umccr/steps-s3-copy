@@ -27,6 +27,9 @@ export interface CostEstimate {
 export interface Files {
   name: string;
   size: number;
+  s3CrossRegionReadWriteCostAUD: number;
+  coldStorageRetrievalCostAUD: number;
+  computeCostAUD: number;
 }
 
 // Convert number of bytes into human-readable format
@@ -47,13 +50,19 @@ function createFilesTable(files: Files[]): string {
     <div class="table-responsive">
       <table class="table table-sm table-hover align-middle table-fixed">
         <colgroup>
-          <col style="width:40ch;">  <!-- Object/Name -->
-          <col style="width:18ch;">  <!-- Size -->
+          <col style="width:40ch;">
+          <col style="width:18ch;">
+          <col style="width:22ch;">
+          <col style="width:22ch;">
+          <col style="width:22ch;">
         </colgroup>
         <thead>
           <tr>
             <th>Object</th>
             <th class="text-center">Size</th>
+            <th class="text-center">S3 X-Region Cost (AUD)</th>
+            <th class="text-center">Cold Storage Cost (AUD)</th>
+            <th class="text-center">Compute Cost (AUD)</th>
           </tr>
         </thead>
         <tbody>
@@ -67,6 +76,13 @@ function createFilesTable(files: Files[]): string {
                       <div class="cell-inner" title="${f.name}">${f.name}</div>
                     </td>
                     <td class="text-center">${formatBytes(f.size)}</td>
+                    <td class="text-center">${f.s3CrossRegionReadWriteCostAUD.toFixed(
+                      6,
+                    )}</td>
+                    <td class="text-center">${f.coldStorageRetrievalCostAUD.toFixed(
+                      6,
+                    )}</td>
+                    <td class="text-center">${f.computeCostAUD.toFixed(6)}</td>
                   </tr>
                 `,
             )
@@ -76,7 +92,6 @@ function createFilesTable(files: Files[]): string {
     </div>
   `;
 }
-
 // Template filling: replaces {{TOKENS}} (UPPERCASE letters, digits, underscores) with values from `vars`
 function fill(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k) => vars[k] ?? "");

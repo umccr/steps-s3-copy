@@ -17,18 +17,32 @@ const records: Files[] = [
   {
     name: "A.fastq.ora",
     size: 6291456,
+    computeCostAUD: 0.0003,
+    s3CrossRegionReadWriteCostAUD: 0.001,
+    coldStorageRetrievalCostAUD: 0.0,
   },
+
   {
     name: "B.fastq.ora",
     size: 15728640,
+    computeCostAUD: 0.0003,
+    s3CrossRegionReadWriteCostAUD: 0.001,
+    coldStorageRetrievalCostAUD: 0.0,
   },
+
   {
     name: "C.fastq.ora",
     size: 123456789,
+    computeCostAUD: 0.0003,
+    s3CrossRegionReadWriteCostAUD: 0.001,
+    coldStorageRetrievalCostAUD: 0.0,
   },
   {
     name: "D.fastq.ora",
     size: 123456789,
+    computeCostAUD: 0.0003,
+    s3CrossRegionReadWriteCostAUD: 0.001,
+    coldStorageRetrievalCostAUD: 0.0,
   },
 ];
 
