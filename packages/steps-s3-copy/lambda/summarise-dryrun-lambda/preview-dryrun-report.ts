@@ -2,7 +2,7 @@ import { writeFileSync } from "fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { createHtmlReport } from "./create-dryrun-report.ts";
+import { createHtmlReport, type Files } from "./create-dryrun-report.ts";
 
 // Run:
 //   npx tsx packages/steps-s3-copy/lambda/summarise-dryrun-lambda/preview-dryrun-report.ts
@@ -12,8 +12,30 @@ import { createHtmlReport } from "./create-dryrun-report.ts";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, "..");
 
+// Mock copy files results
+const records: Files[] = [
+  {
+    name: "A.fastq.ora",
+    size: 6291456,
+  },
+  {
+    name: "B.fastq.ora",
+    size: 15728640,
+  },
+  {
+    name: "C.fastq.ora",
+    size: 123456789,
+  },
+  {
+    name: "D.fastq.ora",
+    size: 123456789,
+  },
+];
+
 const html = createHtmlReport({
   title: "Dry Run Results Report (local preview: dev_dryrun_report.html)",
+  // Add Files reocrds
+  files: records,
   // Add mock cost data
   costsSmall: {
     s3CrossRegionReadWriteCostAUD: 0.002,

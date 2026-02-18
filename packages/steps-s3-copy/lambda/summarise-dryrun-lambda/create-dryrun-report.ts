@@ -24,6 +24,11 @@ export interface CostEstimate {
   computeCostAUD: number;
 }
 
+export interface Files {
+  name: string;
+  size: number;
+}
+
 // Convert number of bytes into human-readable format
 function formatBytes(n?: number) {
   if (n === undefined) return "-";
@@ -37,19 +42,47 @@ function formatBytes(n?: number) {
   return `${v.toFixed(2)} ${units[i]}`;
 }
 
-/**
- * destinationRoot is like "s3://a-bucket/a/give/path/"
- * items[].destination is like "s3://a-bucket/a/give/path/fastq/…/file.fastq"
- * We:
- *   - label the root as destinationRoot without trailing slash
- *   - strip destinationRoot from each destination
- *   - insert remaining relative segments
- */
+function createFilesTable(files: Files[]): string {
+  return `
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle table-fixed">
+        <colgroup>
+          <col style="width:40ch;">  <!-- Object/Name -->
+          <col style="width:18ch;">  <!-- Size -->
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Object</th>
+            <th class="text-center">Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${files
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(
+              (f) => `
+                  <tr>
+                    <td class="cell-scroll">
+                      <div class="cell-inner" title="${f.name}">${f.name}</div>
+                    </td>
+                    <td class="text-center">${formatBytes(f.size)}</td>
+                  </tr>
+                `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
 
 // Template filling: replaces {{TOKENS}} (UPPERCASE letters, digits, underscores) with values from `vars`
 function fill(template: string, vars: Record<string, string>): string {
   return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k) => vars[k] ?? "");
 }
+
+//
 
 // Create the HTML report
 export function createHtmlReport(opts: {
@@ -58,6 +91,7 @@ export function createHtmlReport(opts: {
   costsLarge?: CostEstimate;
   costsSmallThaw?: CostEstimate;
   costsLargeThaw?: CostEstimate;
+  files?: Files[];
 }): string {
   const { title } = opts;
 
@@ -227,8 +261,11 @@ export function createHtmlReport(opts: {
   </script>
 `;
 
+  const filesTable = createFilesTable(opts.files ?? []);
+
   return fill(REPORT_TEMPLATE, {
     TITLE: title,
     COST_HTML: costHtml,
+    FILES_TABLE: filesTable,
   });
 }
