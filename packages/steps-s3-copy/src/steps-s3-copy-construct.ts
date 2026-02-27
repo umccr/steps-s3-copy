@@ -36,7 +36,6 @@ import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
-import { SummariseDryRunLambdaStepConstruct } from "./lib/summarise-dryrun-lambda-step-construct";
 import {
   AssetImage,
   AwsLogDriverMode,
@@ -329,22 +328,6 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
-      this,
-      "SummariseCopy",
-      {
-        writerRole: this._workingRole,
-      },
-    );
-
-    const summariseDryRunLambdaStep = new SummariseDryRunLambdaStepConstruct(
-      this,
-      "SummariseDryRun",
-      {
-        writerRole: this._workingRole,
-      },
-    );
-
     // we construct a set of independent copiers that handle different types of objects
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
@@ -354,17 +337,29 @@ export class StepsS3CopyConstruct extends Construct {
       thawLargeCopierMap.distributedMap,
     );
 
-    const summariseCopy = summariseCopyLambdaStep.invocableLambda;
-    const summariseDryRun = summariseDryRunLambdaStep.invocableLambda;
-
     // Setup Choice
     // HARCODED dryRun condition. Need to se the proper whay of reading that.
-    const dryRunSkipWork = new Choice(this, "Is DryRun?")
+
+    const summariseCopyDryRun = new SummariseCopyLambdaStepConstruct(
+      this,
+      "SummariseCopyDryRun",
+      { writerRole: this._workingRole },
+    );
+
+    const summariseCopyRegular = new SummariseCopyLambdaStepConstruct(
+      this,
+      "SummariseCopyRegular",
+      { writerRole: this._workingRole },
+    );
+
+    const dryRunChoice = new Choice(this, "Is DryRun?")
       .when(
-        Condition.isPresent("$$.Execution.Id"),
-        summariseDryRun.next(success),
+        Condition.booleanEquals("$.dryRun", true),
+        summariseCopyDryRun.invocableLambda.next(success),
       )
-      .otherwise(copiers.next(summariseCopy).next(success));
+      .otherwise(
+        copiers.next(summariseCopyRegular.invocableLambda).next(success),
+      );
 
     // Top-level chain, stop at the Choice
     const definition = ChainDefinitionBody.fromChainable(
@@ -373,7 +368,7 @@ export class StepsS3CopyConstruct extends Construct {
         .next(canWriteStep)
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
-        .next(dryRunSkipWork),
+        .next(dryRunChoice),
     );
 
     // NOTE: we use a technique here to allow optional input parameters to the state machine

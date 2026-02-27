@@ -121,10 +121,6 @@ export async function handler(event: LambdaEvent) {
 
     const stats = await computeStats(df);
 
-    // if we are doing a dry run - then we want to still collect stats etc - but at the end of the day
-    // we will pass an empty list of objects to the actual copiers
-    const emptyDf = df.filter(false);
-
     // Defining the copy sets based on the size of the objects and their storage class (cold or no)
 
     // Small objects that do not need thawing
@@ -148,33 +144,30 @@ export async function handler(event: LambdaEvent) {
       .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
 
     return {
+      dryRun: event.invokeArguments.dryRun,
       stats: stats,
       copySets: {
         small: await createJsonlFromDataFrame(
           event.headObjectsResults.manifestBucket,
           event.headObjectsResults.manifestAbsoluteKey,
-          // event.invokeArguments.dryRun ? emptyDf : smallDf,
           smallDf,
           "small",
         ),
         large: await createJsonlFromDataFrame(
           event.headObjectsResults.manifestBucket,
           event.headObjectsResults.manifestAbsoluteKey,
-          // event.invokeArguments.dryRun ? emptyDf : largeDf,
           largeDf,
           "large",
         ),
         smallThaw: await createJsonlFromDataFrame(
           event.headObjectsResults.manifestBucket,
           event.headObjectsResults.manifestAbsoluteKey,
-          // event.invokeArguments.dryRun ? emptyDf : smallThawDf,
           smallThawDf,
           "smallThaw",
         ),
         largeThaw: await createJsonlFromDataFrame(
           event.headObjectsResults.manifestBucket,
           event.headObjectsResults.manifestAbsoluteKey,
-          // event.invokeArguments.dryRun ? emptyDf : largeThawDf,
           largeThawDf,
           "largeThaw",
         ),

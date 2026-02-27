@@ -118,6 +118,7 @@ test(
             intelligentTieringDeepArchiveThawSpeed: "Standard",
           },
           retainCopyReport: true,
+          dryRun: false,
         }),
       }),
     );

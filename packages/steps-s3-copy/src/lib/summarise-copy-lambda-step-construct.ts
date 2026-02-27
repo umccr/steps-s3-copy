@@ -20,13 +20,14 @@ type SummariseCopyLambdaStepProps = {
  */
 export class SummariseCopyLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
-
+  public readonly stateName: string;
   constructor(
     scope: Construct,
     id: string,
     props: SummariseCopyLambdaStepProps,
   ) {
     super(scope, id);
+    this.stateName = id;
 
     const lambdaRoot = join(
       __dirname,
@@ -62,6 +63,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
               // outputDir === /asset-output
               return [
                 `cp "${inputDir}/summarise-copy-lambda/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/summarise-copy-lambda/dryrun_report_template.html" "${outputDir}/dryrun_report_template.html"`,
               ];
             },
             afterBundling() {
@@ -79,7 +81,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       },
     );
 
-    this.invocableLambda = new LambdaInvoke(this, `Summarise Copy Results`, {
+    this.invocableLambda = new LambdaInvoke(this, this.stateName, {
       lambdaFunction: summariseCopyLambda,
       queryLanguage: QueryLanguage.JSONATA,
       payload: TaskInput.fromObject({
@@ -90,12 +92,17 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         destinationEndCopyRelativeKey:
           "{% $invokeArguments.destinationEndCopyRelativeKey %}",
         workingBucket: "{% $invokeSettings.workingBucket %}",
-        rcloneResultsSmall: "{% $states.input[type='Small'] %}",
-        rcloneResultsLarge: "{% $states.input[type='Large'] %}",
-        rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
-        rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
+        rcloneResultsSmall:
+          "{% $exists($states.input[type='Small']) ? $states.input[type='Small'] : {} %}",
+        rcloneResultsLarge:
+          "{% $exists($states.input[type='Large']) ? $states.input[type='Large'] : {} %}",
+        rcloneResultsNeedThawSmall:
+          "{% $exists($states.input[type='NeedThawSmall']) ? $states.input[type='NeedThawSmall'] : {} %}",
+        rcloneResultsNeedThawLarge:
+          "{% $exists($states.input[type='NeedThawLarge']) ? $states.input[type='NeedThawLarge'] : {}  %}",
         includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
         retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
+        dryRun: "{% $invokeArguments.dryRun %}",
         copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",
         inputCopySets: "{% $coordinateCopyResults.copySets %}",
       }),

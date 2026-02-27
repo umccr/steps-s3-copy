@@ -255,7 +255,7 @@ function fill(template: string, vars: Record<string, string>): string {
 //
 
 // Create the HTML report
-export function createHtmlReport(opts: {
+export function createDryRunHtmlReport(opts: {
   title: string;
   summSmall?: FileSummary[];
   summLarge?: FileSummary[];
