@@ -2,7 +2,10 @@ import { writeFileSync } from "fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { createHtmlReport, type FileSummary } from "./create-dryrun-report.ts";
+import {
+  createDryRunHtmlReport,
+  type FileSummary,
+} from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/create-dryrun-report.ts";
 
 // Run:
 //   npx tsx packages/steps-s3-copy/lambda/summarise-dryrun-lambda/preview-dryrun-report.ts
@@ -137,7 +140,7 @@ const records: FileSummary[] = [
 ];
 
 // Now pass as summSmall ONLY, to mock just one section:
-const html = createHtmlReport({
+const html = createDryRunHtmlReport({
   title: "Dry Run Results Report (local preview: dev_dryrun_report.html)",
   summSmall: records,
   // summLarge, summSmallThaw, summLargeThaw could also be included as arrays if you want.
