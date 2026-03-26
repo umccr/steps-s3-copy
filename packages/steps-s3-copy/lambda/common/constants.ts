@@ -26,7 +26,7 @@ export const COST_CHECK_URL = "https://aws.amazon.com/s3/pricing/"; // Link to A
 export const S3_CROSS_REGION_COPY_COST_PER_GB_AUD = 0.14; // AUD per GB transferred
 
 // -- Cold storage retrieval per GB by storage class and speed (see AWS docs for latest) --
-export const GLACIER_RETRIEVAL_COSTS: Record<string, Record<string, number>> = {
+export const GLACIER_RETRIEVAL_COSTS = {
   GLACIER: { Bulk: 0.0034, Standard: 0.013, Expedited: 0.27 },
   DEEP_ARCHIVE: { Bulk: 0.011, Standard: 0.03 },
   INTELLIGENT_TIERING_ARCHIVE_ACCESS: {
@@ -35,7 +35,7 @@ export const GLACIER_RETRIEVAL_COSTS: Record<string, Record<string, number>> = {
     Expedited: 0.27,
   },
   INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS: { Bulk: 0.011, Standard: 0.03 },
-};
+} as const;
 
 // -- Lambda (Sydney, AUD) --
 export const LAMBDA_GB_SECOND_COST_AUD = 0.00001964; // per GB-second
@@ -91,9 +91,14 @@ export function estimateColdStorageRetrievalCost(
   storageClass: string,
   retrievalSpeed: string = "Standard",
 ): number {
-  const classPricing = GLACIER_RETRIEVAL_COSTS[storageClass];
+  const classPricing =
+    GLACIER_RETRIEVAL_COSTS[
+      storageClass as keyof typeof GLACIER_RETRIEVAL_COSTS
+    ];
   if (!classPricing) return 0;
-  const costPerGB = classPricing[retrievalSpeed] ?? classPricing["Standard"];
+  const costPerGB =
+    classPricing[retrievalSpeed as keyof typeof classPricing] ??
+    classPricing["Standard"];
   if (costPerGB === undefined) return 0;
   return bytesToGB(sizeBytes) * costPerGB;
 }

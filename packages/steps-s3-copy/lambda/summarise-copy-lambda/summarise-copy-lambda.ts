@@ -6,8 +6,11 @@ import {
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
 import { dirname } from "path/posix";
-import { createHtmlReport } from "./create-html-report.ts";
-import { createDryRunHtmlReport, FileSummary } from "./create-dryrun-report.ts";
+import {
+  createHtmlReport,
+  createDryRunHtmlReport,
+  FileSummary,
+} from "./create-html-report.ts";
 
 interface InvokeEvent {
   rcloneResultsLarge: {

@@ -5,7 +5,7 @@ import { execSync } from "node:child_process";
 import {
   createDryRunHtmlReport,
   type FileSummary,
-} from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/create-dryrun-report.ts";
+} from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/create-html-report.ts";
 
 // Run:
 //   npx tsx packages/steps-s3-copy/lambda/summarise-dryrun-lambda/preview-dryrun-report.ts
