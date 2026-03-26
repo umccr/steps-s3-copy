@@ -469,7 +469,8 @@ export function createHtmlReport(opts: {
     SUMMARY_ALREADY: String(already),
     SUMMARY_ERRORS: String(errors),
     TREE_HTML: treeHtml,
-    COPY_TABLE: copyTable,
+    FILES_TABLE: copyTable,
+    FILES_TABLE_TITLE: "Per-object copy results",
     S3_DESTINATION_PATH:
       "s3://" + destinationBucket + "/" + destinationFolderKey,
     COST_HTML: costHtml,
@@ -481,7 +482,7 @@ export function createHtmlReport(opts: {
 // -----------------------------------------------------------------------------------------------------------------
 
 const DRYRUN_REPORT_TEMPLATE = readFileSync(
-  join(__dirname, "dryrun_report_template.html"),
+  join(__dirname, "report_template.html"),
   "utf8",
 );
 
@@ -766,5 +767,9 @@ export function createDryRunHtmlReport(opts: {
     TITLE: title,
     COST_HTML: costHtml,
     FILES_TABLE: filesTables,
+    FILES_TABLE_TITLE: "Per-object estimated costs",
+    // For dry run, we only estimate costs, so we hide the copy tree and summary sections.
+    DISPLAY_DESTINATION_TREE: "d-none",
+    DISPLAY_COPY_SUMMARY: "d-none",
   });
 }

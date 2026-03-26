@@ -262,7 +262,7 @@
       <!-- Top row: Summary (left) + Tree (right) -->
       <div class="row g-3">
         <!-- Summary -->
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 {{DISPLAY_COPY_SUMMARY}}">
           <div class="card shadow-sm fixed-height">
             <div class="card-header bg-white border-0">
               <h2 class="h5 mb-3">Summary</h2>
@@ -303,7 +303,7 @@
         </div>
 
         <!-- Destination Tree -->
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-6 {{DISPLAY_DESTINATION_TREE}}">
           <div class="card shadow-sm fixed-height">
             <div class="card-header bg-white border-0">
               <div
@@ -336,12 +336,12 @@
           </div>
         </div>
 
-        <!-- Table full-width -->
+        <!-- Per-object Table full-width -->
         <div class="col-12">
           <div class="card shadow-sm">
             <div class="card-body">
-              <h2 class="h5 mb-3">Per-object copy results</h2>
-              <div class="small">{{COPY_TABLE}}</div>
+              <h2 class="h5 mb-3">{{FILES_TABLE_TITLE}}</h2>
+              <div class="small">{{FILES_TABLE}}</div>
             </div>
           </div>
         </div>
