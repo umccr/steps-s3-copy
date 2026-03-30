@@ -63,7 +63,6 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
               // outputDir === /asset-output
               return [
                 `cp "${inputDir}/summarise-copy-lambda/report_template.html" "${outputDir}/report_template.html"`,
-                `cp "${inputDir}/summarise-copy-lambda/dryrun_report_template.html" "${outputDir}/dryrun_report_template.html"`,
               ];
             },
             afterBundling() {
