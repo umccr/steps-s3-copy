@@ -12,31 +12,38 @@ import {
   COST_CHECK_URL,
 } from "../common/constants";
 
-// -----------------------------------------------------------------------------------------------------------------
-// Copy Report Section
-// -----------------------------------------------------------------------------------------------------------------
-
-const COPY_REPORT_TEMPLATE = readFileSync(
+// Load the HTML template
+const REPORT_TEMPLATE = readFileSync(
   join(__dirname, "report_template.html"),
   "utf8",
 );
 
+// Template filling: replaces {{TOKENS}} with values from vars.
+function fill(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k) => vars[k] ?? "");
+}
+
 export type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
 
-export interface FileResult {
+export interface CostEstimate {
+  s3CrossRegionReadWriteCostAUD: number;
+  coldStorageRetrievalCostAUD: number;
+  computeCostAUD: number;
+}
+
+export interface FileSummary {
   name: string;
+  size: number;
+  s3CrossRegionReadWriteCostAUD: number;
+  coldStorageRetrievalCostAUD: number;
+  computeCostAUD: number;
+  // Copy results METADATA
   status: TransferStatus;
   speed: number;
   message: string | number;
   destination: string;
   bytesTransferred?: number;
   elapsedSeconds?: number;
-}
-
-export interface CostEstimate {
-  s3CrossRegionReadWriteCostAUD: number;
-  coldStorageRetrievalCostAUD: number;
-  computeCostAUD: number;
 }
 
 // Convert number of bytes into human-readable format
@@ -64,6 +71,10 @@ const secondsToHMS = (sec?: number) => {
     .join(":");
 };
 
+// -----------------------------------------------------------------------------------------------------------------
+// Copy Report Section
+// -----------------------------------------------------------------------------------------------------------------
+
 /* ---------- Stable, URL-safe row IDs ---------- */
 function djb2(str: string): number {
   let h = 5381;
@@ -71,11 +82,9 @@ function djb2(str: string): number {
   // force unsigned 32-bit
   return h >>> 0;
 }
-function rowIdFor(r: FileResult) {
-  // Use destination if present, else name; base36 keeps it compact
-  return `row-${djb2((r.destination || r.name || "").toLowerCase()).toString(
-    36,
-  )}`;
+function rowIdFor(r: FileSummary): string {
+  // Use destination only; FileResult no longer has name
+  return `row-${djb2((r.destination || "").toLowerCase()).toString(36)}`;
 }
 
 /* ---- Simple directry tree ---- */
@@ -188,18 +197,30 @@ function renderTreeRooted(root: TreeNode): string {
 // Create the HTML report
 export function createHtmlReport(opts: {
   title: string;
-  records: FileResult[];
   destinationBucket: string;
   destinationFolderKey: string;
-  costsSmall?: CostEstimate;
-  costsLarge?: CostEstimate;
-  costsSmallThaw?: CostEstimate;
-  costsLargeThaw?: CostEstimate;
+  summSmall?: FileSummary[];
+  summLarge?: FileSummary[];
+  summSmallThaw?: FileSummary[];
+  summLargeThaw?: FileSummary[];
 }): string {
-  const { title, records, destinationBucket, destinationFolderKey } = opts;
+  const {
+    title,
+    destinationBucket,
+    destinationFolderKey,
+    summSmall = [],
+    summLarge = [],
+    summSmallThaw = [],
+    summLargeThaw = [],
+  } = opts;
 
-  // Precompute IDs once
-  const rows = records.map((r) => ({ ...r, rowId: rowIdFor(r) }));
+  // Combine all FileSummary entries into one array for the report
+  const rows: (FileSummary & { rowId: string })[] = [
+    ...summSmall,
+    ...summLarge,
+    ...summSmallThaw,
+    ...summLargeThaw,
+  ].map((f) => ({ ...f, rowId: rowIdFor(f) }));
 
   const total = rows.length;
   const copied = rows.filter((r) => r.status === "COPIED").length;
@@ -212,20 +233,44 @@ export function createHtmlReport(opts: {
 
   // Calculate total costs
   const totalS3CrossRegionReadWriteCost =
-    (opts.costsSmall?.s3CrossRegionReadWriteCostAUD || 0) +
-    (opts.costsLarge?.s3CrossRegionReadWriteCostAUD || 0) +
-    (opts.costsSmallThaw?.s3CrossRegionReadWriteCostAUD || 0) +
-    (opts.costsLargeThaw?.s3CrossRegionReadWriteCostAUD || 0);
+    (opts.summSmall?.reduce(
+      (sum, s) => sum + s.s3CrossRegionReadWriteCostAUD,
+      0,
+    ) || 0) +
+    (opts.summLarge?.reduce(
+      (sum, s) => sum + s.s3CrossRegionReadWriteCostAUD,
+      0,
+    ) || 0) +
+    (opts.summSmallThaw?.reduce(
+      (sum, s) => sum + s.s3CrossRegionReadWriteCostAUD,
+      0,
+    ) || 0) +
+    (opts.summLargeThaw?.reduce(
+      (sum, s) => sum + s.s3CrossRegionReadWriteCostAUD,
+      0,
+    ) || 0);
   const totalColdCost =
-    (opts.costsSmall?.coldStorageRetrievalCostAUD || 0) +
-    (opts.costsLarge?.coldStorageRetrievalCostAUD || 0) +
-    (opts.costsSmallThaw?.coldStorageRetrievalCostAUD || 0) +
-    (opts.costsLargeThaw?.coldStorageRetrievalCostAUD || 0);
+    (opts.summSmall?.reduce(
+      (sum, s) => sum + s.coldStorageRetrievalCostAUD,
+      0,
+    ) || 0) +
+    (opts.summLarge?.reduce(
+      (sum, s) => sum + s.coldStorageRetrievalCostAUD,
+      0,
+    ) || 0) +
+    (opts.summSmallThaw?.reduce(
+      (sum, s) => sum + s.coldStorageRetrievalCostAUD,
+      0,
+    ) || 0) +
+    (opts.summLargeThaw?.reduce(
+      (sum, s) => sum + s.coldStorageRetrievalCostAUD,
+      0,
+    ) || 0);
   const totalComputeCost =
-    (opts.costsSmall?.computeCostAUD || 0) +
-    (opts.costsLarge?.computeCostAUD || 0) +
-    (opts.costsSmallThaw?.computeCostAUD || 0) +
-    (opts.costsLargeThaw?.computeCostAUD || 0);
+    (opts.summSmall?.reduce((sum, s) => sum + s.computeCostAUD, 0) || 0) +
+    (opts.summLarge?.reduce((sum, s) => sum + s.computeCostAUD, 0) || 0) +
+    (opts.summSmallThaw?.reduce((sum, s) => sum + s.computeCostAUD, 0) || 0) +
+    (opts.summLargeThaw?.reduce((sum, s) => sum + s.computeCostAUD, 0) || 0);
   const totalCost =
     totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
 
@@ -460,7 +505,7 @@ export function createHtmlReport(opts: {
     ),
   )}</ul>`;
 
-  return fill(COPY_REPORT_TEMPLATE, {
+  return fill(REPORT_TEMPLATE, {
     TITLE: title,
     SUMMARY_TOTAL: String(total),
     SUMMARY_TOTAL_BYTES: formatBytes(totalBytes),
@@ -480,27 +525,6 @@ export function createHtmlReport(opts: {
 // -----------------------------------------------------------------------------------------------------------------
 // Estimation (DryRun) Report Section
 // -----------------------------------------------------------------------------------------------------------------
-
-const DRYRUN_REPORT_TEMPLATE = readFileSync(
-  join(__dirname, "report_template.html"),
-  "utf8",
-);
-
-export interface FileSummary {
-  name: string; // this is actually sourceKey, so need to filleter the valuer
-  size: number;
-  s3CrossRegionReadWriteCostAUD: number;
-  coldStorageRetrievalCostAUD: number;
-  computeCostAUD: number;
-}
-
-export interface DryRunReportInput {
-  title: string;
-  summSmall: FileSummary[];
-  summLarge: FileSummary[];
-  summSmallThaw: FileSummary[];
-  summLargeThaw: FileSummary[];
-}
 
 function createFilesTable(...fileGroups: FileSummary[][]): string {
   // Flatten into one array
@@ -702,11 +726,6 @@ function renderCostSummaryBlock(
 `;
 }
 
-// Template filling: replaces {{TOKENS}} with values from vars.
-function fill(template: string, vars: Record<string, string>): string {
-  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, k) => vars[k] ?? "");
-}
-
 // Create the HTML report
 export function createDryRunHtmlReport(opts: {
   title: string;
@@ -763,7 +782,7 @@ export function createDryRunHtmlReport(opts: {
     summLargeThaw,
   );
 
-  return fill(DRYRUN_REPORT_TEMPLATE, {
+  return fill(REPORT_TEMPLATE, {
     TITLE: title,
     COST_HTML: costHtml,
     FILES_TABLE: filesTables,

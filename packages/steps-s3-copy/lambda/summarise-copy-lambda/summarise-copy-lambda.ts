@@ -45,7 +45,7 @@ interface InvokeEvent {
   };
 }
 
-type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
+type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 
 interface FileResult {
   name: string;
@@ -129,12 +129,18 @@ export async function readFileSummariesFromJsonl(
     const cost = obj.costEstimate;
     if (cost) {
       out.push({
-        name: obj.sourceKey, // adjust as needed
+        name: obj.sourceKey,
         size: obj.size || 0,
         s3CrossRegionReadWriteCostAUD: cost.s3CrossRegionReadWriteCostAUD || 0,
         coldStorageRetrievalCostAUD: cost.coldStorageRetrievalCostAUD || 0,
         computeCostAUD: cost.computeCostAUD || 0,
-        // ... other fields as needed
+        // The following fields are not present in dryrun/cost estimate, so we provide defaults
+        status: obj.status || "ESTIMATED", // Default to ESTIMATED
+        speed: obj.speed || 0,
+        message: obj.message || "",
+        destination: obj.destination || obj.destKey || "",
+        bytesTransferred: obj.bytesTransferred || 0,
+        elapsedSeconds: obj.elapsedSeconds || 0,
       });
     }
   }
@@ -154,22 +160,43 @@ export async function handler(event: InvokeEvent) {
 
   const client = new S3Client({});
 
-  const costsSmall = await readCostsFromJsonl(
+  // const costsSmall = await readCostsFromJsonl(
+  //   client,
+  //   event.inputCopySets.small.bucket,
+  //   event.inputCopySets.small.key,
+  // );
+  // const costsLarge = await readCostsFromJsonl(
+  //   client,
+  //   event.inputCopySets.large.bucket,
+  //   event.inputCopySets.large.key,
+  // );
+  // const costsSmallThaw = await readCostsFromJsonl(
+  //   client,
+  //   event.inputCopySets.smallThaw.bucket,
+  //   event.inputCopySets.smallThaw.key,
+  // );
+  // const costsLargeThaw = await readCostsFromJsonl(
+  //   client,
+  //   event.inputCopySets.largeThaw.bucket,
+  //   event.inputCopySets.largeThaw.key,
+  // );
+
+  const summSmall = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.small.bucket,
     event.inputCopySets.small.key,
   );
-  const costsLarge = await readCostsFromJsonl(
+  const summLarge = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.large.bucket,
     event.inputCopySets.large.key,
   );
-  const costsSmallThaw = await readCostsFromJsonl(
+  const summSmallThaw = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.smallThaw.bucket,
     event.inputCopySets.smallThaw.key,
   );
-  const costsLargeThaw = await readCostsFromJsonl(
+  const summLargeThaw = await readFileSummariesFromJsonl(
     client,
     event.inputCopySets.largeThaw.bucket,
     event.inputCopySets.largeThaw.key,
@@ -181,33 +208,12 @@ export async function handler(event: InvokeEvent) {
   const dryRun = event.dryRun;
 
   if (dryRun) {
-    const summSmall = await readFileSummariesFromJsonl(
-      client,
-      event.inputCopySets.small.bucket,
-      event.inputCopySets.small.key,
-    );
-    const summLarge = await readFileSummariesFromJsonl(
-      client,
-      event.inputCopySets.large.bucket,
-      event.inputCopySets.large.key,
-    );
-    const summSmallThaw = await readFileSummariesFromJsonl(
-      client,
-      event.inputCopySets.smallThaw.bucket,
-      event.inputCopySets.smallThaw.key,
-    );
-    const summLargeThaw = await readFileSummariesFromJsonl(
-      client,
-      event.inputCopySets.largeThaw.bucket,
-      event.inputCopySets.largeThaw.key,
-    );
-
     if (retainReport) {
       const htmlReportName = "DRY_RUN_REPORT.html";
 
       // Generate the HTML report
       const html = createDryRunHtmlReport({
-        title: "Dry Run Report",
+        title: "Estimation Report",
         summSmall: summSmall,
         summLarge: summLarge,
         summSmallThaw: summSmallThaw,
@@ -467,13 +473,12 @@ export async function handler(event: InvokeEvent) {
       // Generate the HTML report
       const html = createHtmlReport({
         title: "Copy Results Report",
-        records: Object.values(fileResults) as FileResult[],
         destinationBucket: event.destinationBucket,
         destinationFolderKey: event.destinationPrefixKey,
-        costsSmall,
-        costsLarge,
-        costsSmallThaw,
-        costsLargeThaw,
+        summSmall,
+        summLarge,
+        summSmallThaw,
+        summLargeThaw,
       });
 
       // 1) Copy to the destination bucket/folder

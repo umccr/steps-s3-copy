@@ -4,78 +4,83 @@ import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import {
   createHtmlReport,
-  type FileResult,
+  type FileSummary,
 } from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/create-html-report.ts";
-
-// Run:
-//   npx tsx packages/steps-s3-copy/lambda/summarise-copy-lambda/preview-copy-report.ts
-//
-// It will write dev_copy_report.html next to this file and try to open it.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, "..");
 
 // Mock copy files results
-const records: FileResult[] = [
-  {
-    name: "A.fastq.ora",
-    status: "ALREADYCOPIED",
-    speed: 0,
-    message:
-      "destination file already exists with same checksum so nothing was transferred",
-    destination:
-      "s3://dest-bucket/some/long/path/to/test/popover/behaviour/Lane_1/A.fastq.ora",
-    bytesTransferred: 0,
-    elapsedSeconds: 0,
-  },
-  {
-    name: "B.fastq.ora",
-    status: "COPIED",
-    speed: 12.3,
-    message: "",
-    destination:
-      "s3://dest-bucket/some/long/path/to/test/popover/behaviour/Lane_2/B.fastq.ora",
-    bytesTransferred: 123_456_789,
-    elapsedSeconds: 10,
-  },
-  {
-    name: "C.fastq.ora",
-    status: "ERROR",
-    speed: 0,
-    message: "AccessDenied",
-    destination:
-      "s3://dest-bucket/some/long/path/to/test/popover/behaviour/Lane_1/C.fastq.ora",
-    bytesTransferred: 0,
-    elapsedSeconds: 0,
-  },
-];
 
 const html = createHtmlReport({
   title: "Copy Results Report (local preview: dev_copy_report.html)",
-  records,
   destinationBucket: "dest-bucket",
   destinationFolderKey: "some/long/path/to/test/popover/behaviour/",
-  // Add mock cost data
-  costsSmall: {
-    s3CrossRegionReadWriteCostAUD: 0.002,
-    coldStorageRetrievalCostAUD: 0.0,
-    computeCostAUD: 0.0003,
-  },
-  costsLarge: {
-    s3CrossRegionReadWriteCostAUD: 0.0045,
-    coldStorageRetrievalCostAUD: 0.0,
-    computeCostAUD: 0.0011,
-  },
-  costsSmallThaw: {
-    s3CrossRegionReadWriteCostAUD: 0.0013,
-    coldStorageRetrievalCostAUD: 0.015,
-    computeCostAUD: 0.0002,
-  },
-  costsLargeThaw: {
-    s3CrossRegionReadWriteCostAUD: 0.0021,
-    coldStorageRetrievalCostAUD: 0.038,
-    computeCostAUD: 0.0007,
-  },
+  // Add mock per-file cost data as arrays
+  summSmall: [
+    {
+      name: "file1-small.fastq.ora",
+      size: 123456,
+      s3CrossRegionReadWriteCostAUD: 0.002,
+      coldStorageRetrievalCostAUD: 0.0,
+      computeCostAUD: 0.0003,
+      status: "COPIED",
+      speed: 12.3,
+      message: "A message or number.",
+      destination:
+        "s3://dest-bucket/some/long/path/to/test/popover/behaviour/file1-small.fastq.ora",
+      bytesTransferred: 345_678,
+      elapsedSeconds: 5,
+    },
+  ],
+  summLarge: [
+    {
+      name: "file1-large.fastq.ora",
+      size: 234567,
+      s3CrossRegionReadWriteCostAUD: 0.0045,
+      coldStorageRetrievalCostAUD: 0.0,
+      computeCostAUD: 0.0011,
+      status: "COPIED",
+      speed: 12.3,
+      message: "A message or number.",
+      destination:
+        "s3://dest-bucket/some/long/path/to/test/popover/behaviour/file1-small.fastq.ora",
+      bytesTransferred: 345_678,
+      elapsedSeconds: 5,
+    },
+  ],
+  summSmallThaw: [
+    {
+      name: "file1-small-thaw.fastq.ora",
+      size: 345678,
+      s3CrossRegionReadWriteCostAUD: 0.0013,
+      coldStorageRetrievalCostAUD: 0.015,
+      computeCostAUD: 0.0002,
+      status: "COPIED",
+      speed: 12.3,
+      message: "A message or number.",
+      destination:
+        "s3://dest-bucket/some/long/path/to/test/popover/behaviour/file1-small.fastq.ora",
+      bytesTransferred: 345_678,
+      elapsedSeconds: 5,
+    },
+  ],
+  summLargeThaw: [
+    {
+      name: "file1-large-thaw.fastq.ora",
+      size: 456789,
+      s3CrossRegionReadWriteCostAUD: 0.0021,
+      coldStorageRetrievalCostAUD: 0.038,
+      computeCostAUD: 0.0007,
+      status: "COPIED",
+      speed: 12.3,
+      message: "A message or number.",
+      destination:
+        "s3://dest-bucket/some/long/path/to/test/popover/behaviour/file1-small.fastq.ora",
+      bytesTransferred: 345_678,
+      elapsedSeconds: 5,
+    },
+  ],
 });
 const outPath = join(__dirname, "dev_copy_report.html");
 writeFileSync(outPath, html, "utf-8");
