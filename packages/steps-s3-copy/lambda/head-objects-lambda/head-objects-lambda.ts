@@ -387,10 +387,6 @@ export async function handler(
   return resultObjects;
 }
 
-function isNotEmptyString(o: any): o is string {
-  return typeof o !== "undefined" && o !== null;
-}
-
 /**
  * Do the mechanics to derive a full destination key from the source key and our partial destination keys. This is
  * needed because we expand out directories and we need the ability to retain the relative directory structure

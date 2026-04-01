@@ -9,7 +9,6 @@ import { dirname } from "path/posix";
 import {
   createHtmlReport,
   createDryRunHtmlReport,
-  FileSummary,
 } from "./create-html-report.ts";
 
 interface InvokeEvent {
@@ -45,9 +44,21 @@ interface InvokeEvent {
   };
 }
 
+// New definitions
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 
-interface FileResult {
+interface FileCostEstimate {
+  s3CrossRegionReadWriteCostAUD: number;
+  coldStorageRetrievalCostAUD: number;
+  computeCostAUD: number;
+}
+
+interface FileHeadObjectInfo {
+  name: string;
+  size: number;
+  FileCostEstimate: FileCostEstimate;
+}
+interface FileCopyResult {
   name: string;
   status: TransferStatus;
   speed: number;
@@ -59,92 +70,36 @@ interface FileResult {
   // copyMode: string;
 }
 
-// This is the shape of the cost estimate metadata.
-interface CostEstimate {
-  s3CrossRegionReadWriteCostAUD: number;
-  coldStorageRetrievalCostAUD: number;
-  computeCostAUD: number;
+export interface ReportMetadata {
+  headObjectInfo: FileHeadObjectInfo;
+  copyResult: FileCopyResult;
 }
+
 /**
- * Reads the per-file cost estimates from the JSONL
+ * Reads a JSONL file from S3 containing head object info and cost estimates,
+ * and returns an array of FileHeadObjectInfo.
  */
-async function readCostsFromJsonl(
+export async function readFileHeadObjectInfoFromJsonl(
   client: S3Client,
   bucket: string,
   key: string,
-): Promise<CostEstimate> {
-  const costs: CostEstimate = {
-    s3CrossRegionReadWriteCostAUD: 0,
-    coldStorageRetrievalCostAUD: 0,
-    computeCostAUD: 0,
-  };
-
-  const getCommand = new GetObjectCommand({ Bucket: bucket, Key: key });
-  const result = await client.send(getCommand);
-
-  if (!result.Body) return costs;
-
-  const content = await result.Body.transformToString();
-  const lines = content
-    .trim()
-    .split(/\r?\n/)
-    .filter((l) => l.trim());
-
-  for (const line of lines) {
-    const obj = JSON.parse(line);
-    const cost = obj.costEstimate;
-
-    if (cost) {
-      costs.s3CrossRegionReadWriteCostAUD +=
-        cost.s3CrossRegionReadWriteCostAUD || 0;
-      costs.coldStorageRetrievalCostAUD +=
-        cost.coldStorageRetrievalCostAUD || 0;
-      costs.computeCostAUD += cost.computeCostAUD || 0;
-    }
+): Promise<FileHeadObjectInfo[]> {
+  const getObjectResult = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+  );
+  if (!getObjectResult.Body) {
+    throw new Error("S3 object Body is undefined");
   }
-
-  return costs;
-}
-
-export async function readFileSummariesFromJsonl(
-  client: S3Client,
-  bucket: string,
-  key: string,
-): Promise<FileSummary[]> {
-  const getCommand = new GetObjectCommand({ Bucket: bucket, Key: key });
-  const result = await client.send(getCommand);
-
-  if (!result.Body) return [];
-
-  const content = await result.Body.transformToString();
-  const lines = content
-    .trim()
-    .split(/\r?\n/)
-    .filter((l) => l.trim());
-
-  const out: FileSummary[] = [];
-
-  for (const line of lines) {
+  const content = await getObjectResult.Body.transformToString();
+  const lines = content.split(/\r?\n/).filter((l) => l.trim());
+  return lines.map((line) => {
     const obj = JSON.parse(line);
-    const cost = obj.costEstimate;
-    if (cost) {
-      out.push({
-        name: obj.sourceKey,
-        size: obj.size || 0,
-        s3CrossRegionReadWriteCostAUD: cost.s3CrossRegionReadWriteCostAUD || 0,
-        coldStorageRetrievalCostAUD: cost.coldStorageRetrievalCostAUD || 0,
-        computeCostAUD: cost.computeCostAUD || 0,
-        // The following fields are not present in dryrun/cost estimate, so we provide defaults
-        status: obj.status || "ESTIMATED", // Default to ESTIMATED
-        speed: obj.speed || 0,
-        message: obj.message || "",
-        destination: obj.destination || obj.destKey || "",
-        bytesTransferred: obj.bytesTransferred || 0,
-        elapsedSeconds: obj.elapsedSeconds || 0,
-      });
-    }
-  }
-  return out;
+    return {
+      name: basename(obj.destinationKey), // or obj.destinationKey if you want the full key
+      size: obj.size,
+      FileCostEstimate: obj.costEstimate,
+    };
+  });
 }
 
 /**
@@ -160,43 +115,24 @@ export async function handler(event: InvokeEvent) {
 
   const client = new S3Client({});
 
-  // const costsSmall = await readCostsFromJsonl(
-  //   client,
-  //   event.inputCopySets.small.bucket,
-  //   event.inputCopySets.small.key,
-  // );
-  // const costsLarge = await readCostsFromJsonl(
-  //   client,
-  //   event.inputCopySets.large.bucket,
-  //   event.inputCopySets.large.key,
-  // );
-  // const costsSmallThaw = await readCostsFromJsonl(
-  //   client,
-  //   event.inputCopySets.smallThaw.bucket,
-  //   event.inputCopySets.smallThaw.key,
-  // );
-  // const costsLargeThaw = await readCostsFromJsonl(
-  //   client,
-  //   event.inputCopySets.largeThaw.bucket,
-  //   event.inputCopySets.largeThaw.key,
-  // );
-
-  const summSmall = await readFileSummariesFromJsonl(
+  // Read the head object info for the small/large/needThawSmall/needThawLarge
+  // copy sets that were generated by and stored in S3 as JSONL files in the head-objects-lambda.
+  const smallFileHeadObjectInfo = await readFileHeadObjectInfoFromJsonl(
     client,
     event.inputCopySets.small.bucket,
     event.inputCopySets.small.key,
   );
-  const summLarge = await readFileSummariesFromJsonl(
+  const largeFileHeadObjectInfo = await readFileHeadObjectInfoFromJsonl(
     client,
     event.inputCopySets.large.bucket,
     event.inputCopySets.large.key,
   );
-  const summSmallThaw = await readFileSummariesFromJsonl(
+  const smallThawFileHeadObjectInfo = await readFileHeadObjectInfoFromJsonl(
     client,
     event.inputCopySets.smallThaw.bucket,
     event.inputCopySets.smallThaw.key,
   );
-  const summLargeThaw = await readFileSummariesFromJsonl(
+  const largeThawFileHeadObjectInfo = await readFileHeadObjectInfoFromJsonl(
     client,
     event.inputCopySets.largeThaw.bucket,
     event.inputCopySets.largeThaw.key,
@@ -208,16 +144,81 @@ export async function handler(event: InvokeEvent) {
   const dryRun = event.dryRun;
 
   if (dryRun) {
+    // In a dry run, theres is not actual coppy happening. Copy result are defined empty
+
+    const smallReportMetadata = smallFileHeadObjectInfo.map(
+      (headObjectInfo) => ({
+        headObjectInfo,
+        copyResult: {
+          name: headObjectInfo.name,
+          status: "ESTIMATED" as TransferStatus,
+          speed: 0,
+          message: "Dry run: no copy performed",
+          destination: "",
+          bytesTransferred: 0,
+          elapsedSeconds: 0,
+        },
+      }),
+    );
+
+    const largeReportMetadata = largeFileHeadObjectInfo.map(
+      (headObjectInfo) => ({
+        headObjectInfo,
+        copyResult: {
+          name: headObjectInfo.name,
+          status: "ESTIMATED" as TransferStatus,
+          speed: 0,
+          message: "Dry run: no copy performed",
+          destination: "",
+          bytesTransferred: 0,
+          elapsedSeconds: 0,
+        },
+      }),
+    );
+
+    const smallThawReportMetadata = smallThawFileHeadObjectInfo.map(
+      (headObjectInfo) => ({
+        headObjectInfo,
+        copyResult: {
+          name: headObjectInfo.name,
+          status: "ESTIMATED" as TransferStatus,
+          speed: 0,
+          message: "Dry run: no copy performed",
+          destination: "",
+          bytesTransferred: 0,
+          elapsedSeconds: 0,
+        },
+      }),
+    );
+
+    const largeThawReportMetadata = largeThawFileHeadObjectInfo.map(
+      (headObjectInfo) => ({
+        headObjectInfo,
+        copyResult: {
+          name: headObjectInfo.name,
+          status: "ESTIMATED" as TransferStatus,
+          speed: 0,
+          message: "Dry run: no copy performed",
+          destination: "",
+          bytesTransferred: 0,
+          elapsedSeconds: 0,
+        },
+      }),
+    );
+
     if (retainReport) {
       const htmlReportName = "DRY_RUN_REPORT.html";
 
       // Generate the HTML report
-      const html = createDryRunHtmlReport({
+      const html = createHtmlReport({
         title: "Estimation Report",
-        summSmall: summSmall,
-        summLarge: summLarge,
-        summSmallThaw: summSmallThaw,
-        summLargeThaw: summLargeThaw,
+        destinationBucket: event.destinationBucket,
+        destinationFolderKey: event.destinationPrefixKey,
+        smallReportMetadata: smallReportMetadata,
+        largeReportMetadata: largeReportMetadata,
+        smallThawReportMetadata: smallThawReportMetadata,
+        largeThawReportMetadata: largeThawReportMetadata,
+        isDryRun: dryRun,
       });
 
       const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
@@ -238,7 +239,7 @@ export async function handler(event: InvokeEvent) {
 
     // Each Distributed Map we run (Large, Small, NeedThawSmall, NeedThawLarge) writes a
     // `manifest.json` to S3. The manifest is generated by Step Functions and summarises the
-    // per-item result files for that map run (grouped into PENDING / FAILED / SUCCEEDED).
+    // per-item copy result files for that map run (grouped into PENDING / FAILED / SUCCEEDED).
     //
     // Example:
     // {"DestinationBucket":"elsa-data-tmp",
@@ -249,7 +250,7 @@ export async function handler(event: InvokeEvent) {
     //     "SUCCEEDED":[{"Key":"copy-out-test-working/a6faea86c066cd90/1-objects-to-copy.tsv/0c17ffd6-e8ad-44c0-a65b-a8b721007241/SUCCEEDED_0.json",
     //                   "Size":2887}]}}
 
-    // We read and merge the manifests from all four maps to get the complete set of results.
+    // We read and merge the manifests from all four maps to get the complete set of copy results.
 
     const manifestKeys = [
       event.rcloneResultsLarge.manifestKey,
@@ -319,7 +320,7 @@ export async function handler(event: InvokeEvent) {
       throw new Error("Copy is meant to succeed - but it had failed results");
 
     // fileResults will hold the final collated results for all files.
-    const fileResults: Record<string, FileResult> = {};
+    const fileResults: Record<string, FileCopyResult> = {};
 
     // Process each SUCCEEDED result file to extract stats.
     for (const succeededFile of succeededFiles) {
@@ -380,7 +381,7 @@ export async function handler(event: InvokeEvent) {
         const lastError: number = row["lastError"];
         const retryError = row["retryError"]; // Not being passed
 
-        // firstly if we have been signalled an error - we need to report that
+        // if we have been signalled an error - we need to report that
         if (errors > 0) {
           fileResults[name] = {
             name: name,
@@ -475,10 +476,10 @@ export async function handler(event: InvokeEvent) {
         title: "Copy Results Report",
         destinationBucket: event.destinationBucket,
         destinationFolderKey: event.destinationPrefixKey,
-        summSmall,
-        summLarge,
-        summSmallThaw,
-        summLargeThaw,
+        smallFileHeadObjectInfo: summSmall,
+        largeFileHeadObjectInfo: summLarge,
+        smallThawFileHeadObjectInfo: summSmallThaw,
+        largeThawFileHeadObjectInfo: summLargeThaw,
       });
 
       // 1) Copy to the destination bucket/folder

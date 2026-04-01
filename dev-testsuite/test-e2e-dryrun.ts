@@ -102,6 +102,7 @@ test(
           destinationFolderKey: `${state.testDestPrefix}${DEST}`,
           maxItemsPerBatch: 3,
           dryRun: true,
+          retainCopyReport: true,
         }),
       }),
     );
