@@ -23,9 +23,9 @@ function djb2(str: string): number {
   return h >>> 0;
 }
 function rowIdFor(r: ReportMetadata): string {
-  return `row-${djb2((r.copyResult.destination || "").toLowerCase()).toString(
-    36,
-  )}`;
+  return `row-${djb2(
+    (r.copyResultMetadata.destination || "").toLowerCase(),
+  ).toString(36)}`;
 }
 
 // Create the HTML report
@@ -33,105 +33,55 @@ export function createHtmlReport(opts: {
   title: string;
   destinationBucket: string;
   destinationFolderKey: string;
-  smallReportMetadata: ReportMetadata[];
-  largeReportMetadata: ReportMetadata[];
-  smallThawReportMetadata: ReportMetadata[];
-  largeThawReportMetadata: ReportMetadata[];
+  reportMetadata: ReportMetadata[];
   dryRun: boolean;
 }): string {
   const {
     title,
     destinationBucket,
     destinationFolderKey,
-    smallReportMetadata = [],
-    largeReportMetadata = [],
-    smallThawReportMetadata = [],
-    largeThawReportMetadata = [],
+    reportMetadata = [],
     dryRun,
   } = opts;
 
   // Combine all FileSummary entries into one array for the report
-  const rows: (ReportMetadata & { rowId: string })[] = [
-    ...smallReportMetadata,
-    ...largeReportMetadata,
-    ...smallThawReportMetadata,
-    ...largeThawReportMetadata,
-  ].map((f) => ({ ...f, rowId: rowIdFor(f) }));
+  const rows: (ReportMetadata & { rowId: string })[] = reportMetadata.map(
+    (f) => ({ ...f, rowId: rowIdFor(f) }),
+  );
 
   const total = rows.length;
-  const copied = rows.filter((r) => r.copyResult.status === "COPIED").length;
-  const already = rows.filter(
-    (r) => r.copyResult.status === "ALREADYCOPIED",
+  const copied = rows.filter(
+    (r) => r.copyResultMetadata.status === "COPIED",
   ).length;
-  const errors = rows.filter((r) => r.copyResult.status === "ERROR").length;
+  const already = rows.filter(
+    (r) => r.copyResultMetadata.status === "ALREADYCOPIED",
+  ).length;
+  const errors = rows.filter(
+    (r) => r.copyResultMetadata.status === "ERROR",
+  ).length;
   const totalBytes = rows.reduce(
-    (a, r) => a + (r.copyResult.bytesTransferred ?? 0),
+    (a, r) => a + (r.copyResultMetadata.bytesTransferred ?? 0),
     0,
   );
   const avgSpeed = total
-    ? rows.reduce((a, r) => a + (r.copyResult.speed || 0), 0) / total
+    ? rows.reduce((a, r) => a + (r.copyResultMetadata.speed || 0), 0) / total
     : 0;
 
-  // Calculate total costs
-  const totalS3CrossRegionReadWriteCost =
-    (opts.smallReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.s3CrossRegionReadWriteCostAUD,
-      0,
-    ) || 0) +
-    (opts.largeReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.s3CrossRegionReadWriteCostAUD,
-      0,
-    ) || 0) +
-    (opts.smallThawReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.s3CrossRegionReadWriteCostAUD,
-      0,
-    ) || 0) +
-    (opts.largeThawReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.s3CrossRegionReadWriteCostAUD,
-      0,
-    ) || 0);
-  const totalColdCost =
-    (opts.smallReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.coldStorageRetrievalCostAUD,
-      0,
-    ) || 0) +
-    (opts.largeReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.coldStorageRetrievalCostAUD,
-      0,
-    ) || 0) +
-    (opts.smallThawReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.coldStorageRetrievalCostAUD,
-      0,
-    ) || 0) +
-    (opts.largeThawReportMetadata?.reduce(
-      (sum, s) =>
-        sum + s.headObjectInfo.FileCostEstimate.coldStorageRetrievalCostAUD,
-      0,
-    ) || 0);
-  const totalComputeCost =
-    (opts.smallReportMetadata?.reduce(
-      (sum, s) => sum + s.headObjectInfo.FileCostEstimate.computeCostAUD,
-      0,
-    ) || 0) +
-    (opts.largeReportMetadata?.reduce(
-      (sum, s) => sum + s.headObjectInfo.FileCostEstimate.computeCostAUD,
-      0,
-    ) || 0) +
-    (opts.smallThawReportMetadata?.reduce(
-      (sum, s) => sum + s.headObjectInfo.FileCostEstimate.computeCostAUD,
-      0,
-    ) || 0) +
-    (opts.largeThawReportMetadata?.reduce(
-      (sum, s) => sum + s.headObjectInfo.FileCostEstimate.computeCostAUD,
-      0,
-    ) || 0);
+  // Calculate total costs using only reportMetadata
+  const totalS3CrossRegionReadWriteCost = reportMetadata.reduce(
+    (sum, s) =>
+      sum + s.copySetsMetadata.FileCostEstimate.s3CrossRegionReadWriteCostAUD,
+    0,
+  );
+  const totalColdCost = reportMetadata.reduce(
+    (sum, s) =>
+      sum + s.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostAUD,
+    0,
+  );
+  const totalComputeCost = reportMetadata.reduce(
+    (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.computeCostAUD,
+    0,
+  );
   const totalCost =
     totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
 
@@ -146,13 +96,24 @@ export function createHtmlReport(opts: {
   // Create files table block HTML
   const filesTableBlock = createFilesTableBlock(rows);
 
-  // Create destination tree block HTML
-  const destinationTreeBlock = createDestinationTreeBlock(
-    rows,
-    destinationBucket,
-    destinationFolderKey,
-  );
+  // For dry run, we only estimate costs, so we hide the copy tree and summary sections.
+  let destinationTreeBlock = "";
+  let displayDestinationTree = "";
+  let displayCopySummary = "";
 
+  if (dryRun) {
+    displayDestinationTree = "d-none";
+    displayCopySummary = "d-none";
+    destinationTreeBlock = "";
+  } else {
+    displayDestinationTree = "";
+    displayCopySummary = "";
+    destinationTreeBlock = createDestinationTreeBlock(
+      rows,
+      destinationBucket,
+      destinationFolderKey,
+    );
+  }
   return fill_template(REPORT_TEMPLATE, {
     TITLE: title,
     SUMMARY_TOTAL: String(total),
@@ -167,6 +128,8 @@ export function createHtmlReport(opts: {
     S3_DESTINATION_PATH:
       "s3://" + destinationBucket + "/" + destinationFolderKey,
     COST_ESTIMATION_BLOCK: costEstimationBlock,
+    DISPLAY_DESTINATION_TREE: displayDestinationTree,
+    DISPLAY_COPY_SUMMARY: displayCopySummary,
   });
 }
 

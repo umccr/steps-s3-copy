@@ -159,7 +159,7 @@ export function createDestinationTreeBlock(
   return `<ul class="tree">${renderTree(
     buildDestinationTree(
       rows.map((r) => ({
-        destination: r.copyResult.destination,
+        destination: r.copyResultMetadata.destination,
         rowId: r.rowId,
       })),
       "s3://" + destinationBucket + "/" + destinationFolderKey,
@@ -202,54 +202,60 @@ export function createFilesTableBlock(
         .slice()
         .sort(
           (a, b) =>
-            a.copyResult.destination.localeCompare(b.copyResult.destination) ||
-            a.copyResult.name.localeCompare(b.copyResult.name),
+            a.copyResultMetadata.destination.localeCompare(
+              b.copyResultMetadata.destination,
+            ) ||
+            a.copyResultMetadata.name.localeCompare(b.copyResultMetadata.name),
         )
         .map(
           (r) => `
           <tr id="${r.rowId}">
             <td class="cell-scroll">
-              <div class="cell-inner" title="${r.copyResult.name}">${
-                r.copyResult.name
+              <div class="cell-inner" title="${r.copyResultMetadata.name}">${
+                r.copyResultMetadata.name
               }</div>
             </td>
 <td class="text-center">
   <span class="badge ${
-    r.copyResult.status === "COPIED"
+    r.copyResultMetadata.status === "COPIED"
       ? "text-bg-success"
-      : r.copyResult.status === "ALREADYCOPIED"
+      : r.copyResultMetadata.status === "ALREADYCOPIED"
         ? "text-bg-warning"
         : "text-bg-danger"
   }">
     ${
-      r.copyResult.status === "COPIED"
+      r.copyResultMetadata.status === "COPIED"
         ? "Copied"
-        : r.copyResult.status === "ALREADYCOPIED"
+        : r.copyResultMetadata.status === "ALREADYCOPIED"
           ? "Already exists"
           : "Error"
     }
   </span>
 </td>
 
-            <td class="text-center">${(r.copyResult.speed ?? 0).toFixed(2)}</td>
+            <td class="text-center">${(r.copyResultMetadata.speed ?? 0).toFixed(
+              2,
+            )}</td>
             <td class="text-center">${formatBytes(
-              r.copyResult.bytesTransferred,
+              r.copyResultMetadata.bytesTransferred,
             )}</td>
             <td class="text-center">${secondsToHMS(
-              r.copyResult.elapsedSeconds,
+              r.copyResultMetadata.elapsedSeconds,
             )}</td>
 
             <td class="cell-scroll">
               <div class="cell-inner" title="${String(
-                r.copyResult.message ?? "",
+                r.copyResultMetadata.message ?? "",
               )}">
-                ${String(r.copyResult.message ?? "")}
+                ${String(r.copyResultMetadata.message ?? "")}
               </div>
             </td>
 
             <td class="cell-scroll">
-              <div class="cell-inner" title="${r.copyResult.destination}">
-                ${r.copyResult.destination}
+              <div class="cell-inner" title="${
+                r.copyResultMetadata.destination
+              }">
+                ${r.copyResultMetadata.destination}
               </div>
             </td>
           </tr>`,
