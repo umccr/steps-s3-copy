@@ -221,14 +221,18 @@ export function createFilesTableBlock(
       ? "text-bg-success"
       : r.copyResultMetadata.status === "ALREADYCOPIED"
         ? "text-bg-warning"
-        : "text-bg-danger"
+        : r.copyResultMetadata.status === "ESTIMATED"
+          ? "text-bg-secondary"
+          : "text-bg-danger"
   }">
     ${
       r.copyResultMetadata.status === "COPIED"
         ? "Copied"
         : r.copyResultMetadata.status === "ALREADYCOPIED"
           ? "Already exists"
-          : "Error"
+          : r.copyResultMetadata.status === "ESTIMATED"
+            ? "Estimated"
+            : "Error"
     }
   </span>
 </td>
