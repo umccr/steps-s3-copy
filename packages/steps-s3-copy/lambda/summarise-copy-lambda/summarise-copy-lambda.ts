@@ -49,12 +49,13 @@ interface FileCostEstimate {
   computeCostAUD: number;
 }
 
-interface FileCopySetsMetadata {
+export interface FileCopySetsMetadata {
   name: string;
+  destination: string;
   size: number;
   FileCostEstimate: FileCostEstimate;
 }
-interface FileCopyResultMetadata {
+export interface FileCopyResultMetadata {
   name: string;
   status: TransferStatus;
   speed: number;
@@ -236,6 +237,7 @@ export async function readFileCopySetsFromJsonl(
       const name = basename(obj.destinationKey);
       fileCopySets[name] = {
         name,
+        destination: obj.destinationKey,
         size: obj.size,
         FileCostEstimate: obj.costEstimate,
       };
