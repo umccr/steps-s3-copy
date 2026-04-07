@@ -17,7 +17,7 @@ import {
 // This is a test of the whole end-to-end flow, from copy to report generation,
 //  but with a focus on testing the report generation in the different cases considered:
 
-const TEST_EXPECTED_SECONDS = 7 * 60;
+const TEST_EXPECTED_SECONDS = 1 * 60;
 
 let state: TestSetupState;
 

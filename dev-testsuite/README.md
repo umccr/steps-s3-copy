@@ -50,12 +50,13 @@ These tests will establish a source or destination (per test) folder in the work
 bucket and copy from one to the other. The test objects should expire after 1 day
 (using lifecycle rules in a folder called "1day/").
 
-| Test                    | Time Est | Rationale                                                                |
-| ----------------------- | -------- | ------------------------------------------------------------------------ |
-| `bun run e2e-dryrun`    | < 1min   | Creates a few files and executes in dryrun mode (does no actual copying) |
-| `bun run e2e-thawing`   | hours    | Creates a variety of sized files in cold storage and restore/copies them |
-| `bun run e2e-koalas`    | < 5min   | Copies some external data (AWS OpenData koala genomes)                   |
-| `bun run e2e-realistic` | < 5min   | Generates a realistic set of files and copies them including wildcards   |
+| Test                    | Time Est | Rationale                                                                 |
+| ----------------------- | -------- | ------------------------------------------------------------------------- |
+| `bun run e2e-dryrun`    | < 1min   | Creates a few files and executes in dryrun mode (does no actual copying)  |
+| `bun run e2e-thawing`   | hours    | Creates a variety of sized files in cold storage and restore/copies them  |
+| `bun run e2e-koalas`    | < 5min   | Copies some external data (AWS OpenData koala genomes)                    |
+| `bun run e2e-realistic` | < 5min   | Generates a realistic set of files and copies them including wildcards    |
+| `bun run e2e-large`     | < 2min   | Generates a set of files and creates the copy and estimation html reports |
 
 ## Local HTML Report Preview
 
