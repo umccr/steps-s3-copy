@@ -178,10 +178,8 @@ export async function handler(event: InvokeEvent) {
 
   if (includeReport || retainReport) {
     // TODO: define a better naming scheme for the HTML report (?)
-    const htmlReportName = "ENDED_COPY_REPORT.html";
+    const htmlReportName = "COPY_REPORT.html";
     const htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
-    const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
-    const retainReportKey = sourceFilePrefix + htmlReportName;
 
     // Prepare metadata for the HTML report generation
     const reportMetadata = Object.keys(fileCopyResults).map((name) => ({
@@ -190,7 +188,7 @@ export async function handler(event: InvokeEvent) {
     }));
 
     // Generate the HTML report
-    const html = createHtmlReport({
+    const htmlReport = createHtmlReport({
       title: "Estimation Report",
       destinationBucket: event.destinationBucket,
       destinationFolderKey: event.destinationPrefixKey,
@@ -198,15 +196,31 @@ export async function handler(event: InvokeEvent) {
       dryRun: dryRun,
     });
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: event.workingBucket,
-        Key: retainReportKey,
-        Body: html,
-        ContentType: "text/html; charset=utf-8",
-      }),
-    );
-    return;
+    // 1) Copy to the destination bucket/folder
+    if (includeReport) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: event.destinationBucket,
+          Key: htmlKey,
+          Body: htmlReport,
+          ContentType: "text/html; charset=utf-8",
+        }),
+      );
+    }
+    // 2) Extra copy to a specific S3 URI (sender retention)
+    if (retainReport) {
+      const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
+      const retainReportKey = sourceFilePrefix + htmlReportName;
+
+      await client.send(
+        new PutObjectCommand({
+          Bucket: event.workingBucket,
+          Key: retainReportKey,
+          Body: htmlReport,
+          ContentType: "text/html; charset=utf-8",
+        }),
+      );
+    }
   }
 
   await client.send(putCommand);
