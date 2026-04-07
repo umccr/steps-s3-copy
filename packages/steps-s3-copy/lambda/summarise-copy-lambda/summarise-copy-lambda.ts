@@ -177,9 +177,13 @@ export async function handler(event: InvokeEvent) {
   // --------------------------------------------------
 
   if (includeReport || retainReport) {
-    // TODO: define a better naming scheme for the HTML report (?)
-    const htmlReportName = "COPY_REPORT.html";
+    // Use a different report name for dry run (estimation) vs actual copy
+    const htmlReportName = dryRun
+      ? "ESTIMATION_REPORT.html"
+      : "COPY_REPORT.html";
     const htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
+
+    const title = dryRun ? "Copy Estimation Report" : "Copy Results Report";
 
     // Prepare metadata for the HTML report generation
     const reportMetadata = Object.keys(fileCopyResults).map((name) => ({
@@ -189,7 +193,7 @@ export async function handler(event: InvokeEvent) {
 
     // Generate the HTML report
     const htmlReport = createHtmlReport({
-      title: "Estimation Report",
+      title: title,
       destinationBucket: event.destinationBucket,
       destinationFolderKey: event.destinationPrefixKey,
       reportMetadata: reportMetadata,
