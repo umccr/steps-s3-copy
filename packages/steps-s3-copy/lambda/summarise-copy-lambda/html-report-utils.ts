@@ -135,7 +135,7 @@ function renderTree(node: TreeNode): string {
       </li>`,
     )
     .join("");
-  return `${folders}${files}`;
+  return `${files}${folders}`;
 }
 
 /** Render including the root line (bucket/prefix) */

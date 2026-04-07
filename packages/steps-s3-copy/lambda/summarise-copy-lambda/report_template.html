@@ -98,18 +98,19 @@
         margin: 0.1rem 0;
       }
       .tree .file .file-name::before {
-        content: "📄"; /* keep your existing file icon */
+        content: "📄";
         display: inline-block;
         width: 1.1rem;
         margin-right: 0.25rem;
+        margin-left: -0.3rem;
         line-height: 1;
         text-align: center;
       }
 
-      /* nested lists (indent, no bullets) */
+      /* nested lists */
       .tree ul {
         list-style: none;
-        margin: 0.2rem 0 0.2rem 0.75rem;
+        margin: 0.4rem 0 0.2rem 0.75rem;
         padding-left: 0.75rem;
       }
 
@@ -140,7 +141,7 @@
         color: var(--folder-open);
       }
 
-      /* Optional: a subtle hover highlight on folder rows */
+      /* Light hover highlight on folder rows */
       .tree summary:hover {
         background: rgba(13, 110, 253, 0.06);
         border-radius: 0.25rem;
@@ -328,7 +329,9 @@
                   {{S3_DESTINATION_PATH}}
                 </code>
               </div>
-              <div class="text-secondary small mt-2">Copied folder tree:</div>
+              <div class="text-secondary small mt-2">
+                Destination Path Tree:
+              </div>
             </div>
             <div class="card-body">
               <div class="small">{{DESTINATION_TREE_BLOCK}}</div>
