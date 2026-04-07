@@ -11,6 +11,6 @@ cdk.out/
 /.fleet/
 
 
-# Local HTML preview for summarise reports
-**/dev_copy_report.html
-**/dev_dryrun_report.html
+# Local HTML preview reports
+**/test-report-preview-copy.html
+**/test-report-preview-dryrun.html
