@@ -138,19 +138,6 @@ function renderTree(node: TreeNode): string {
   return `${files}${folders}`;
 }
 
-/** Render including the root line (bucket/prefix) */
-function renderTreeRooted(root: TreeNode): string {
-  return `
-    <ul class="tree">
-      <li class="folder">
-        <details open>
-          <summary><span class="folder-name">${root.name}</span></summary>
-          <ul>${renderTree(root)}</ul>
-        </details>
-      </li>
-    </ul>`.trim();
-}
-
 export function createDestinationTreeBlock(
   rows: (ReportMetadata & { rowId: string })[],
   destinationBucket: string,
@@ -174,7 +161,6 @@ export function createDestinationTreeBlock(
 export function createFilesTableBlock(
   rows: (ReportMetadata & { rowId: string })[],
 ): string {
-  // Always show Object and Size, rest in tabs
   return `
 <style>
   .nav-tabs .nav-link {
@@ -215,7 +201,7 @@ export function createFilesTableBlock(
             <col style="width:14ch;">  <!-- Size -->
             <col style="width:14ch;">  <!-- Status -->
             <col style="width:14ch;">  <!-- Transferred -->
-            <col style="width:18ch;">  <!-- Transfer speed (MiB/s) -->
+            <col style="width:18ch;">  <!-- Transf. speed (MiB/s) -->
             <col style="width:22ch;">  <!-- Elapsed time (hh:mm:ss) -->
             <col style="width:22ch;">  <!-- Message -->
             <col style="width:80ch;">  <!-- Destination path-->
@@ -226,7 +212,7 @@ export function createFilesTableBlock(
               <th class="text-center">Size</th>
               <th class="text-center">Status</th>
               <th class="text-center">Transferred</th>
-              <th class="text-center">Transfer speed (MiB/s)</th>
+              <th class="text-center">Transf. speed (MiB/s)</th>
               <th class="text-center">Elapsed time (hh:mm:ss)</th>
               <th>Message</th>
               <th>Destination path</th>

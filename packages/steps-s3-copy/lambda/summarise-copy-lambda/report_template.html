@@ -343,7 +343,7 @@
         <div class="col-12">
           <div class="card shadow-sm">
             <div class="card-body">
-              <h2 class="h5 mb-3">{{FILES_TABLE_TITLE}}</h2>
+              <h2 class="h5 mb-3">Per-Object Details</h2>
               <div class="small">{{FILES_TABLE_BLOCK}}</div>
             </div>
           </div>
@@ -365,15 +365,40 @@
 
     <script>
       (function () {
-        function highlightRow(id) {
-          const row = document.getElementById(id);
-          if (!row) return;
-          row.classList.add("hl");
-          row.scrollIntoView({ behavior: "smooth", block: "center" });
-          setTimeout(() => row.classList.remove("hl"), 2000);
+        // Helper: clear all highlights from both tables
+        function clearHighlights() {
+          document
+            .querySelectorAll(
+              "#copy-results tbody tr, #fileTableTabsContent .tab-pane#costs tbody tr",
+            )
+            .forEach(function (row) {
+              row.classList.remove("hl");
+            });
         }
 
-        // Click on any file in the tree → highlight the matching row
+        // Highlight the row in the currently active tab
+        function highlightRow(id) {
+          clearHighlights();
+          // Determine active tab
+          var resultsTab = document.getElementById("results-tab");
+          var costsTab = document.getElementById("costs-tab");
+          var isResultsActive =
+            resultsTab && resultsTab.classList.contains("active");
+          var isCostsActive = costsTab && costsTab.classList.contains("active");
+          var targetRow = null;
+          if (isResultsActive) {
+            targetRow = document.getElementById(id);
+          } else if (isCostsActive) {
+            targetRow = document.getElementById("cost-" + id);
+          }
+          if (targetRow) {
+            targetRow.classList.add("hl");
+            targetRow.scrollIntoView({ behavior: "smooth", block: "center" });
+            setTimeout(() => targetRow.classList.remove("hl"), 2000);
+          }
+        }
+
+        // Click on any file in the tree → highlight the matching row in the active tab
         document.addEventListener(
           "click",
           function (e) {
@@ -391,10 +416,18 @@
           { passive: false },
         );
 
-        // If page loads with a #hash, highlight that row
+        // If page loads with a #hash, highlight that row in the active tab
         if (location.hash) {
           const id = location.hash.slice(1);
           setTimeout(() => highlightRow(id), 50);
+        }
+
+        // Also clear highlights when switching tabs
+        var resultsTabBtn = document.getElementById("results-tab");
+        var costsTabBtn = document.getElementById("costs-tab");
+        if (resultsTabBtn && costsTabBtn) {
+          resultsTabBtn.addEventListener("shown.bs.tab", clearHighlights);
+          costsTabBtn.addEventListener("shown.bs.tab", clearHighlights);
         }
       })();
     </script>
