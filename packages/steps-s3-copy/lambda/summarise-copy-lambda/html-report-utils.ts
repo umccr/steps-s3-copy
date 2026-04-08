@@ -174,99 +174,213 @@ export function createDestinationTreeBlock(
 export function createFilesTableBlock(
   rows: (ReportMetadata & { rowId: string })[],
 ): string {
+  // Always show Object and Size, rest in tabs
   return `
-<div class="table-responsive">
-  <table id="copy-results" class="table table-sm table-hover align-middle table-fixed">
-    <colgroup>
-      <col style="width:32ch;">  <!-- Object -->
-      <col style="width:14ch;">  <!-- Status -->
-      <col style="width:18ch;">  <!-- Transfer speed (MiB/s) -->
-      <col style="width:14ch;">  <!-- Size -->
-      <col style="width:22ch;">  <!-- Elapsed time (hh:mm:ss) -->
-      <col style="width:22ch;">  <!-- Message -->
-      <col style="width:80ch;">  <!-- Destination path-->
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Object</th>
-        <th class="text-center">Status</th>
-        <th class="text-center">Transfer speed (MiB/s)</th>
-        <th class="text-center">Size</th>
-        <th class="text-center">Elapsed time (hh:mm:ss)</th>
-        <th>Message</th>
-        <th>Destination path</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rows
-        .slice()
-        .sort(
-          (a, b) =>
-            a.copyResultMetadata.destination.localeCompare(
-              b.copyResultMetadata.destination,
-            ) ||
-            a.copyResultMetadata.name.localeCompare(b.copyResultMetadata.name),
-        )
-        .map(
-          (r) => `
-          <tr id="${r.rowId}">
-            <td class="cell-scroll">
-              <div class="cell-inner" title="${r.copyResultMetadata.name}">${
-                r.copyResultMetadata.name
-              }</div>
-            </td>
-<td class="text-center">
-  <span class="badge ${
-    r.copyResultMetadata.status === "COPIED"
-      ? "text-bg-success"
-      : r.copyResultMetadata.status === "ALREADYCOPIED"
-        ? "text-bg-warning"
-        : r.copyResultMetadata.status === "ESTIMATED"
-          ? "text-bg-secondary"
-          : "text-bg-danger"
-  }">
-    ${
-      r.copyResultMetadata.status === "COPIED"
-        ? "Copied"
-        : r.copyResultMetadata.status === "ALREADYCOPIED"
-          ? "Already exists"
-          : r.copyResultMetadata.status === "ESTIMATED"
-            ? "Estimated"
-            : "Error"
-    }
-  </span>
-</td>
+<style>
+  .nav-tabs .nav-link {
+    color: #495057;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+    font-weight: 500;
+    min-width: 160px;
+    box-sizing: border-box;
+    transition: color 0.2s, background 0.2s, font-weight 0.2s, border-color 0.2s;
+  }
+  .nav-tabs .nav-link.active {
+    color: #212529;
+    background: #fff;
+    font-weight: bold;
+    border-color: #dee2e6 #dee2e6 #fff;
+    border-bottom: none;
+    z-index: 2;
+  }
+</style>
+<div>
+  <ul class="nav nav-tabs" id="fileTableTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="results-tab" data-bs-toggle="tab" data-bs-target="#results" type="button" role="tab" aria-controls="results" aria-selected="true">Copy Results</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab" aria-controls="costs" aria-selected="false">Estimated Cost</button>
+    </li>
+  </ul>
 
-            <td class="text-center">${(r.copyResultMetadata.speed ?? 0).toFixed(
-              2,
-            )}</td>
-            <td class="text-center">${formatBytes(
-              r.copyResultMetadata.bytesTransferred,
-            )}</td>
-            <td class="text-center">${secondsToHMS(
-              r.copyResultMetadata.elapsedSeconds,
-            )}</td>
+  <div class="tab-content border border-top-0 p-2" id="fileTableTabsContent">
+    <div class="tab-pane show active" id="results" role="tabpanel" aria-labelledby="results-tab">
+      <div class="table-responsive">
+        <table id="copy-results" class="table table-sm table-hover align-middle table-fixed">
+          <colgroup>
+            <col style="width:32ch;">  <!-- Object -->
+            <col style="width:14ch;">  <!-- Size -->
+            <col style="width:14ch;">  <!-- Status -->
+            <col style="width:14ch;">  <!-- Transferred -->
+            <col style="width:18ch;">  <!-- Transfer speed (MiB/s) -->
+            <col style="width:22ch;">  <!-- Elapsed time (hh:mm:ss) -->
+            <col style="width:22ch;">  <!-- Message -->
+            <col style="width:80ch;">  <!-- Destination path-->
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Object</th>
+              <th class="text-center">Size</th>
+              <th class="text-center">Status</th>
+              <th class="text-center">Transferred</th>
+              <th class="text-center">Transfer speed (MiB/s)</th>
+              <th class="text-center">Elapsed time (hh:mm:ss)</th>
+              <th>Message</th>
+              <th>Destination path</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .slice()
+              .sort(
+                (a, b) =>
+                  a.copyResultMetadata.destination.localeCompare(
+                    b.copyResultMetadata.destination,
+                  ) ||
+                  a.copyResultMetadata.name.localeCompare(
+                    b.copyResultMetadata.name,
+                  ),
+              )
+              .map(
+                (r) => `
+                <tr id="${r.rowId}">
+                  <td class="cell-scroll">
+                    <div class="cell-inner" title="${
+                      r.copyResultMetadata.name
+                    }">${r.copyResultMetadata.name}</div>
+                  </td>
+                  <td class="text-center">${formatBytes(
+                    r.copySetsMetadata.size,
+                  )}</td>
+                  <td class="text-center">
+                    <span class="badge ${
+                      r.copyResultMetadata.status === "COPIED"
+                        ? "text-bg-success"
+                        : r.copyResultMetadata.status === "ALREADYCOPIED"
+                          ? "text-bg-warning"
+                          : r.copyResultMetadata.status === "ESTIMATED"
+                            ? "text-bg-secondary"
+                            : "text-bg-danger"
+                    }">
+                      ${
+                        r.copyResultMetadata.status === "COPIED"
+                          ? "Copied"
+                          : r.copyResultMetadata.status === "ALREADYCOPIED"
+                            ? "Already exists"
+                            : r.copyResultMetadata.status === "ESTIMATED"
+                              ? "Estimated"
+                              : "Error"
+                      }
+                    </span>
+                  </td>
+                  <td class="text-center">${formatBytes(
+                    r.copyResultMetadata.bytesTransferred,
+                  )}</td>
+                  <td class="text-center">${(
+                    r.copyResultMetadata.speed ?? 0
+                  ).toFixed(2)}</td>
+                  <td class="text-center">${secondsToHMS(
+                    r.copyResultMetadata.elapsedSeconds,
+                  )}</td>
+                  <td class="cell-scroll">
+                    <div class="cell-inner" title="${String(
+                      r.copyResultMetadata.message ?? "",
+                    )}">
+                      ${String(r.copyResultMetadata.message ?? "")}
+                    </div>
+                  </td>
+                  <td class="cell-scroll">
+                    <div class="cell-inner" title="${
+                      r.copyResultMetadata.destination
+                    }">
+                      ${r.copyResultMetadata.destination}
+                    </div>
+                  </td>
+                </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-            <td class="cell-scroll">
-              <div class="cell-inner" title="${String(
-                r.copyResultMetadata.message ?? "",
-              )}">
-                ${String(r.copyResultMetadata.message ?? "")}
-              </div>
-            </td>
-
-            <td class="cell-scroll">
-              <div class="cell-inner" title="${
-                r.copyResultMetadata.destination
-              }">
-                ${r.copyResultMetadata.destination}
-              </div>
-            </td>
-          </tr>`,
-        )
-        .join("")}
-    </tbody>
-  </table>
+    <div class="tab-pane" id="costs" role="tabpanel" aria-labelledby="costs-tab" style="margin-left: 12.5px;">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle table-fixed">
+          <colgroup>
+            <col style="width:15.5ch;">  <!-- Object -->
+            <col style="width:14ch;">  <!-- Size -->
+            <col style="width:18ch;">  <!-- S3 Cross-Region Cost -->
+            <col style="width:18ch;">  <!-- Cold Storage Retrieval Cost -->
+            <col style="width:18ch;">  <!-- Compute Cost -->
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Object</th>
+              <th class="text-center">Size</th>
+              <th class="text-center">S3 Cross-Region Cost (AUD)</th>
+              <th class="text-center">Cold Storage Retrieval Cost (AUD)</th>
+              <th class="text-center">Compute Cost (AUD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .slice()
+              .sort(
+                (a, b) =>
+                  a.copyResultMetadata.destination.localeCompare(
+                    b.copyResultMetadata.destination,
+                  ) ||
+                  a.copyResultMetadata.name.localeCompare(
+                    b.copyResultMetadata.name,
+                  ),
+              )
+              .map(
+                (r) => `
+                <tr id="cost-${r.rowId}">
+                  <td class="cell-scroll">
+                    <div class="cell-inner" title="${
+                      r.copyResultMetadata.name
+                    }">${r.copyResultMetadata.name}</div>
+                  </td>
+                  <td class="text-center">${formatBytes(
+                    r.copySetsMetadata.size,
+                  )}</td>
+                  <td class="text-center">${
+                    r.copySetsMetadata.FileCostEstimate
+                      ?.s3CrossRegionReadWriteCostAUD !== undefined
+                      ? r.copySetsMetadata.FileCostEstimate.s3CrossRegionReadWriteCostAUD.toFixed(
+                          6,
+                        )
+                      : "-"
+                  }</td>
+                  <td class="text-center">${
+                    r.copySetsMetadata.FileCostEstimate
+                      ?.coldStorageRetrievalCostAUD !== undefined
+                      ? r.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostAUD.toFixed(
+                          6,
+                        )
+                      : "-"
+                  }</td>
+                  <td class="text-center">${
+                    r.copySetsMetadata.FileCostEstimate?.computeCostAUD !==
+                    undefined
+                      ? r.copySetsMetadata.FileCostEstimate.computeCostAUD.toFixed(
+                          6,
+                        )
+                      : "-"
+                  }</td>
+                </tr>`,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>`;
 }
 

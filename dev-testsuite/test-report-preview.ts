@@ -19,8 +19,6 @@ const reportMetadataDryRun: ReportMetadata[] = [
   {
     copySetsMetadata: {
       name: "file_1.fastq",
-      destination:
-        "s3://a-very-long-bucket-name/a-very-long-prefix/file_1.fastq",
       size: 123456789,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.12,
@@ -42,8 +40,6 @@ const reportMetadataDryRun: ReportMetadata[] = [
   {
     copySetsMetadata: {
       name: "file_2.bam",
-      destination:
-        "s3://a-very-long-bucket-name/a-very-long-prefix/level-1-dir/file_2.bam",
       size: 987654321,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.1,
@@ -65,8 +61,6 @@ const reportMetadataDryRun: ReportMetadata[] = [
   {
     copySetsMetadata: {
       name: "file_3.fastq.ora",
-      destination:
-        "s3://a-very-long-bucket-name/a-very-long-prefix/level-1-dir/level-2-dir/file_3.fastq.ora",
       size: 345678901,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.0,
@@ -91,8 +85,6 @@ const reportMetadataCopy: ReportMetadata[] = [
   {
     copySetsMetadata: {
       name: "file_1.fastq",
-      destination:
-        "s3://a-very-long-bucket-name/a-very-long-prefix/file_1.fastq",
       size: 123456789,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.12,
@@ -114,8 +106,6 @@ const reportMetadataCopy: ReportMetadata[] = [
   {
     copySetsMetadata: {
       name: "file_2.bam",
-      destination:
-        "s3://a-very-long-bucket-name/a-very-long-prefix/level-1-dir/file_2.bam",
       size: 987654321,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.1,
@@ -138,8 +128,6 @@ const reportMetadataCopy: ReportMetadata[] = [
   {
     copySetsMetadata: {
       name: "file_3.fastq.ora",
-      destination:
-        "s3://a-very-long-bucket-name/a-very-long-prefix/level-1-dir/level-2-dir/file_3.fastq.ora",
       size: 345678901,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.0,
