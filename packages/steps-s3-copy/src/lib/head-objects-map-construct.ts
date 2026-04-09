@@ -76,6 +76,9 @@ export class HeadObjectsMapConstruct extends Construct {
           "$invokeArguments.destinationFolderKey",
         ),
         maximumExpansion: 256,
+        "bucketDefinitions.$": JsonPath.stringAt(
+          "$invokeArguments.bucketDefinitions",
+        ),
       },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",
