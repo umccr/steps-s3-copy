@@ -2,11 +2,12 @@ import {
   HeadObjectCommand,
   NotFound,
   paginateListObjectsV2,
-  S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
+import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+import { buildS3Client } from "../common/s3-client-builder";
 
 /**
  * The way this lambda will be invoked. We expect to be part of a Distributed Map -
@@ -17,6 +18,7 @@ export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
     destinationFolderKey: string;
     maximumExpansion: number;
+    bucketDefinitions?: Record<string, BucketDefinition>;
   };
   Items: HeadObjectsLambdaItem[];
 };
@@ -175,11 +177,6 @@ export async function handler(
     }
   }
 
-  const client = new S3Client({});
-  const anonClient = new S3Client({
-    signer: { sign: async (request) => request },
-  });
-
   // we build an array of details of objects that we find either from ListObjects
   // *or* by calling HeadObject
   const resultObjects: HeadObjectsLambdaResultItem[] = [];
@@ -206,8 +203,14 @@ export async function handler(
 
       let expansionCount = 0;
 
+      const client = await buildS3Client(
+        o.sourceBucket,
+        event.BatchInput.bucketDefinitions,
+        undefined,
+        o.sourceNoSignRequest,
+      );
       for await (const data of paginateListObjectsV2(
-        { client: o.sourceNoSignRequest ? anonClient : client },
+        { client },
         {
           Bucket: o.sourceBucket,
           Prefix: sourceKeyPrefix,
@@ -251,7 +254,7 @@ export async function handler(
               o.destinationRelativeFolderKey,
             ),
             etag: item.ETag,
-            size: item.Size,
+            size: item.Size!,
             storageClass: item.StorageClass ?? "STANDARD",
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
@@ -270,15 +273,19 @@ export async function handler(
 
   for (const o of toHeadItems) {
     try {
+      const client = await buildS3Client(
+        o.sourceBucket,
+        event.BatchInput.bucketDefinitions,
+        undefined,
+        o.sourceNoSignRequest,
+      );
       // find the details of the object
       const headCommand = new HeadObjectCommand({
         Bucket: o.sourceBucket,
         Key: o.sourceKey,
       });
 
-      const headResult = o.sourceNoSignRequest
-        ? await anonClient.send(headCommand)
-        : await client.send(headCommand);
+      const headResult = await client.send(headCommand);
 
       assert.ok(headResult.ETag);
       assert.ok(headResult.LastModified);
@@ -294,7 +301,7 @@ export async function handler(
           o.destinationRelativeFolderKey,
         ),
         etag: headResult.ETag,
-        size: headResult.ContentLength,
+        size: headResult.ContentLength!,
         // as per spec - storage class is always returned by head object EXCEPT for standard
         // for our downstream processing - we mind as well rectify this so it is always present
         storageClass: headResult.StorageClass ?? "STANDARD",

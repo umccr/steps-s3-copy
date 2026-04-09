@@ -1,11 +1,12 @@
 import {
   HeadObjectCommand,
   RestoreObjectCommand,
-  S3Client,
   Tier,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { IsThawingError } from "./errors";
+import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+import { buildS3Client } from "../common/s3-client-builder";
 
 interface ThawParams {
   glacierFlexibleRetrievalThawDays?: number;
@@ -26,6 +27,7 @@ interface ThawObjectsEvent {
   BatchInput: {
     thawParams: ThawParams;
     aggressiveTimes: boolean;
+    bucketDefinitions?: Record<string, BucketDefinition>;
   };
 }
 
@@ -44,13 +46,16 @@ export async function handler(event: ThawObjectsEvent) {
   console.log("canReadObjects()");
   console.log(JSON.stringify(event, null, 2));
 
-  const client = new S3Client({});
-
   // count of how many of the passed in objects we are thawing
   let isThawing = 0;
 
   for (const o of event.Items || []) {
     try {
+      const client = await buildS3Client(
+        o.bucket,
+        event.BatchInput.bucketDefinitions,
+      );
+
       // need to find out if the object is in a "needs restore" or "currently restoring" or "restored" category
       // and also if the sourceBucket is in the correct region
       const headCommand = new HeadObjectCommand({
@@ -136,7 +141,7 @@ export async function handler(event: ThawObjectsEvent) {
           },
         });
 
-        const restoreObjectResult = await client.send(restoreObjectCommand);
+        await client.send(restoreObjectCommand);
 
         // note: if the restore operation itself fails - then above line will throw an exception
         // which means this will not count for "isThawing"

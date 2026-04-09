@@ -10,12 +10,17 @@ import type { BucketDefinition } from "../../src/steps-s3-copy-input";
  *
  * If a `bucketDefinition` exists for the bucket, that will be used over any other parameters.
  */
-export async function buildS3ClientForBucket(
-  bucketName: string,
-  bucketDefinitions: Record<string, BucketDefinition>,
+export async function buildS3Client(
+  bucketName?: string,
+  bucketDefinitions?: Record<string, BucketDefinition>,
+  requiredRegion?: string,
   sourceNoSignRequest?: boolean,
 ): Promise<S3Client> {
-  if (bucketName in bucketDefinitions) {
+  if (
+    bucketDefinitions !== undefined &&
+    bucketName !== undefined &&
+    bucketName in bucketDefinitions
+  ) {
     const def = bucketDefinitions[bucketName];
     const config: S3ClientConfig = {};
 
@@ -65,11 +70,13 @@ export async function buildS3ClientForBucket(
     return new S3Client(config);
   }
 
+  const config: S3ClientConfig = {};
   if (sourceNoSignRequest) {
-    return new S3Client({
-      signer: { sign: async (request: any) => request },
-    });
+    config.signer = { sign: async (request: any) => request };
+  }
+  if (requiredRegion) {
+    config.region = requiredRegion;
   }
 
-  return new S3Client();
+  return new S3Client(config);
 }

@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   AccessDeniedError,
   DestinationPrefixKeyNoTrailingSlashError,
@@ -8,6 +8,7 @@ import type {
   CanWriteLambdaInvokeEvent,
   CanWriteLambdaResult,
 } from "../common/can-write-lambda-types";
+import { buildS3Client } from "../common/s3-client-builder";
 
 export async function handler(event: CanWriteLambdaInvokeEvent) {
   console.log("canWrite()");
@@ -22,9 +23,12 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
   // we are being super specific here - more so than our normal client creation
   // the "required region" is where we are going
   // to make our client - in order to ensure we get 301 Redirects for buckets outside our location
-  const client = new S3Client({
-    region: event.invokeArguments.destinationRequiredRegion,
-  });
+  // If bucket overrides are present, this will take precedence over the required region.
+  const client = await buildS3Client(
+    event.invokeArguments.destinationBucket,
+    event.invokeArguments.bucketDefinitions,
+    event.invokeArguments.destinationRequiredRegion,
+  );
 
   try {
     if (event.invokeArguments.dryRun) {

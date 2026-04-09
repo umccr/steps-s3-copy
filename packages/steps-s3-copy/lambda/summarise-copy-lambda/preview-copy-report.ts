@@ -2,7 +2,7 @@ import { writeFileSync } from "fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { createHtmlReport, type FileResult } from "./create-html-report.ts";
+import { createHtmlReport, type FileResult } from "./create-html-report";
 
 // Run:
 //   npx tsx packages/steps-s3-copy/lambda/summarise-copy-lambda/preview-copy-report.ts
