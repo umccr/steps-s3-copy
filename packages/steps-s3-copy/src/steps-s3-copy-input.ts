@@ -83,6 +83,15 @@ export type StepsS3CopyInvokeArguments = {
     readonly intelligentTieringDeepArchiveThawDays?: number;
     readonly intelligentTieringDeepArchiveThawSpeed?: "Bulk" | "Standard";
   };
+
+  /**
+   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used to
+   * configure the credentials used to access the bucket.
+   *
+   * Settings here will override `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` if
+   * using the no-credential `CredentialProvider`.
+   */
+  readonly bucketDefinitions?: Record<string, BucketDefinition>;
 };
 
 export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
@@ -113,3 +122,24 @@ export const INCLUDE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
 
 export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
   "retainCopyReport";
+
+/**
+ * The kinds of credential providers.
+ */
+export type CredentialProvider =
+  | "default-environment"
+  | "no-credentials"
+  | "aws-profile"
+  | "aws-secret";
+
+/**
+ * The `BucketDefinition` type specifies custom credentials for accessing a bucket.
+ */
+export type BucketDefinition = {
+  readonly credentialProvider?: CredentialProvider;
+  readonly profile?: string;
+  readonly secret?: string;
+  readonly region?: string;
+  readonly endpointUrl?: string;
+  readonly s3Compatible?: boolean;
+};
