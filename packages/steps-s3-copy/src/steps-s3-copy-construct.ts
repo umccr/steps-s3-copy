@@ -507,6 +507,15 @@ export class StepsS3CopyConstruct extends Construct {
       }),
     );
 
+    // allow reading secrets for the aws-secret credential provider in bucket definitions
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["secretsmanager:GetSecretValue"],
+        resources: ["*"],
+      }),
+    );
+
     return writerRole;
   }
 }
