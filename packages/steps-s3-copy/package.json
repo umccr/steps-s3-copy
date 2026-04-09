@@ -39,6 +39,8 @@
     "constructs": "^10.4.2"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1026.0",
+    "@aws-sdk/client-secrets-manager": "^3.1026.0",
     "aws-cdk-lib": "2.192.0",
     "constructs": "10.4.2",
     "jsii": "5.9.22",
