@@ -124,22 +124,19 @@ export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
   "retainCopyReport";
 
 /**
- * The kinds of credential providers.
+ * Common fields shared by all bucket definitions.
  */
-export type CredentialProvider =
-  | "default-environment"
-  | "no-credentials"
-  | "aws-profile"
-  | "aws-secret";
-
-/**
- * The `BucketDefinition` type specifies custom credentials for accessing a bucket.
- */
-export type BucketDefinition = {
-  readonly credentialProvider?: CredentialProvider;
-  readonly profile?: string;
-  readonly secret?: string;
+type BaseBucketDefinition = {
   readonly region?: string;
   readonly endpointUrl?: string;
   readonly s3Compatible?: boolean;
 };
+
+/**
+ * The `BucketDefinition` type specifies custom credentials for accessing a bucket.
+ */
+export type BucketDefinition = BaseBucketDefinition &
+  (
+    | { readonly credentialProvider?: "default-environment" | "no-credentials" }
+    | { readonly credentialProvider: "aws-secret"; readonly secret: string }
+  );

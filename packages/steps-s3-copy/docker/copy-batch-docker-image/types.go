@@ -4,7 +4,6 @@ package main
 // mapped to copyrite CLI flags.
 type BucketDefinition struct {
 	CredentialProvider string `json:"credentialProvider,omitempty"`
-	Profile            string `json:"profile,omitempty"`
 	Secret             string `json:"secret,omitempty"`
 	Region             string `json:"region,omitempty"`
 	EndpointUrl        string `json:"endpointUrl,omitempty"`

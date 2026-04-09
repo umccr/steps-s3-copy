@@ -25,9 +25,6 @@ func appendBucketFlags(args []string, prefix string, def BucketDefinition) []str
 	if def.CredentialProvider != "" {
 		args = append(args, fmt.Sprintf("--%scredential-provider", prefix), def.CredentialProvider)
 	}
-	if def.Profile != "" {
-		args = append(args, fmt.Sprintf("--%sprofile", prefix), def.Profile)
-	}
 	if def.Secret != "" {
 		args = append(args, fmt.Sprintf("--%ssecret", prefix), def.Secret)
 	}
