@@ -13,8 +13,38 @@ import (
 	"time"
 )
 
+// bucketNameFromS3Uri extracts the bucket name from an "s3://bucket/key" URI.
+func bucketNameFromS3Uri(uri string) string {
+	trimmed := strings.TrimPrefix(uri, "s3://")
+	parts := strings.SplitN(trimmed, "/", 2)
+	return parts[0]
+}
+
+// appendBucketFlags appends copyrite CLI flags for a bucket definition.
+func appendBucketFlags(args []string, prefix string, def BucketDefinition) []string {
+	if def.CredentialProvider != "" {
+		args = append(args, fmt.Sprintf("--%scredential-provider", prefix), def.CredentialProvider)
+	}
+	if def.Profile != "" {
+		args = append(args, fmt.Sprintf("--%sprofile", prefix), def.Profile)
+	}
+	if def.Secret != "" {
+		args = append(args, fmt.Sprintf("--%ssecret", prefix), def.Secret)
+	}
+	if def.Region != "" {
+		args = append(args, fmt.Sprintf("--%sregion", prefix), def.Region)
+	}
+	if def.EndpointUrl != "" {
+		args = append(args, fmt.Sprintf("--%sendpoint-url", prefix), def.EndpointUrl)
+	}
+	if def.S3Compatible {
+		args = append(args, fmt.Sprintf("--%ss3-compatible", prefix))
+	}
+	return args
+}
+
 // copyRunner invokes a UNIX CLI tool to perform a set of object copy operations
-func copyRunner(copyBinary string, copyInterruptWait time.Duration, toCopy *[]*CopyArg, toCopyResults *[]*CopyResult) {
+func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefinitions map[string]BucketDefinition, toCopy *[]*CopyArg, toCopyResults *[]*CopyResult) {
 
 	// NOTE that the signal TERM handling is only _used_ where copyInterruptWait is positive (so we can switch
 	// it off in lambdas etc) - however we set up the signal channel no matter what as there is no downside
@@ -49,14 +79,19 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, toCopy *[]*C
 			continue
 		}
 
-		var cliArgs []string
-
-		cliArgs = append(cliArgs,
-			"copy",
-			"--concurrency", "1",
-			//"--...",
-			copyArg.Source,
-			copyArg.Destination)
+		var cliArgs = []string{"copy", "--concurrency", "1"}
+		if bucketDefinitions != nil {
+			srcBucket := bucketNameFromS3Uri(copyArg.Source)
+			dstBucket := bucketNameFromS3Uri(copyArg.Destination)
+			// If there is a definition, append the flags, otherwise proceed with default behaviour.
+			if def, ok := bucketDefinitions[srcBucket]; ok {
+				cliArgs = appendBucketFlags(cliArgs, "source-", def)
+			}
+			if def, ok := bucketDefinitions[dstBucket]; ok {
+				cliArgs = appendBucketFlags(cliArgs, "destination-", def)
+			}
+		}
+		cliArgs = append(cliArgs, copyArg.Source, copyArg.Destination)
 
 		// construct the command that will do the execution - though not trigger it yet
 		cmd := exec.Command(copyBinary, cliArgs...)
