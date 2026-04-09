@@ -188,6 +188,9 @@ export class StepsS3CopyConstruct extends Construct {
 
       // if not passed, default to ""
       [RETAIN_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${RETAIN_COPY_REPORT_FIELD_NAME}, "" ][0] %}`,
+
+      // bucket definitions default to empty object when not provided
+      bucketDefinitions: `{% $exists($states.input.bucketDefinitions) ? $states.input.bucketDefinitions : {} %}`,
     };
     const jsonataInvokeSettings: {
       [K in keyof StepsS3CopyInvokeSettings]: string;
