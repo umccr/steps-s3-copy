@@ -208,10 +208,69 @@ export type StepsS3CopyInvokeArguments = {
     readonly intelligentTieringDeepArchiveThawDays?: number;
     readonly intelligentTieringDeepArchiveThawSpeed?: string;
   };
+
+  /**
+   * When a source or destination bucket matches a key in this map, the BucketDefinition
+   * is used to configure access for the bucket. Access settings here override sourceRequiredRegion,
+   * destinationRequiredRegion, or sourceNoSignRequest for that bucket.
+   */
+  readonly bucketDefinitions?: Record<string, BucketDefinition>;
+};
+
+type BucketDefinition = {
+  /** The AWS region for this bucket. */
+  readonly region?: string;
+
+  /** A custom S3 endpoint URL. */
+  readonly endpointUrl?: string;
+
+  /** This should be enabled when using S3-compatible endpoints like Ceph. */
+  readonly s3Compatible?: boolean;
+
+  /**
+   * Specifies how the copier should connect to a specific bucket.
+   *
+   * - `"default-environment"` - use the default SDK credential chain.
+   * - `"no-credentials"` - no request signing.
+   * - `"aws-secret"` - fetch credentials from an AWS Secrets Manager secret.
+   */
+  readonly credentialProvider?:
+    | "default-environment"
+    | "no-credentials"
+    | "aws-secret";
+
+  /**
+   * The name or ARN of the Secrets Manager secret containing credentials.
+   * This option is required when credentialProvider is "aws-secret". The secret
+   * must a JSON with `access_key_id`, `secret_access_key`, and optionally `session_token`.
+   */
+  readonly secret?: string;
 };
 ```
 
 Note that the `copyInstructionsKey` points to the JSONL copy-instructions file (relative to the working folder). For instance if we uploaded the JSONL copy instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would specify a `copyInstructionsKey` of `instructions.jsonl`.
+
+### Copying to S3-compatible endpoints
+
+To copy objects to a non-AWS S3-compatible endpoint like Ceph, use `bucketDefinitions`
+to configure the destination bucket with the custom endpoint and credentials. For example,
+copying to a Ceph bucket using credentials in Secrets Manager:
+
+```json
+{
+  "copyInstructionsKey": "instructions.jsonl",
+  "destinationBucket": "<bucket-name>",
+  "destinationFolderKey": "output/",
+  "bucketDefinitions": {
+    "<bucket-name>": {
+      "credentialProvider": "aws-secret",
+      "secret": "<secret-name-or-arn>",
+      "endpointUrl": "https://objects.storage.example.com",
+      "s3Compatible": true
+    }
+  }
+}
+```
 
 ## Thawing objects from cold storage
 

@@ -127,13 +127,31 @@ export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
  * Common fields shared by all bucket definitions.
  */
 type BaseBucketDefinition = {
+  /**
+   * The AWS region for this bucket.
+   */
   readonly region?: string;
+
+  /**
+   * A custom S3 endpoint URL
+   */
   readonly endpointUrl?: string;
+
+  /**
+   * Enables compatibility mode that ensures that this works with S3-compatible endpoints.
+   * This option should be enabled when not using an S3 native bucket, like on Ceph.
+   */
   readonly s3Compatible?: boolean;
 };
 
 /**
- * The `BucketDefinition` type specifies custom credentials for accessing a bucket.
+ * Specifies how the copier should connect to a specific bucket.
+ *
+ * - `"default-environment"` - use the default SDK credential chain.
+ * - `"no-credentials"` - no request signing.
+ * - `"aws-secret"` - fetch credentials from an AWS Secrets Manager secret.
+ *   The secret must contain JSON with `access_key_id`, `secret_access_key`,
+ *   and optionally `session_token`.
  */
 export type BucketDefinition = BaseBucketDefinition &
   (

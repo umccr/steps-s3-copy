@@ -7,7 +7,7 @@ import { createTestObject } from "./lib/create-test-object";
 import {
   REALISTIC_SOURCE_OBJECTS,
   REALISTIC_WILDCARD_PREFIX,
-} from "./test-e2e-realistic";
+} from "./lib/realistic-source-objects";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import assert from "node:assert";
 import { assertDestinations } from "./lib/assert-destinations.mjs";
@@ -22,7 +22,7 @@ const S3_ENDPOINT_URL =
 const S3_SECRET_NAME =
   process.env.STEPS_TEST_SECRET_NAME ?? "ceph-5690-guardians-dev";
 const S3_BUCKET = process.env.STEPS_TEST_BUCKET ?? "5690-guardians-dev";
-const S3_REGION = process.env.STEPS_TEST_REGION;
+const S3_REGION = process.env.STEPS_TEST_REGION ?? "ap-southeast-2";
 
 let state: TestSetupState;
 
