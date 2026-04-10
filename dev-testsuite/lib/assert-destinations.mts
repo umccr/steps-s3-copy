@@ -4,20 +4,15 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import assert, { fail } from "node:assert";
-import {
-  type TestObject,
-  type TestObjectParams,
-} from "./create-test-object.js";
+import { type TestObjectParams } from "./create-test-object.js";
 import { basename } from "node:path";
 
 export async function assertDestinations(
   destinationBucket: string,
   destinationFolderKey: string,
   sourceObjects: Record<string, TestObjectParams>,
-  testObjects: Record<string, TestObject>,
+  s3Client: S3Client = new S3Client({}),
 ) {
-  const s3Client = new S3Client({});
-
   for (const [n, to] of Object.entries(sourceObjects)) {
     let h: HeadObjectCommandOutput;
     const destKey = to.overrideExpectedDestinationRelativeKey
