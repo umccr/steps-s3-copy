@@ -24,19 +24,16 @@ export class CanWriteLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const lambdaFolder = join(
-      __dirname,
-      "..",
-      "..",
-      "lambda",
-      "can-write-lambda",
-    );
+    const packageRoot = join(__dirname, "..", "..");
+    const lambdaFolder = join(packageRoot, "lambda", "can-write-lambda");
 
     this.stateName = `Can Write To Destination Bucket?`;
 
     this.lambda = new NodejsFunction(this, "CanWriteFunction", {
+      projectRoot: packageRoot,
       role: props.writerRole,
       entry: join(lambdaFolder, "can-write-lambda.ts"),
+      depsLockFilePath: join(lambdaFolder, "package-lock.json"),
       runtime: Runtime.NODEJS_22_X,
       handler: "handler",
       bundling: {
