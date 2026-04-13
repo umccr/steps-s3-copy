@@ -45,7 +45,7 @@ type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 
 interface FileCostEstimate {
   s3CrossRegionReadWriteCostAUD: number;
-  coldStorageRetrievalCostAUD: number;
+  coldStorageRetrievalCostUSD: number;
   computeCostAUD: number;
 }
 
@@ -191,7 +191,7 @@ export async function handler(event: InvokeEvent) {
     }));
 
     // Generate the HTML report
-    const htmlReport = createHtmlReport({
+    const htmlReport = await createHtmlReport({
       title: title,
       destinationBucket: event.destinationBucket,
       destinationFolderKey: event.destinationPrefixKey,

@@ -223,7 +223,7 @@ async function computeStats(df: pl.DataFrame) {
     .field("s3CrossRegionReadWriteCostAUD")
     .sum();
   const totalColdStorageRetrievalCostAUD = costEstimates.struct
-    .field("coldStorageRetrievalCostAUD")
+    .field("coldStorageRetrievalCostUSD")
     .sum();
   const totalComputeCostAUD = costEstimates.struct
     .field("computeCostAUD")

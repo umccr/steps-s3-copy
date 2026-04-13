@@ -521,6 +521,21 @@ export class StepsS3CopyConstruct extends Construct {
       }),
     );
 
+    // Allow Pricing API access for cost estimation
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+          "pricing:DescribeServices",
+          "pricing:GetAttributeValues",
+          "pricing:GetProducts",
+          "pricing:ListPriceLists",
+          "pricing:GetPriceListFileUrl",
+        ],
+        resources: ["*"],
+      }),
+    );
+
     return writerRole;
   }
 }

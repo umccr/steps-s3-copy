@@ -25,18 +25,6 @@ export const COST_CHECK_URL = "https://aws.amazon.com/s3/pricing/"; // Link to A
 // -- Cross-region S3 copy (may need to update periodically) --
 export const S3_CROSS_REGION_COPY_COST_PER_GB_AUD = 0.14; // AUD per GB transferred
 
-// -- Cold storage retrieval per GB by storage class and speed (see AWS docs for latest) --
-export const GLACIER_RETRIEVAL_COSTS = {
-  GLACIER: { Bulk: 0.0034, Standard: 0.013, Expedited: 0.27 },
-  DEEP_ARCHIVE: { Bulk: 0.011, Standard: 0.03 },
-  INTELLIGENT_TIERING_ARCHIVE_ACCESS: {
-    Bulk: 0.0034,
-    Standard: 0.013,
-    Expedited: 0.27,
-  },
-  INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS: { Bulk: 0.011, Standard: 0.03 },
-} as const;
-
 // -- Lambda (Sydney, AUD) --
 export const LAMBDA_GB_SECOND_COST_AUD = 0.00001964; // per GB-second
 export const LAMBDA_INVOCATION_COST_AUD = 0.00000027; // per event
@@ -71,37 +59,44 @@ export function bytesToGB(bytes: number): number {
   return bytes / 1024 ** 3;
 }
 
+export function getThawParams(
+  storageClass: string,
+  thawParams?: {
+    glacierFlexibleRetrievalThawDays?: number;
+    glacierFlexibleRetrievalThawSpeed?: string;
+    glacierDeepArchiveThawDays?: number;
+    glacierDeepArchiveThawSpeed?: string;
+    intelligentTieringArchiveThawDays?: number;
+    intelligentTieringArchiveThawSpeed?: string;
+    intelligentTieringDeepArchiveThawDays?: number;
+    intelligentTieringDeepArchiveThawSpeed?: string;
+  },
+): { retrievalSpeed: string; restoreWindowDays: number } {
+  switch (storageClass) {
+    case "GLACIER":
+      return {
+        retrievalSpeed: thawParams?.glacierFlexibleRetrievalThawSpeed ?? "Bulk",
+        restoreWindowDays: thawParams?.glacierFlexibleRetrievalThawDays ?? 1,
+      };
+    case "DEEP_ARCHIVE":
+      return {
+        retrievalSpeed: thawParams?.glacierDeepArchiveThawSpeed ?? "Bulk",
+        restoreWindowDays: thawParams?.glacierDeepArchiveThawDays ?? 1,
+      };
+    case "INTELLIGENT_TIERING":
+      return {
+        retrievalSpeed:
+          thawParams?.intelligentTieringArchiveThawSpeed ?? "Bulk",
+        restoreWindowDays: thawParams?.intelligentTieringArchiveThawDays ?? 1,
+      };
+    default:
+      return { retrievalSpeed: "Bulk", restoreWindowDays: 1 };
+  }
+}
+
 // -------------
 // COST ESTIMATION FUNCTIONS
 // -------------
-
-// S3 cross-region cost (returns 0 for same region, supply flag)
-export function estimateS3CrossRegionReadWriteCost(
-  sizeBytes: number,
-  isCrossRegion: boolean,
-): number {
-  return isCrossRegion
-    ? bytesToGB(sizeBytes) * S3_CROSS_REGION_COPY_COST_PER_GB_AUD
-    : 0;
-}
-
-// Glacier/Deep Archive retrieval
-export function estimateColdStorageRetrievalCost(
-  sizeBytes: number,
-  storageClass: string,
-  retrievalSpeed: string = "Standard",
-): number {
-  const classPricing =
-    GLACIER_RETRIEVAL_COSTS[
-      storageClass as keyof typeof GLACIER_RETRIEVAL_COSTS
-    ];
-  if (!classPricing) return 0;
-  const costPerGB =
-    classPricing[retrievalSpeed as keyof typeof classPricing] ??
-    classPricing["Standard"];
-  if (costPerGB === undefined) return 0;
-  return bytesToGB(sizeBytes) * costPerGB;
-}
 
 /**
  * Estimate copy duration (seconds) from size and speed.

@@ -8,17 +8,24 @@ import {
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
 import {
-  estimateS3CrossRegionReadWriteCost,
-  estimateColdStorageRetrievalCost,
   estimateComputeCost,
+  COLD_STORAGE_CLASSES,
+  getThawParams,
 } from "../common/constants";
+
+import {
+  fetchThawingCosts,
+  estimateColdStorageRetrievalCost,
+  fetchS3CrossRegionEgressPrice,
+  estimateS3CrossRegionReadWriteCost,
+} from "../common/pricing";
 
 /**
  * Cost estimate
  */
 export type CostEstimate = {
   s3CrossRegionReadWriteCostAUD: number; // Cost to copy S3 objects across regions (per object)
-  coldStorageRetrievalCostAUD: number; // Thawing from Glacier/Deep Archive
+  coldStorageRetrievalCostUSD: number; // Thawing from Glacier/Deep Archive
   computeCostAUD: number; // Lambda execution cost
 };
 
@@ -33,6 +40,16 @@ export type HeadObjectsLambdaInvokeEvent = {
     maximumExpansion: number;
     sourceRequiredRegion: string;
     destinationRequiredRegion: string;
+    thawParams?: {
+      glacierFlexibleRetrievalThawDays?: number;
+      glacierFlexibleRetrievalThawSpeed?: string;
+      glacierDeepArchiveThawDays?: number;
+      glacierDeepArchiveThawSpeed?: string;
+      intelligentTieringArchiveThawDays?: number;
+      intelligentTieringArchiveThawSpeed?: string;
+      intelligentTieringDeepArchiveThawDays?: number;
+      intelligentTieringDeepArchiveThawSpeed?: string;
+    };
   };
   Items: HeadObjectsLambdaItem[];
 };
@@ -199,6 +216,12 @@ export async function handler(
     signer: { sign: async (request) => request },
   });
 
+  // The region of the source bucket
+  const sourceRegion = event.BatchInput.sourceRequiredRegion;
+
+  // Fetch cost info from API - Cost estimation is for of each item
+  const thawingCosts = await fetchThawingCosts(sourceRegion);
+
   // we build an array of details of objects that we find either from ListObjects
   // *or* by calling HeadObject
   const resultObjects: HeadObjectsLambdaResultItem[] = [];
@@ -262,9 +285,19 @@ export async function handler(
           // in both the result object and cost estimation
           const size = item.Size;
           const storageClass = item.StorageClass ?? "STANDARD";
-          const sourceRegion = event.BatchInput.sourceRequiredRegion;
           const destinationRegion = event.BatchInput.destinationRequiredRegion;
           const iscrossRegion = sourceRegion !== destinationRegion;
+          const isColdStorage = COLD_STORAGE_CLASSES.map((s) =>
+            s.toUpperCase(),
+          ).includes(storageClass.toUpperCase());
+          const { retrievalSpeed, restoreWindowDays } = getThawParams(
+            storageClass,
+            event.BatchInput.thawParams,
+          );
+
+          // Read pricing info from API
+          const perGbPriceAud =
+            await fetchS3CrossRegionEgressPrice(sourceRegion);
 
           // we have the benefit that ListObjects actually returns the details we
           // need - so these do not need a further HEAD command
@@ -289,10 +322,16 @@ export async function handler(
               s3CrossRegionReadWriteCostAUD: estimateS3CrossRegionReadWriteCost(
                 size,
                 iscrossRegion,
+                perGbPriceAud,
               ),
-              coldStorageRetrievalCostAUD: estimateColdStorageRetrievalCost(
+
+              coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
+                isColdStorage,
                 size,
                 storageClass,
+                retrievalSpeed,
+                restoreWindowDays,
+                thawingCosts,
               ),
               computeCostAUD: estimateComputeCost(size),
             },
@@ -329,9 +368,18 @@ export async function handler(
       const size = headResult.ContentLength;
       const storageClass = headResult.StorageClass ?? "STANDARD";
 
-      const sourceRegion = event.BatchInput.sourceRequiredRegion;
       const destinationRegion = event.BatchInput.destinationRequiredRegion;
       const iscrossRegion = sourceRegion !== destinationRegion;
+      const isColdStorage = COLD_STORAGE_CLASSES.map((s) =>
+        s.toUpperCase(),
+      ).includes(storageClass.toUpperCase());
+      const { retrievalSpeed, restoreWindowDays } = getThawParams(
+        storageClass,
+        event.BatchInput.thawParams,
+      );
+
+      // Read COST PRICING INFO FROM API
+      const perGbPriceAud = await fetchS3CrossRegionEgressPrice(sourceRegion);
 
       resultObjects.push({
         sourceBucket: o.sourceBucket,
@@ -355,10 +403,15 @@ export async function handler(
           s3CrossRegionReadWriteCostAUD: estimateS3CrossRegionReadWriteCost(
             size,
             iscrossRegion,
+            perGbPriceAud,
           ),
-          coldStorageRetrievalCostAUD: estimateColdStorageRetrievalCost(
+          coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
+            isColdStorage,
             size,
             storageClass,
+            retrievalSpeed,
+            restoreWindowDays,
+            thawingCosts,
           ),
           computeCostAUD: estimateComputeCost(size),
         },

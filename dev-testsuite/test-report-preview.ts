@@ -22,7 +22,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       size: 123456789,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.12,
-        coldStorageRetrievalCostAUD: 0.05,
+        coldStorageRetrievalCostUSD: 0.05,
         computeCostAUD: 0.01,
       },
     },
@@ -43,7 +43,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       size: 987654321,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.1,
-        coldStorageRetrievalCostAUD: 0.0,
+        coldStorageRetrievalCostUSD: 0.0,
         computeCostAUD: 0.01,
       },
     },
@@ -64,7 +64,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       size: 345678901,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.0,
-        coldStorageRetrievalCostAUD: 0.0,
+        coldStorageRetrievalCostUSD: 0.0,
         computeCostAUD: 0.01,
       },
     },
@@ -88,7 +88,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 123456789,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.12,
-        coldStorageRetrievalCostAUD: 0.05,
+        coldStorageRetrievalCostUSD: 0.05,
         computeCostAUD: 0.01,
       },
     },
@@ -109,7 +109,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 987654321,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.1,
-        coldStorageRetrievalCostAUD: 0.0,
+        coldStorageRetrievalCostUSD: 0.0,
         computeCostAUD: 0.01,
       },
     },
@@ -131,7 +131,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 345678901,
       FileCostEstimate: {
         s3CrossRegionReadWriteCostAUD: 0.0,
-        coldStorageRetrievalCostAUD: 0.0,
+        coldStorageRetrievalCostUSD: 0.0,
         computeCostAUD: 0.01,
       },
     },
@@ -166,7 +166,7 @@ const outFile = join(
   __dirname,
   dryRun ? "test-report-preview-dryrun.html" : "test-report-preview-copy.html",
 );
-writeFileSync(outFile, htmlReport, "utf8");
+writeFileSync(outFile, await htmlReport, "utf8");
 console.log(`Report written to: ${outFile}`);
 
 // Try to open the report file just created

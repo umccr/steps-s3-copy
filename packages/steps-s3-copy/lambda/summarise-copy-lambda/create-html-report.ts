@@ -9,6 +9,8 @@ import {
   fill_template,
 } from "./html-report-utils.ts";
 
+import { fetchThawingCosts } from "../common/pricing.ts";
+
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
   join(__dirname, "report_template.html"),
@@ -29,13 +31,13 @@ function rowIdFor(r: ReportMetadata): string {
 }
 
 // Create the HTML report
-export function createHtmlReport(opts: {
+export async function createHtmlReport(opts: {
   title: string;
   destinationBucket: string;
   destinationFolderKey: string;
   reportMetadata: ReportMetadata[];
   dryRun: boolean;
-}): string {
+}): Promise<string> {
   const {
     title,
     destinationBucket,
@@ -75,7 +77,7 @@ export function createHtmlReport(opts: {
   );
   const totalColdCost = reportMetadata.reduce(
     (sum, s) =>
-      sum + s.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostAUD,
+      sum + s.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostUSD,
     0,
   );
   const totalComputeCost = reportMetadata.reduce(
@@ -86,11 +88,16 @@ export function createHtmlReport(opts: {
     totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
 
   // Create cost estimation block HTML
+
+  // Fetch cost info from API - Cost estimation is for of each item
+  const thawingCosts = await fetchThawingCosts("ap-southeast-2");
+
   const costEstimationBlock = createCostEstimationBlock(
     totalS3CrossRegionReadWriteCost,
     totalColdCost,
     totalComputeCost,
     totalCost,
+    thawingCosts,
   );
 
   // Create files table block HTML

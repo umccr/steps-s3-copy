@@ -1,6 +1,5 @@
 import {
   S3_CROSS_REGION_COPY_COST_PER_GB_AUD,
-  GLACIER_RETRIEVAL_COSTS,
   LAMBDA_GB_SECOND_COST_AUD,
   LAMBDA_INVOCATION_COST_AUD,
   FARGATE_VCPU_COST_PER_HOUR_AUD,
@@ -11,6 +10,7 @@ import {
 } from "../common/constants";
 
 import type { ReportMetadata } from "./summarise-copy-lambda.ts";
+import type { ThawingCosts } from "../common/pricing";
 
 // Template filling: replaces {{TOKENS}} with values from vars.
 export function fill_template(
@@ -345,8 +345,8 @@ export function createFilesTableBlock(
                   }</td>
                   <td class="text-center">${
                     r.copySetsMetadata.FileCostEstimate
-                      ?.coldStorageRetrievalCostAUD !== undefined
-                      ? r.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostAUD.toFixed(
+                      ?.coldStorageRetrievalCostUSD !== undefined
+                      ? r.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostUSD.toFixed(
                           6,
                         )
                       : "-"
@@ -378,6 +378,7 @@ export function createCostEstimationBlock(
   totalColdCost: number,
   totalComputeCost: number,
   totalCost: number,
+  thawingCosts: ThawingCosts,
 ): string {
   return `
 	<div class="row align-items-start">
@@ -428,45 +429,44 @@ export function createCostEstimationBlock(
 					</li>
 
 					<!-- Cold Storage Costs -->
-					<li class="mb-2">
-						<strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
-						<ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
-							<li>
-								<span style="color:#527FFF;"><strong>Glacier:</strong></span>
-								Bulk $${GLACIER_RETRIEVAL_COSTS.GLACIER.Bulk}/GB,
-								Standard $${GLACIER_RETRIEVAL_COSTS.GLACIER.Standard}/GB,
-								Expedited $${GLACIER_RETRIEVAL_COSTS.GLACIER.Expedited}/GB
-							</li>
-							<li>
-								<span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
-								Bulk $${GLACIER_RETRIEVAL_COSTS.DEEP_ARCHIVE.Bulk}/GB,
-								Standard $${GLACIER_RETRIEVAL_COSTS.DEEP_ARCHIVE.Standard}/GB
-							</li>
-							<li>
-								<span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
-								Bulk $${GLACIER_RETRIEVAL_COSTS.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Bulk}/GB,
-								Standard $${
-                  GLACIER_RETRIEVAL_COSTS.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-                    .Standard
-                }/GB,
-								Expedited $${
-                  GLACIER_RETRIEVAL_COSTS.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-                    .Expedited
-                }/GB
-							</li>
-							<li>
-								<span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
-								Bulk $${
-                  GLACIER_RETRIEVAL_COSTS
-                    .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk
-                }/GB,
-								Standard $${
-                  GLACIER_RETRIEVAL_COSTS
-                    .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard
-                }/GB
-							</li>
-						</ul>
-					</li>
+          <li class="mb-2">
+          <strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
+          <ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
+            <li>
+              <span style="color:#527FFF;"><strong>Glacier:</strong></span>
+              Bulk $${thawingCosts.GLACIER.Bulk.perGB}/GB,
+              Standard $${thawingCosts.GLACIER.Standard.perGB}/GB,
+              Expedited $${thawingCosts.GLACIER.Expedited.perGB}/GB
+            </li>
+            <li>
+              <span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
+              Bulk $${thawingCosts.DEEP_ARCHIVE.Bulk.perGB}/GB,
+              Standard $${thawingCosts.DEEP_ARCHIVE.Standard.perGB}/GB
+            </li>
+            <li>
+              <span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
+              Bulk $${
+                thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Bulk.perGB
+              }/GB,
+              Standard $${
+                thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Standard.perGB
+              }/GB,
+              Expedited $${
+                thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Expedited.perGB
+              }/GB
+            </li>
+            <li>
+              <span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
+              Bulk $${
+                thawingCosts.INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk.perGB
+              }/GB,
+              Standard $${
+                thawingCosts.INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard
+                  .perGB
+              }/GB
+            </li>
+          </ul>
+          </li>
 
 					<!-- Compute Costs -->
 					<li class="mb-2">
@@ -523,3 +523,43 @@ export function createCostEstimationBlock(
 	</script>
 `;
 }
+
+// <li class="mb-2">
+// 	<strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
+// 	<ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
+// 		<li>
+// 			<span style="color:#527FFF;"><strong>Glacier:</strong></span>
+// 			Bulk $${thawingCosts.GLACIER.Bulk}/GB,
+// 			Standard $${thawingCosts.GLACIER.Standard}/GB,
+// 			Expedited $${thawingCosts.GLACIER.Expedited}/GB
+// 		</li>
+// 		<li>
+// 			<span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
+// 			Bulk $${thawingCosts.DEEP_ARCHIVE.Bulk}/GB,
+// 			Standard $${thawingCosts.DEEP_ARCHIVE.Standard}/GB
+// 		</li>
+// 		<li>
+// 			<span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
+// 			Bulk $${thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Bulk}/GB,
+// 			Standard $${
+//         thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+//           .Standard
+//       }/GB,
+// 			Expedited $${
+//         thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+//           .Expedited
+//       }/GB
+// 		</li>
+// 		<li>
+// 			<span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
+// 			Bulk $${
+//         thawingCosts
+//           .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk
+//       }/GB,
+// 			Standard $${
+//         thawingCosts
+//           .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard
+//       }/GB
+// 		</li>
+// 	</ul>
+// </li>

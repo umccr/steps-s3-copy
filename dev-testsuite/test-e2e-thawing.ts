@@ -117,6 +117,8 @@ test(
             intelligentTieringDeepArchiveThawDays: 1,
             intelligentTieringDeepArchiveThawSpeed: "Standard",
           },
+          includeCopyReport: true,
+          retainCopyReport: true,
         }),
       }),
     );
