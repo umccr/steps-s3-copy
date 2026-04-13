@@ -255,8 +255,11 @@ Note that the `copyInstructionsKey` points to the JSONL copy-instructions file (
 ### Copying to S3-compatible endpoints
 
 To copy objects to a non-AWS S3-compatible endpoint like Ceph, use `bucketDefinitions`
-to configure the destination bucket with the custom endpoint and credentials. For example,
-copying to a Ceph bucket using credentials in Secrets Manager:
+to configure the destination bucket with the custom endpoint and credentials. `bucketDefintions`
+is a set of key-value definitions where the key represents the bucket name, and the value
+configures credentials and access for that bucket in source and destinations across steps-s3-copy.
+
+For example, copying to a Ceph bucket using credentials in Secrets Manager:
 
 ```json
 {
@@ -267,12 +270,18 @@ copying to a Ceph bucket using credentials in Secrets Manager:
     "<bucket-name>": {
       "credentialProvider": "aws-secret",
       "secret": "<secret-name-or-arn>",
+      "region": "ap-southeast-2",
       "endpointUrl": "https://objects.storage.example.com",
       "s3Compatible": true
     }
   }
 }
 ```
+
+Existing options that define bucket access like `sourceRequiredRegion`, `destinationRequiredRegion` and `sourceNoSignRequest`
+are still supported, however any `bucketDefinitions` will override these values for specific buckets. For example,
+using `"credentialProvider" = "no-credentials"` will have the same effect, and override, `sourceNoSignRequest` for that
+bucket.
 
 ## Thawing objects from cold storage
 
