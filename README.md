@@ -224,7 +224,9 @@ type BucketDefinition = {
   /** A custom S3 endpoint URL. */
   readonly endpointUrl?: string;
 
-  /** This should be enabled when using S3-compatible endpoints like Ceph. */
+  /** Enables S3-compatible mode for endpoints like Ceph. Defaults to true when `endpointUrl` is set,
+   *  although it can be set here to explicitly override.
+   */
   readonly s3Compatible?: boolean;
 
   /**

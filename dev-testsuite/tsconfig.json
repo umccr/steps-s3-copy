@@ -1,7 +1,6 @@
 {
   "extends": "@tsconfig/bun/tsconfig.json",
   "compilerOptions": {
-    "verbatimModuleSyntax": true,
     "types": ["bun"]
   }
 }

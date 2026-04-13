@@ -7,7 +7,7 @@ type BucketDefinition struct {
 	Secret             string `json:"secret,omitempty"`
 	Region             string `json:"region,omitempty"`
 	EndpointUrl        string `json:"endpointUrl,omitempty"`
-	S3Compatible       bool   `json:"s3Compatible,omitempty"`
+	S3Compatible       *bool  `json:"s3Compatible,omitempty"`
 }
 
 // BatchInput is the input passed into copy-batch from the steps functions.

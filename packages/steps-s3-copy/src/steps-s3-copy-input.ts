@@ -138,8 +138,8 @@ type BaseBucketDefinition = {
   readonly endpointUrl?: string;
 
   /**
-   * Enables compatibility mode that ensures that this works with S3-compatible endpoints.
-   * This option should be enabled when not using an S3 native bucket, like on Ceph.
+   * Enables compatibility mode for S3-compatible endpoints.
+   * Defaults to `true` when `endpointUrl` is set. Set explicitly to override this.
    */
   readonly s3Compatible?: boolean;
 };

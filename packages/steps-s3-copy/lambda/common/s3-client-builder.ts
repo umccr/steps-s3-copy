@@ -30,7 +30,9 @@ export async function buildS3Client(
     if (def.region !== undefined) {
       config.region = def.region;
     }
-    if (def.s3Compatible !== undefined) {
+    // if s3Compatible is set that takes precedence over the endpointUrl logic.
+    const s3Compatible = def.s3Compatible ?? def.endpointUrl !== undefined;
+    if (s3Compatible) {
       config.forcePathStyle = true;
     }
 

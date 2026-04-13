@@ -5,12 +5,11 @@
     "test": "tsx --test"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1027.0",
-    "@aws-sdk/client-secrets-manager": "^3.1027.0",
-    "@types/aws-lambda": "^8.10.161"
+    "@aws-sdk/client-s3": "3.787.0",
+    "@aws-sdk/client-secrets-manager": "3.1029.0",
+    "@types/aws-lambda": "8.10.149"
   },
   "devDependencies": {
-    "@types/node": "^25.5.2",
-    "tsx": "4.21.0"
+    "tsx": "4.19.3"
   }
 }

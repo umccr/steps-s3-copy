@@ -34,9 +34,17 @@ func appendBucketFlags(args []string, prefix string, def BucketDefinition) []str
 	if def.EndpointUrl != "" {
 		args = append(args, fmt.Sprintf("--%sendpoint-url", prefix), def.EndpointUrl)
 	}
-	if def.S3Compatible {
+
+	s3Compatible := def.EndpointUrl != ""
+	// Override this if set.
+	if def.S3Compatible != nil {
+		s3Compatible = *def.S3Compatible
+	}
+	// Otherwise it's based on the value of EndpointUrl
+	if s3Compatible {
 		args = append(args, fmt.Sprintf("--%ss3-compatible", prefix))
 	}
+
 	return args
 }
 
