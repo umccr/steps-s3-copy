@@ -3,7 +3,6 @@ FROM public.ecr.aws/docker/library/golang:1.24.1-alpine AS builder
 # copyrite rebuilt 2026-04-10 with glibc 2.35 compatibility
 # git is needed for go mod download to work
 RUN apk add --no-cache git
-RUN ls
 
 WORKDIR /build
 

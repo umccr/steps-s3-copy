@@ -244,7 +244,7 @@ type BucketDefinition = {
   /**
    * The name or ARN of the Secrets Manager secret containing credentials.
    * This option is required when credentialProvider is "aws-secret". The secret
-   * must a JSON with `access_key_id`, `secret_access_key`, and optionally `session_token`.
+   * must be a JSON with `access_key_id`, `secret_access_key`, and optionally `session_token`.
    */
   readonly secret?: string;
 };
@@ -255,7 +255,7 @@ Note that the `copyInstructionsKey` points to the JSONL copy-instructions file (
 ### Copying to S3-compatible endpoints
 
 To copy objects to a non-AWS S3-compatible endpoint like Ceph, use `bucketDefinitions`
-to configure the destination bucket with the custom endpoint and credentials. `bucketDefintions`
+to configure the destination bucket with the custom endpoint and credentials. `bucketDefinitions`
 is a set of key-value definitions where the key represents the bucket name, and the value
 configures credentials and access for that bucket in source and destinations across steps-s3-copy.
 

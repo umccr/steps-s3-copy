@@ -1,4 +1,4 @@
-import { GetObjectCommand, S3 } from "@aws-sdk/client-s3";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import pl from "nodejs-polars";
 import { createReadStream, rmSync } from "node:fs";

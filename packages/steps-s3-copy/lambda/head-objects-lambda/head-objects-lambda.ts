@@ -7,7 +7,7 @@ import {
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
-import { buildS3Client } from "../common/s3-client-builder";
+import { createS3ClientCache } from "../common/s3-client-builder";
 
 /**
  * The way this lambda will be invoked. We expect to be part of a Distributed Map -
@@ -184,6 +184,8 @@ export async function handler(
   // this is a new list of input items we have not dealt with yet
   const toHeadItems: HeadObjectsLambdaItem[] = [];
 
+  const getClient = createS3ClientCache(event.BatchInput.bucketDefinitions);
+
   // first step is to expand out any entries we note are wildcards
   for (const o of event.Items || []) {
     // expand wildcard
@@ -203,12 +205,7 @@ export async function handler(
 
       let expansionCount = 0;
 
-      const client = await buildS3Client(
-        o.sourceBucket,
-        event.BatchInput.bucketDefinitions,
-        undefined,
-        o.sourceNoSignRequest,
-      );
+      const client = await getClient(o.sourceBucket, o.sourceNoSignRequest);
       for await (const data of paginateListObjectsV2(
         { client },
         {
@@ -273,12 +270,7 @@ export async function handler(
 
   for (const o of toHeadItems) {
     try {
-      const client = await buildS3Client(
-        o.sourceBucket,
-        event.BatchInput.bucketDefinitions,
-        undefined,
-        o.sourceNoSignRequest,
-      );
+      const client = await getClient(o.sourceBucket, o.sourceNoSignRequest);
       // find the details of the object
       const headCommand = new HeadObjectCommand({
         Bucket: o.sourceBucket,

@@ -14,7 +14,7 @@ export async function buildS3Client(
   bucketName?: string,
   bucketDefinitions?: Record<string, BucketDefinition>,
   requiredRegion?: string,
-  sourceNoSignRequest?: boolean,
+  noSignRequest?: boolean,
 ): Promise<S3Client> {
   if (
     bucketDefinitions !== undefined &&
@@ -45,7 +45,12 @@ export async function buildS3Client(
         );
       }
 
-      const secretsManager = new SecretsManagerClient();
+      const secretRegion = def.secret.startsWith("arn:")
+        ? def.secret.split(":")[3]
+        : undefined;
+      const secretsManager = new SecretsManagerClient(
+        secretRegion ? { region: secretRegion } : {},
+      );
       const response = await secretsManager.send(
         new GetSecretValueCommand({ SecretId: def.secret }),
       );
@@ -73,7 +78,7 @@ export async function buildS3Client(
   }
 
   const config: S3ClientConfig = {};
-  if (sourceNoSignRequest) {
+  if (noSignRequest) {
     config.signer = { sign: async (request: any) => request };
   }
   if (requiredRegion) {
@@ -81,4 +86,28 @@ export async function buildS3Client(
   }
 
   return new S3Client(config);
+}
+
+/**
+ * Returns a cached S3Client builder where the clients are cached per bucket and
+ * noSignRequest so repeated calls within one loop don't rebuild clients unnecessarily.
+ */
+export function createS3ClientCache(
+  bucketDefinitions?: Record<string, BucketDefinition>,
+) {
+  const cache = new Map<string, Promise<S3Client>>();
+  return (bucket: string, noSignRequest?: boolean): Promise<S3Client> => {
+    const key = `${bucket}-${!!noSignRequest}`;
+    let promise = cache.get(key);
+    if (!promise) {
+      promise = buildS3Client(
+        bucket,
+        bucketDefinitions,
+        undefined,
+        noSignRequest,
+      );
+      cache.set(key, promise);
+    }
+    return promise;
+  };
 }

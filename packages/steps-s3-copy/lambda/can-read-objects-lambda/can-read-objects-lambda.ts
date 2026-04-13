@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { IsThawingError } from "./errors";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
-import { buildS3Client } from "../common/s3-client-builder";
+import { createS3ClientCache } from "../common/s3-client-builder";
 
 interface ThawParams {
   glacierFlexibleRetrievalThawDays?: number;
@@ -49,12 +49,11 @@ export async function handler(event: ThawObjectsEvent) {
   // count of how many of the passed in objects we are thawing
   let isThawing = 0;
 
+  const getClient = createS3ClientCache(event.BatchInput.bucketDefinitions);
+
   for (const o of event.Items || []) {
     try {
-      const client = await buildS3Client(
-        o.bucket,
-        event.BatchInput.bucketDefinitions,
-      );
+      const client = await getClient(o.bucket);
 
       // need to find out if the object is in a "needs restore" or "currently restoring" or "restored" category
       // and also if the sourceBucket is in the correct region
