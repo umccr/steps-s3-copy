@@ -96,14 +96,18 @@ export function createS3ClientCache(
   bucketDefinitions?: Record<string, BucketDefinition>,
 ) {
   const cache = new Map<string, Promise<S3Client>>();
-  return (bucket: string, noSignRequest?: boolean): Promise<S3Client> => {
-    const key = `${bucket}-${!!noSignRequest}`;
+  return (
+    bucket: string,
+    noSignRequest?: boolean,
+    requiredRegion?: string,
+  ): Promise<S3Client> => {
+    const key = `${bucket}-${!!noSignRequest}-${requiredRegion ?? ""}`;
     let promise = cache.get(key);
     if (!promise) {
       promise = buildS3Client(
         bucket,
         bucketDefinitions,
-        undefined,
+        requiredRegion,
         noSignRequest,
       );
       cache.set(key, promise);
