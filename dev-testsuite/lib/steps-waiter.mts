@@ -1,13 +1,13 @@
 import {
   createWaiter,
-  WaiterConfiguration,
-  WaiterResult,
+  type WaiterConfiguration,
+  type WaiterResult,
   WaiterState,
 } from "@smithy/util-waiter";
 import {
   DescribeExecutionCommand,
-  DescribeExecutionInput,
-  DescribeExecutionOutput,
+  type DescribeExecutionInput,
+  type DescribeExecutionOutput,
   SFNClient,
 } from "@aws-sdk/client-sfn";
 

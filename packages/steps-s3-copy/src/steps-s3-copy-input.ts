@@ -83,6 +83,15 @@ export type StepsS3CopyInvokeArguments = {
     readonly intelligentTieringDeepArchiveThawDays?: number;
     readonly intelligentTieringDeepArchiveThawSpeed?: "Bulk" | "Standard";
   };
+
+  /**
+   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used to
+   * configure the credentials used to access the bucket.
+   *
+   * Settings here will override `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` if
+   * using the no-credential `CredentialProvider`.
+   */
+  readonly bucketDefinitions?: Record<string, BucketDefinition>;
 };
 
 export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
@@ -113,3 +122,39 @@ export const INCLUDE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
 
 export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
   "retainCopyReport";
+
+/**
+ * Common fields shared by all bucket definitions.
+ */
+type BaseBucketDefinition = {
+  /**
+   * The AWS region for this bucket.
+   */
+  readonly region?: string;
+
+  /**
+   * A custom S3 endpoint URL
+   */
+  readonly endpointUrl?: string;
+
+  /**
+   * Enables compatibility mode for S3-compatible endpoints.
+   * Defaults to `true` when `endpointUrl` is set. Set explicitly to override this.
+   */
+  readonly s3Compatible?: boolean;
+};
+
+/**
+ * Specifies how the copier should connect to a specific bucket.
+ *
+ * - `"default-environment"` - use the default SDK credential chain.
+ * - `"no-credentials"` - no request signing.
+ * - `"aws-secret"` - fetch credentials from an AWS Secrets Manager secret.
+ *   The secret must contain JSON with `access_key_id`, `secret_access_key`,
+ *   and optionally `session_token`.
+ */
+export type BucketDefinition = BaseBucketDefinition &
+  (
+    | { readonly credentialProvider?: "default-environment" | "no-credentials" }
+    | { readonly credentialProvider: "aws-secret"; readonly secret: string }
+  );

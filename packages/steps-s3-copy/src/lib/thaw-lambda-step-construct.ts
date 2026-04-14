@@ -27,17 +27,16 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
 
+    const packageRoot = join(__dirname, "..", "..");
+
+    const lambdaFolder = join(packageRoot, "lambda", "can-read-objects-lambda");
+
     const thawObjectsLambda = new NodejsFunction(this, "ThawObjectsFunction", {
       // our pre-made role will have the ability to read objects
       role: _props.writerRole,
-      entry: join(
-        __dirname,
-        "..",
-        "..",
-        "lambda",
-        "can-read-objects-lambda",
-        "can-read-objects-lambda.ts",
-      ),
+      projectRoot: packageRoot,
+      entry: join(lambdaFolder, "can-read-objects-lambda.ts"),
+      depsLockFilePath: join(lambdaFolder, "package-lock.json"),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
       handler: "handler",

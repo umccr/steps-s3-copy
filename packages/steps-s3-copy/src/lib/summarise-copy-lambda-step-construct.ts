@@ -28,18 +28,15 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
   ) {
     super(scope, id);
 
-    const lambdaRoot = join(
-      __dirname,
-      "..",
-      "..",
-      "lambda",
-      "summarise-copy-lambda",
-    );
+    const packageRoot = join(__dirname, "..", "..");
+    const lambdaRoot = join(packageRoot, "lambda", "summarise-copy-lambda");
+    const lambdaRootRelative = join("lambda", "summarise-copy-lambda");
 
     const summariseCopyLambda = new NodejsFunction(
       this,
       "SummariseCopyFunction",
       {
+        projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
         depsLockFilePath: join(lambdaRoot, "package-lock.json"),
@@ -55,10 +52,10 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           nodeModules: ["csv-stringify"],
           commandHooks: {
             beforeBundling(inputDir: string, outputDir: string) {
-              // inputDir === packages/steps-s3-copy/lambda/summarise-copy-lambda (mounted as /asset-input)
+              // inputDir === projectRoot (mounted as /asset-input)
               // outputDir === /asset-output
               return [
-                `cp "${inputDir}/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/${lambdaRootRelative}/report_template.html" "${outputDir}/report_template.html"`,
               ];
             },
             afterBundling() {
@@ -91,6 +88,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         rcloneResultsLarge: "{% $states.input[type='Large'] %}",
         rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
         rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
+        bucketDefinitions: "{% $invokeArguments.bucketDefinitions %}",
         includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
         retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
         copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",

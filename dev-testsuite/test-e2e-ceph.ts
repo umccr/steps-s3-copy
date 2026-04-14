@@ -3,17 +3,26 @@ import { WaiterState } from "@smithy/util-waiter";
 import { makeObjectDictionaryJsonl } from "./util.mjs";
 import { testSetup, type TestSetupState } from "./setup";
 import { beforeAll, test } from "bun:test";
-import { createTestObject, type TestObject } from "./lib/create-test-object";
-import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
-import assert from "node:assert";
-import { assertDestinations } from "./lib/assert-destinations.mjs";
+import { createTestObject } from "./lib/create-test-object";
 import {
   REALISTIC_SOURCE_OBJECTS,
   REALISTIC_WILDCARD_PREFIX,
 } from "./lib/realistic-source-objects";
+import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
+import assert from "node:assert";
+import { assertDestinations } from "./lib/assert-destinations.mjs";
+import type { BucketDefinition } from "../packages/steps-s3-copy/src/steps-s3-copy-input";
+import { buildS3Client } from "../packages/steps-s3-copy/lambda/common/s3-client-builder";
 
-// we have a few large objects so this can take a few minutes
-const TEST_EXPECTED_SECONDS = 60 * 10;
+const TEST_EXPECTED_SECONDS = 60 * 15;
+
+const S3_ENDPOINT_URL =
+  process.env.STEPS_TEST_ENDPOINT_URL ??
+  "https://objects.storage.unimelb.edu.au";
+const S3_SECRET_NAME =
+  process.env.STEPS_TEST_SECRET_NAME ?? "ceph-5690-guardians-dev";
+const S3_BUCKET = process.env.STEPS_TEST_BUCKET ?? "5690-guardians-dev";
+const S3_REGION = process.env.STEPS_TEST_REGION ?? "ap-southeast-2";
 
 let state: TestSetupState;
 
@@ -21,18 +30,26 @@ beforeAll(async () => {
   state = await testSetup();
 });
 
+const cephBucketDefinition: BucketDefinition = {
+  credentialProvider: "aws-secret",
+  secret: S3_SECRET_NAME,
+  endpointUrl: S3_ENDPOINT_URL,
+  s3Compatible: true,
+  ...(S3_REGION && { region: S3_REGION }),
+};
+
+/**
+ * A test of copying from native S3 to an S3-compatible endpoint.
+ */
 test(
-  "realistic",
+  "s3compatible",
   async () => {
     const sfnClient = new SFNClient({});
 
     const sourceObjects = REALISTIC_SOURCE_OBJECTS;
 
-    // create the objects in S3
-    const testObjects: Record<string, TestObject> = {};
-
     for (const [n, params] of Object.entries(sourceObjects)) {
-      testObjects[n] = await createTestObject(
+      await createTestObject(
         state.workingBucket,
         `${state.testSrcPrefix}${n}`,
         params.sizeInBytes,
@@ -42,18 +59,11 @@ test(
       );
     }
 
-    // make some instructions for this copy
-    // noting that the instructions in this case are not 1 to 1
-    // with the test objects because we want to try out
-    // wildcards
     {
       const testObjectKeys = Object.keys(sourceObjects)
-        // remove all objects that we are going to copy using wildcards
         .filter((n) => !n.startsWith(REALISTIC_WILDCARD_PREFIX))
-        // handle turning them into keys in our test directory
         .map((n) => `${state.testSrcPrefix}${n}`);
 
-      // add a wildcard instructions
       testObjectKeys.push(
         `${state.testSrcPrefix}${REALISTIC_WILDCARD_PREFIX}*`,
       );
@@ -67,7 +77,8 @@ test(
       );
     }
 
-    const DEST = "a-destination-folder/";
+    const DEST = "steps_s3_copy_destination/";
+    console.info("Copying to S3 endpoint");
 
     const executionStartResult = await sfnClient.send(
       new StartExecutionCommand({
@@ -75,12 +86,19 @@ test(
         name: state.uniqueTestId,
         input: JSON.stringify({
           copyInstructionsKey: state.testInstructionsRelative,
-          destinationBucket: state.workingBucket,
+          destinationBucket: S3_BUCKET,
           destinationFolderKey: `${state.testDestPrefix}${DEST}`,
+          // the destination is not in AWS so disable the region check
+          destinationRequiredRegion: "",
           maxItemsPerBatch: 3,
+          bucketDefinitions: {
+            [S3_BUCKET]: cephBucketDefinition,
+          },
         }),
       }),
     );
+
+    console.info("Waiting for copy to complete");
 
     const executionResult = await waitUntilStateMachineFinishes(
       { client: sfnClient, maxWaitTime: TEST_EXPECTED_SECONDS },
@@ -91,13 +109,17 @@ test(
 
     assert(
       executionResult.state === WaiterState.SUCCESS,
-      "Orchestration did not succeed as expected",
+      `Orchestration did not succeed, got ${executionResult.state}`,
     );
 
+    const s3CompatClient = await buildS3Client(S3_BUCKET, {
+      [S3_BUCKET]: cephBucketDefinition,
+    });
     await assertDestinations(
-      state.workingBucket,
+      S3_BUCKET,
       `${state.testDestPrefix}${DEST}`,
       sourceObjects,
+      s3CompatClient as any,
     );
   },
   TEST_EXPECTED_SECONDS * 1000,
