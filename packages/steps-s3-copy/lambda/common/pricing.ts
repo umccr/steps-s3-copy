@@ -5,11 +5,12 @@ import {
 } from "@aws-sdk/client-pricing";
 import { bytesToGB } from "./constants.ts";
 
+// --------------------------------------------------------------------------------------------
 // Thawing cost estimation (returns 0 for non-cold storage classes)
-
+// --------------------------------------------------------------------------------------------
 type TierCost = { perGB: number; perRequest: number };
 
-export type ThawingCosts = {
+export type ColdStorageRetrievalCosts = {
   tempStoragePerGBPerMonth: number;
   GLACIER: { Bulk: TierCost; Standard: TierCost; Expedited: TierCost };
   DEEP_ARCHIVE: { Bulk: TierCost; Standard: TierCost };
@@ -24,13 +25,9 @@ export type ThawingCosts = {
   };
 };
 
-/**
- * Fetch Glacier/Deep Archive retrieval costs from AWS Pricing API and build a thawingCosts-style dictionary.
- * @param region AWS region string (e.g. "ap-southeast-2")
- * @returns Promise<Record<string, Record<string, number>>>
- */
-
-export async function fetchThawingCosts(region: string): Promise<ThawingCosts> {
+export async function fetchColdStorageRetrievalCosts(
+  region: string,
+): Promise<ColdStorageRetrievalCosts> {
   const client = new PricingClient({ region: "us-east-1" });
 
   const sleep = (ms: number) =>
@@ -222,12 +219,14 @@ export function estimateColdStorageRetrievalCost(
   storageClass: string,
   retrievalSpeed: string,
   restoreWindowDays: number,
-  thawingCosts: ThawingCosts,
+  ColdStorageRetrievalCosts: ColdStorageRetrievalCosts,
 ): number {
   if (!isColdStorage) return 0;
 
   const tierCosts = (
-    thawingCosts[storageClass as keyof ThawingCosts] as Record<string, TierCost>
+    ColdStorageRetrievalCosts[
+      storageClass as keyof ColdStorageRetrievalCosts
+    ] as Record<string, TierCost>
   )?.[retrievalSpeed];
   if (!tierCosts) return 0;
 
@@ -236,57 +235,127 @@ export function estimateColdStorageRetrievalCost(
   return (
     sizeGB * tierCosts.perGB +
     tierCosts.perRequest +
-    sizeGB * thawingCosts.tempStoragePerGBPerMonth * (restoreWindowDays / 30)
+    sizeGB *
+      ColdStorageRetrievalCosts.tempStoragePerGBPerMonth *
+      (restoreWindowDays / 30)
   );
 }
 
-// Cross Region S3 read/write cost estimation (returns 0 for same-region copies, or if size is 0)
+// --------------------------------------------------------------------------------------------
+// Cross Region S3 read/write cost est. (returns 0 for same-region copies, or if size is 0)
+// --------------------------------------------------------------------------------------------
 
-/**
- * Fetch S3 cross-region egress price (AUD per GB) from AWS Pricing API.
- * @param fromRegion AWS region string (e.g. "ap-southeast-2")
- * @returns price in AUD per GB, or 0 if not found
- */
-export async function fetchS3CrossRegionEgressPrice(
+export type CrossRegionCosts = {
+  egressPriceTiers: EgressPriceTier[];
+  putPricePerRequest: number;
+};
+
+export async function fetchCrossRegionCosts(
+  sourceRegion: string,
+): Promise<CrossRegionCosts> {
+  const [egressPriceTiers, putPricePerRequest] = await Promise.all([
+    fetchCrossRegionEgressPrice(sourceRegion),
+    fetchCrossRegionPutRequestPrice(sourceRegion),
+  ]);
+  return { egressPriceTiers, putPricePerRequest };
+}
+
+interface EgressPriceTier {
+  beginRangeGb: number;
+  endRangeGb: number;
+  pricePerGbUsd: number;
+}
+
+export async function fetchCrossRegionEgressPrice(
+  fromRegion: string,
+): Promise<EgressPriceTier[]> {
+  const client = new PricingClient({ region: "us-east-1" });
+  const command = new GetProductsCommand({
+    ServiceCode: "AWSDataTransfer",
+    Filters: [
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "fromRegionCode",
+        Value: fromRegion,
+      },
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "transferType",
+        Value: "AWS Outbound",
+      },
+    ],
+    MaxResults: 1,
+  });
+
+  const response = await client.send(command);
+  if (!response.PriceList?.length) return [];
+
+  const priceItem = JSON.parse(response.PriceList[0] as string);
+  const terms = priceItem.terms?.OnDemand || {};
+  const tiers: EgressPriceTier[] = [];
+
+  for (const termKey of Object.keys(terms)) {
+    const priceDimensions = terms[termKey].priceDimensions || {};
+    for (const dimKey of Object.keys(priceDimensions)) {
+      const dim = priceDimensions[dimKey];
+      const usd = dim.pricePerUnit?.USD;
+      if (!usd) continue;
+      tiers.push({
+        beginRangeGb: parseFloat(dim.beginRange),
+        endRangeGb:
+          dim.endRange === "Inf" ? Infinity : parseFloat(dim.endRange),
+        pricePerGbUsd: parseFloat(usd),
+      });
+    }
+  }
+
+  // Sort by beginRange ascending
+  return tiers.sort((a, b) => a.beginRangeGb - b.beginRangeGb);
+}
+
+export async function fetchCrossRegionPutRequestPrice(
   fromRegion: string,
 ): Promise<number> {
   const client = new PricingClient({ region: "us-east-1" });
-  const params = {
+  const command = new GetProductsCommand({
     ServiceCode: "AmazonS3",
     Filters: [
-      { Type: FilterType.TERM_MATCH, Field: "location", Value: fromRegion },
-      {
-        Type: FilterType.TERM_MATCH,
-        Field: "usagetype",
-        Value: "DataTransfer-Out-Bytes",
-      },
-      { Type: FilterType.TERM_MATCH, Field: "currencyCode", Value: "AUD" },
+      { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: fromRegion },
+      { Type: FilterType.TERM_MATCH, Field: "group", Value: "S3-API-Tier1" },
     ],
     MaxResults: 1,
-  };
-  const command = new GetProductsCommand(params);
-  const response = await client.send(command);
+  });
 
-  if (response.PriceList && response.PriceList.length > 0) {
-    const priceItem = JSON.parse(response.PriceList[0]);
-    const terms = priceItem.terms?.OnDemand || {};
-    for (const termKey of Object.keys(terms)) {
-      const priceDimensions = terms[termKey].priceDimensions || {};
-      for (const dimKey of Object.keys(priceDimensions)) {
-        const pricePerUnit = priceDimensions[dimKey].pricePerUnit;
-        if (pricePerUnit && pricePerUnit.AUD) {
-          return parseFloat(pricePerUnit.AUD);
-        }
-      }
+  const response = await client.send(command);
+  if (!response.PriceList?.length) return 0;
+
+  const priceItem = JSON.parse(response.PriceList[0] as string);
+  const terms = priceItem.terms?.OnDemand || {};
+
+  for (const termKey of Object.keys(terms)) {
+    const priceDimensions = terms[termKey].priceDimensions || {};
+    for (const dimKey of Object.keys(priceDimensions)) {
+      const usd = priceDimensions[dimKey].pricePerUnit?.USD;
+      if (usd) return parseFloat(usd);
     }
   }
   return 0;
 }
 
-export function estimateS3CrossRegionReadWriteCost(
+export function estimateCrossRegionCost(
+  iscrossRegion: boolean,
+  crossRegionCosts: CrossRegionCosts,
   sizeBytes: number,
-  isCrossRegion: boolean,
-  perGbPriceAud: number,
 ): number {
-  return isCrossRegion ? bytesToGB(sizeBytes) * perGbPriceAud : 0;
+  if (!iscrossRegion) return 0;
+
+  const totalGb = sizeBytes / 1024 / 1024 / 1024;
+  const tier = crossRegionCosts.egressPriceTiers.find(
+    (t) => totalGb >= t.beginRangeGb && totalGb < t.endRangeGb,
+  );
+  const egressCostUsd = (tier?.pricePerGbUsd ?? 0) * totalGb;
+  const putCostUsd = crossRegionCosts.putPricePerRequest; // 1 PUT request
+  return egressCostUsd + putCostUsd;
 }
+
+// Cross Region S3 read/write cost estimation (returns 0 for same-region copies, or if size is 0)

@@ -1,5 +1,4 @@
 import {
-  S3_CROSS_REGION_COPY_COST_PER_GB_AUD,
   LAMBDA_GB_SECOND_COST_AUD,
   LAMBDA_INVOCATION_COST_AUD,
   FARGATE_VCPU_COST_PER_HOUR_AUD,
@@ -10,7 +9,10 @@ import {
 } from "../common/constants";
 
 import type { ReportMetadata } from "./summarise-copy-lambda.ts";
-import type { ThawingCosts } from "../common/pricing";
+import type {
+  ColdStorageRetrievalCosts,
+  CrossRegionCosts,
+} from "../common/pricing";
 
 // Template filling: replaces {{TOKENS}} with values from vars.
 export function fill_template(
@@ -307,8 +309,8 @@ export function createFilesTableBlock(
             <tr>
               <th>Object</th>
               <th class="text-center">Size</th>
-              <th class="text-center">S3 Cross-Region Cost (AUD)</th>
-              <th class="text-center">Cold Storage Retrieval Cost (AUD)</th>
+              <th class="text-center">Cross-Region Cost (USD)</th>
+              <th class="text-center">Cold Storage Retrieval Cost (USD)</th>
               <th class="text-center">Compute Cost (AUD)</th>
             </tr>
           </thead>
@@ -336,9 +338,9 @@ export function createFilesTableBlock(
                     r.copySetsMetadata.size,
                   )}</td>
                   <td class="text-center">${
-                    r.copySetsMetadata.FileCostEstimate
-                      ?.s3CrossRegionReadWriteCostAUD !== undefined
-                      ? r.copySetsMetadata.FileCostEstimate.s3CrossRegionReadWriteCostAUD.toFixed(
+                    r.copySetsMetadata.FileCostEstimate?.crossRegionCostUSD !==
+                    undefined
+                      ? r.copySetsMetadata.FileCostEstimate.crossRegionCostUSD.toFixed(
                           6,
                         )
                       : "-"
@@ -378,7 +380,8 @@ export function createCostEstimationBlock(
   totalColdCost: number,
   totalComputeCost: number,
   totalCost: number,
-  thawingCosts: ThawingCosts,
+  ColdStorageRetrievalCosts: ColdStorageRetrievalCosts,
+  CrossRegionCosts: CrossRegionCosts,
 ): string {
   return `
 	<div class="row align-items-start">
@@ -387,7 +390,7 @@ export function createCostEstimationBlock(
 			<ul class="list-unstyled mb-0 flex-grow-1 d-flex flex-column justify-content-center">
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
-					<strong>S3 cross-region read/write:</strong>
+					<strong>Cross-region read/write:</strong>
 					<span class="text-muted">$${totalS3CrossRegionReadWriteCost.toFixed(
             4,
           )} AUD</span>
@@ -422,11 +425,35 @@ export function createCostEstimationBlock(
 				</h6>
 
 				<ul class="small text-secondary mb-0 ps-3">
+
 					<!-- Cross Region Costs -->
-					<li class="mb-2">
-							<strong>S3 cross-region read/write:</strong>
-							<code>~$${S3_CROSS_REGION_COPY_COST_PER_GB_AUD} per GB transferred</code> between AWS regions (S3 in-region copies are free)
-					</li>
+          <li class="mb-2">
+            <strong>S3 cross-region read/write:</strong>
+            <ul class="mt-1 text-sm">
+              <li>
+                <strong>Egress (tiered, per GB):</strong>
+                <ul class="ml-4">
+                  ${CrossRegionCosts.egressPriceTiers
+                    .map((t) =>
+                      t.endRangeGb === Infinity
+                        ? `<li><code>&gt;${t.beginRangeGb.toLocaleString()} GB</code> → <code>$${t.pricePerGbUsd.toFixed(
+                            4,
+                          )} USD/GB</code></li>`
+                        : `<li><code>${t.beginRangeGb.toLocaleString()} – ${t.endRangeGb.toLocaleString()} GB</code> → <code>$${t.pricePerGbUsd.toFixed(
+                            4,
+                          )} USD/GB</code></li>`,
+                    )
+                    .join("")}
+                </ul>
+              </li>
+              <li class="mt-1">
+                <strong>PUT requests:</strong> <code>$${CrossRegionCosts.putPricePerRequest.toFixed(
+                  6,
+                )} USD/request</code>
+              </li>
+              <li class="mt-1 text-gray-500">S3 in-region copies are free.</li>
+            </ul>
+          </li>
 
 					<!-- Cold Storage Costs -->
           <li class="mb-2">
@@ -434,35 +461,41 @@ export function createCostEstimationBlock(
           <ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
             <li>
               <span style="color:#527FFF;"><strong>Glacier:</strong></span>
-              Bulk $${thawingCosts.GLACIER.Bulk.perGB}/GB,
-              Standard $${thawingCosts.GLACIER.Standard.perGB}/GB,
-              Expedited $${thawingCosts.GLACIER.Expedited.perGB}/GB
+              Bulk $${ColdStorageRetrievalCosts.GLACIER.Bulk.perGB}/GB,
+              Standard $${ColdStorageRetrievalCosts.GLACIER.Standard.perGB}/GB,
+              Expedited $${ColdStorageRetrievalCosts.GLACIER.Expedited.perGB}/GB
             </li>
             <li>
               <span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
-              Bulk $${thawingCosts.DEEP_ARCHIVE.Bulk.perGB}/GB,
-              Standard $${thawingCosts.DEEP_ARCHIVE.Standard.perGB}/GB
+              Bulk $${ColdStorageRetrievalCosts.DEEP_ARCHIVE.Bulk.perGB}/GB,
+              Standard $${
+                ColdStorageRetrievalCosts.DEEP_ARCHIVE.Standard.perGB
+              }/GB
             </li>
             <li>
               <span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
               Bulk $${
-                thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Bulk.perGB
+                ColdStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                  .Bulk.perGB
               }/GB,
               Standard $${
-                thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Standard.perGB
+                ColdStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                  .Standard.perGB
               }/GB,
               Expedited $${
-                thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Expedited.perGB
+                ColdStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                  .Expedited.perGB
               }/GB
             </li>
             <li>
               <span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
               Bulk $${
-                thawingCosts.INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk.perGB
+                ColdStorageRetrievalCosts
+                  .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk.perGB
               }/GB,
               Standard $${
-                thawingCosts.INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard
-                  .perGB
+                ColdStorageRetrievalCosts
+                  .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard.perGB
               }/GB
             </li>
           </ul>
@@ -523,43 +556,3 @@ export function createCostEstimationBlock(
 	</script>
 `;
 }
-
-// <li class="mb-2">
-// 	<strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
-// 	<ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
-// 		<li>
-// 			<span style="color:#527FFF;"><strong>Glacier:</strong></span>
-// 			Bulk $${thawingCosts.GLACIER.Bulk}/GB,
-// 			Standard $${thawingCosts.GLACIER.Standard}/GB,
-// 			Expedited $${thawingCosts.GLACIER.Expedited}/GB
-// 		</li>
-// 		<li>
-// 			<span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
-// 			Bulk $${thawingCosts.DEEP_ARCHIVE.Bulk}/GB,
-// 			Standard $${thawingCosts.DEEP_ARCHIVE.Standard}/GB
-// 		</li>
-// 		<li>
-// 			<span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
-// 			Bulk $${thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS.Bulk}/GB,
-// 			Standard $${
-//         thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-//           .Standard
-//       }/GB,
-// 			Expedited $${
-//         thawingCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-//           .Expedited
-//       }/GB
-// 		</li>
-// 		<li>
-// 			<span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
-// 			Bulk $${
-//         thawingCosts
-//           .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk
-//       }/GB,
-// 			Standard $${
-//         thawingCosts
-//           .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard
-//       }/GB
-// 		</li>
-// 	</ul>
-// </li>

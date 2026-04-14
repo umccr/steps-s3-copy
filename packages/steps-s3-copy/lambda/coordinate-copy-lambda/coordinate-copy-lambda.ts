@@ -220,7 +220,7 @@ async function computeStats(df: pl.DataFrame) {
   // Extract cost estimate fields from the dataframe and compute their sums
   const costEstimates = df.getColumn("costEstimate");
   const totalS3CrossRegionReadWriteCostAUD = costEstimates.struct
-    .field("s3CrossRegionReadWriteCostAUD")
+    .field("crossRegionCostUSD")
     .sum();
   const totalColdStorageRetrievalCostAUD = costEstimates.struct
     .field("coldStorageRetrievalCostUSD")

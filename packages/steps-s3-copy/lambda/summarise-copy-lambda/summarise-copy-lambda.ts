@@ -44,7 +44,7 @@ interface InvokeEvent {
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 
 interface FileCostEstimate {
-  s3CrossRegionReadWriteCostAUD: number;
+  crossRegionCostUSD: number;
   coldStorageRetrievalCostUSD: number;
   computeCostAUD: number;
 }
@@ -82,7 +82,13 @@ export async function handler(event: InvokeEvent) {
   // debug input event
   console.debug(JSON.stringify(event, null, 2));
 
-  const client = new S3Client({});
+  // TODO: requestChecksumCalculation/responseChecksumValidation set to WHEN_REQUIRED as a workaround
+  // for "Unable to calculate hash for flowing readable stream" error introduced in @aws-sdk/client-s3 3.787.0.
+  // It need a proper fix
+  const client = new S3Client({
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
+  });
 
   // Determine if we need to generate and store the HTML report(s)
   const includeReport = event.includeCopyReport;

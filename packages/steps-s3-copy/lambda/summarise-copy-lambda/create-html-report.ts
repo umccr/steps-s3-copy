@@ -9,7 +9,10 @@ import {
   fill_template,
 } from "./html-report-utils.ts";
 
-import { fetchThawingCosts } from "../common/pricing.ts";
+import {
+  fetchColdStorageRetrievalCosts,
+  fetchCrossRegionCosts,
+} from "../common/pricing.ts";
 
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
@@ -71,8 +74,7 @@ export async function createHtmlReport(opts: {
 
   // Calculate total costs using only reportMetadata
   const totalS3CrossRegionReadWriteCost = reportMetadata.reduce(
-    (sum, s) =>
-      sum + s.copySetsMetadata.FileCostEstimate.s3CrossRegionReadWriteCostAUD,
+    (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.crossRegionCostUSD,
     0,
   );
   const totalColdCost = reportMetadata.reduce(
@@ -90,14 +92,17 @@ export async function createHtmlReport(opts: {
   // Create cost estimation block HTML
 
   // Fetch cost info from API - Cost estimation is for of each item
-  const thawingCosts = await fetchThawingCosts("ap-southeast-2");
+  const coldStorageRetrievalCosts =
+    await fetchColdStorageRetrievalCosts("ap-southeast-2");
+  const crossRegionCosts = await fetchCrossRegionCosts("ap-southeast-2");
 
   const costEstimationBlock = createCostEstimationBlock(
     totalS3CrossRegionReadWriteCost,
     totalColdCost,
     totalComputeCost,
     totalCost,
-    thawingCosts,
+    coldStorageRetrievalCosts,
+    crossRegionCosts,
   );
 
   // Create files table block HTML
