@@ -7,17 +7,15 @@ import {
 } from "@aws-sdk/client-s3";
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
-import {
-  estimateComputeCost,
-  COLD_STORAGE_CLASSES,
-  getThawParams,
-} from "../common/constants";
+import { COLD_STORAGE_CLASSES, getThawParams } from "../common/constants";
 
 import {
   fetchColdStorageRetrievalCosts,
   estimateColdStorageRetrievalCost,
   fetchCrossRegionCosts,
   estimateCrossRegionCost,
+  fetchComputeCosts,
+  estimateComputeCost,
 } from "../common/pricing";
 
 /**
@@ -26,7 +24,7 @@ import {
 export type CostEstimate = {
   crossRegionCostUSD: number; // Cost to copy S3 objects across regions (per object)
   coldStorageRetrievalCostUSD: number; // Thawing from Glacier/Deep Archive
-  computeCostAUD: number; // Lambda execution cost
+  computeCostUSD: number; // Lambda execution cost
 };
 
 /**
@@ -223,6 +221,7 @@ export async function handler(
   const ColdStorageRetrievalCosts =
     await fetchColdStorageRetrievalCosts(sourceRegion);
   const crossRegionCosts = await fetchCrossRegionCosts(sourceRegion);
+  const computeCosts = await fetchComputeCosts(sourceRegion);
 
   // we build an array of details of objects that we find either from ListObjects
   // *or* by calling HeadObject
@@ -331,7 +330,7 @@ export async function handler(
                 restoreWindowDays,
                 ColdStorageRetrievalCosts,
               ),
-              computeCostAUD: estimateComputeCost(size),
+              computeCostUSD: estimateComputeCost(size, computeCosts),
             },
           });
         }
@@ -408,7 +407,7 @@ export async function handler(
             restoreWindowDays,
             ColdStorageRetrievalCosts,
           ),
-          computeCostAUD: estimateComputeCost(size),
+          computeCostUSD: estimateComputeCost(size, computeCosts),
         },
       });
     } catch (e: any) {

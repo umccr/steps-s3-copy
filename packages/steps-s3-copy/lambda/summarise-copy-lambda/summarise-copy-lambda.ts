@@ -46,7 +46,7 @@ type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 interface FileCostEstimate {
   crossRegionCostUSD: number;
   coldStorageRetrievalCostUSD: number;
-  computeCostAUD: number;
+  computeCostUSD: number;
 }
 
 export interface FileCopySetsMetadata {

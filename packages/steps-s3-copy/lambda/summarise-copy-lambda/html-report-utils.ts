@@ -1,18 +1,13 @@
-import {
-  LAMBDA_GB_SECOND_COST_AUD,
-  LAMBDA_INVOCATION_COST_AUD,
-  FARGATE_VCPU_COST_PER_HOUR_AUD,
-  FARGATE_MEMORY_COST_PER_HOUR_AUD,
-  FARGATE_MIN_BILLING_SECONDS,
-  COST_LAST_UPDATED,
-  COST_CHECK_URL,
-} from "../common/constants";
+import { FARGATE_MIN_BILLING_SECONDS } from "../common/constants";
 
 import type { ReportMetadata } from "./summarise-copy-lambda.ts";
 import type {
   ColdStorageRetrievalCosts,
   CrossRegionCosts,
+  ComputeCosts,
 } from "../common/pricing";
+
+export const COST_CHECK_URL = "https://aws.amazon.com/s3/pricing/"; // Link to AWS official pricing page
 
 // Template filling: replaces {{TOKENS}} with values from vars.
 export function fill_template(
@@ -301,7 +296,7 @@ export function createFilesTableBlock(
           <colgroup>
             <col style="width:15.5ch;">  <!-- Object -->
             <col style="width:14ch;">  <!-- Size -->
-            <col style="width:18ch;">  <!-- S3 Cross-Region Cost -->
+            <col style="width:18ch;">  <!-- Cross-Region Cost -->
             <col style="width:18ch;">  <!-- Cold Storage Retrieval Cost -->
             <col style="width:18ch;">  <!-- Compute Cost -->
           </colgroup>
@@ -311,7 +306,7 @@ export function createFilesTableBlock(
               <th class="text-center">Size</th>
               <th class="text-center">Cross-Region Cost (USD)</th>
               <th class="text-center">Cold Storage Retrieval Cost (USD)</th>
-              <th class="text-center">Compute Cost (AUD)</th>
+              <th class="text-center">Compute Cost (USD)</th>
             </tr>
           </thead>
           <tbody>
@@ -354,9 +349,9 @@ export function createFilesTableBlock(
                       : "-"
                   }</td>
                   <td class="text-center">${
-                    r.copySetsMetadata.FileCostEstimate?.computeCostAUD !==
+                    r.copySetsMetadata.FileCostEstimate?.computeCostUSD !==
                     undefined
-                      ? r.copySetsMetadata.FileCostEstimate.computeCostAUD.toFixed(
+                      ? r.copySetsMetadata.FileCostEstimate.computeCostUSD.toFixed(
                           6,
                         )
                       : "-"
@@ -380,8 +375,9 @@ export function createCostEstimationBlock(
   totalColdCost: number,
   totalComputeCost: number,
   totalCost: number,
-  ColdStorageRetrievalCosts: ColdStorageRetrievalCosts,
-  CrossRegionCosts: CrossRegionCosts,
+  coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
+  crossRegionCosts: CrossRegionCosts,
+  computeCosts: ComputeCosts,
 ): string {
   return `
 	<div class="row align-items-start">
@@ -393,21 +389,21 @@ export function createCostEstimationBlock(
 					<strong>Cross-region read/write:</strong>
 					<span class="text-muted">$${totalS3CrossRegionReadWriteCost.toFixed(
             4,
-          )} AUD</span>
+          )} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Cold storage retrieval:</strong>
-					<span class="text-muted">$${totalColdCost.toFixed(4)} AUD</span>
+					<span class="text-muted">$${totalColdCost.toFixed(4)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #527FFF; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Compute:</strong>
-					<span class="text-muted">$${totalComputeCost.toFixed(4)} AUD</span>
+					<span class="text-muted">$${totalComputeCost.toFixed(4)} USD</span>
 				</li>
 				<li class="pt-2 mt-2 border-top">
 					<strong class="h5">Total:</strong>
-					<span class="h5 text-primary">$${totalCost.toFixed(4)} AUD</span>
+					<span class="h5 text-primary">$${totalCost.toFixed(4)} USD</span>
 				</li>
 			</ul>
 		</div>
@@ -433,7 +429,7 @@ export function createCostEstimationBlock(
               <li>
                 <strong>Egress (tiered, per GB):</strong>
                 <ul class="ml-4">
-                  ${CrossRegionCosts.egressPriceTiers
+                  ${crossRegionCosts.egressPriceTiers
                     .map((t) =>
                       t.endRangeGb === Infinity
                         ? `<li><code>&gt;${t.beginRangeGb.toLocaleString()} GB</code> → <code>$${t.pricePerGbUsd.toFixed(
@@ -447,7 +443,7 @@ export function createCostEstimationBlock(
                 </ul>
               </li>
               <li class="mt-1">
-                <strong>PUT requests:</strong> <code>$${CrossRegionCosts.putPricePerRequest.toFixed(
+                <strong>PUT requests:</strong> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
                   6,
                 )} USD/request</code>
               </li>
@@ -461,40 +457,40 @@ export function createCostEstimationBlock(
           <ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
             <li>
               <span style="color:#527FFF;"><strong>Glacier:</strong></span>
-              Bulk $${ColdStorageRetrievalCosts.GLACIER.Bulk.perGB}/GB,
-              Standard $${ColdStorageRetrievalCosts.GLACIER.Standard.perGB}/GB,
-              Expedited $${ColdStorageRetrievalCosts.GLACIER.Expedited.perGB}/GB
+              Bulk $${coldStorageRetrievalCosts.GLACIER.Bulk.perGB}/GB,
+              Standard $${coldStorageRetrievalCosts.GLACIER.Standard.perGB}/GB,
+              Expedited $${coldStorageRetrievalCosts.GLACIER.Expedited.perGB}/GB
             </li>
             <li>
               <span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
-              Bulk $${ColdStorageRetrievalCosts.DEEP_ARCHIVE.Bulk.perGB}/GB,
+              Bulk $${coldStorageRetrievalCosts.DEEP_ARCHIVE.Bulk.perGB}/GB,
               Standard $${
-                ColdStorageRetrievalCosts.DEEP_ARCHIVE.Standard.perGB
+                coldStorageRetrievalCosts.DEEP_ARCHIVE.Standard.perGB
               }/GB
             </li>
             <li>
               <span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
               Bulk $${
-                ColdStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
                   .Bulk.perGB
               }/GB,
               Standard $${
-                ColdStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
                   .Standard.perGB
               }/GB,
               Expedited $${
-                ColdStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
                   .Expedited.perGB
               }/GB
             </li>
             <li>
               <span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
               Bulk $${
-                ColdStorageRetrievalCosts
+                coldStorageRetrievalCosts
                   .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk.perGB
               }/GB,
               Standard $${
-                ColdStorageRetrievalCosts
+                coldStorageRetrievalCosts
                   .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard.perGB
               }/GB
             </li>
@@ -502,18 +498,30 @@ export function createCostEstimationBlock(
           </li>
 
 					<!-- Compute Costs -->
-					<li class="mb-2">
-						<strong>Compute:</strong>
-						<br>
-						<code>
-							Lambda: $${LAMBDA_GB_SECOND_COST_AUD} per GB-second × memory × duration, plus $${LAMBDA_INVOCATION_COST_AUD} per invocation<br>
-							Fargate: $${FARGATE_VCPU_COST_PER_HOUR_AUD} per vCPU-hour, $${FARGATE_MEMORY_COST_PER_HOUR_AUD} per GB-hour (min ${FARGATE_MIN_BILLING_SECONDS}s)
-						</code>
-					</li>
+
+          <li class="mb-2">
+              <strong>Compute:</strong>
+              <br>
+              <code>
+                  Lambda: $${
+                    computeCosts.lambda.gbSecondPrice
+                  } per GB-second × memory × duration, plus $${
+                    computeCosts.lambda.invocationPrice
+                  } per invocation<br>
+                  Fargate: $${
+                    computeCosts.fargate.vCpuPricePerHour
+                  } per vCPU-hour, $${
+                    computeCosts.fargate.memoryGbPricePerHour
+                  } per GB-hour (min ${FARGATE_MIN_BILLING_SECONDS}s)
+              </code>
+          </li>
+
 				</ul>
-				<p class="small text-muted fst-italic mb-0 mt-3">
-					Based on official <a href="${COST_CHECK_URL}" target="_blank" rel="noopener">AWS pricing</a> (ap-southeast-2). Last updated: ${COST_LAST_UPDATED}.
+
+        <p class="small text-muted fst-italic mb-0 mt-3">
+					Based on official <a href="${COST_CHECK_URL}" target="_blank" rel="noopener">AWS pricing</a> (ap-southeast-2).
 				</p>
+
 			</div>
 		</div>
 	</div>
@@ -546,7 +554,7 @@ export function createCostEstimationBlock(
 								const value = context.parsed || 0;
 								const total = context.dataset.data.reduce((a, b) => a + b, 0);
 								const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-								return label + ': $' + value.toFixed(4) + ' AUD (' + percentage + '%)';
+								return label + ': $' + value.toFixed(4) + ' USD (' + percentage + '%)';
 							}
 						}
 					}

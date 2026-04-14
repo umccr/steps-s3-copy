@@ -12,6 +12,7 @@ import {
 import {
   fetchColdStorageRetrievalCosts,
   fetchCrossRegionCosts,
+  fetchComputeCosts,
 } from "../common/pricing.ts";
 
 // Load the HTML template
@@ -83,7 +84,7 @@ export async function createHtmlReport(opts: {
     0,
   );
   const totalComputeCost = reportMetadata.reduce(
-    (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.computeCostAUD,
+    (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.computeCostUSD,
     0,
   );
   const totalCost =
@@ -95,6 +96,7 @@ export async function createHtmlReport(opts: {
   const coldStorageRetrievalCosts =
     await fetchColdStorageRetrievalCosts("ap-southeast-2");
   const crossRegionCosts = await fetchCrossRegionCosts("ap-southeast-2");
+  const computeCosts = await fetchComputeCosts("ap-southeast-2");
 
   const costEstimationBlock = createCostEstimationBlock(
     totalS3CrossRegionReadWriteCost,
@@ -103,6 +105,7 @@ export async function createHtmlReport(opts: {
     totalCost,
     coldStorageRetrievalCosts,
     crossRegionCosts,
+    computeCosts,
   );
 
   // Create files table block HTML

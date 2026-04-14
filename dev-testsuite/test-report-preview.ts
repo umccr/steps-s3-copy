@@ -23,7 +23,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       FileCostEstimate: {
         crossRegionCostUSD: 0.12,
         coldStorageRetrievalCostUSD: 0.05,
-        computeCostAUD: 0.01,
+        computeCostUSD: 0.01,
       },
     },
     copyResultMetadata: {
@@ -44,7 +44,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       FileCostEstimate: {
         crossRegionCostUSD: 0.1,
         coldStorageRetrievalCostUSD: 0.0,
-        computeCostAUD: 0.01,
+        computeCostUSD: 0.01,
       },
     },
     copyResultMetadata: {
@@ -65,7 +65,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       FileCostEstimate: {
         crossRegionCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
-        computeCostAUD: 0.01,
+        computeCostUSD: 0.01,
       },
     },
     copyResultMetadata: {
@@ -89,7 +89,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       FileCostEstimate: {
         crossRegionCostUSD: 0.12,
         coldStorageRetrievalCostUSD: 0.05,
-        computeCostAUD: 0.01,
+        computeCostUSD: 0.01,
       },
     },
     copyResultMetadata: {
@@ -110,7 +110,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       FileCostEstimate: {
         crossRegionCostUSD: 0.1,
         coldStorageRetrievalCostUSD: 0.0,
-        computeCostAUD: 0.01,
+        computeCostUSD: 0.01,
       },
     },
     copyResultMetadata: {
@@ -132,7 +132,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       FileCostEstimate: {
         crossRegionCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
-        computeCostAUD: 0.01,
+        computeCostUSD: 0.01,
       },
     },
     copyResultMetadata: {
@@ -343,3 +343,244 @@ import {
 // console.log(`  Egress cost : $${estimate.egressCostUsd.toFixed(6)} USD`);
 // console.log(`  PUT cost    : $${estimate.putCostUsd.toFixed(6)} USD`);
 // console.log(`  Total cost  : $${estimate.totalCostUsd.toFixed(6)} USD`);
+
+const client = new PricingClient({ region: "us-east-1" });
+
+// // --- Lambda GB-second and invocation ---
+// const lambdaResponse = await client.send(new GetProductsCommand({
+//   ServiceCode: "AWSLambda",
+//   Filters: [
+//     { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: "ap-southeast-2" },
+//     { Type: FilterType.TERM_MATCH, Field: "group", Value: "AWS-Lambda-Duration" },
+//   ],
+//   MaxResults: 10,
+// }));
+
+// console.log("=== LAMBDA Duration ===");
+// console.log(JSON.stringify(lambdaResponse.PriceList, null, 2));
+
+// // --- Fargate vCPU ---
+// const fargateVcpuResponse = await client.send(new GetProductsCommand({
+//   ServiceCode: "AmazonECS",
+//   Filters: [
+//     { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: "ap-southeast-2" },
+//     { Type: FilterType.TERM_MATCH, Field: "usagetype", Value: "APS2-Fargate-vCPU-Hours:perCPU" },
+//   ],
+//   MaxResults: 5,
+// }));
+
+// console.log("=== FARGATE vCPU ===");
+// console.log(JSON.stringify(fargateVcpuResponse.PriceList, null, 2));
+
+// // --- Fargate Memory ---
+
+// let nextToken: string | undefined;
+// const fargateAttrs: any[] = [];
+
+// do {
+//   const response = await client.send(new GetProductsCommand({
+//     ServiceCode: "AmazonECS",
+//     Filters: [
+//       { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: "ap-southeast-2" },
+//     ],
+//     MaxResults: 100,
+//     NextToken: nextToken,
+//   }));
+
+//   for (const item of response.PriceList ?? []) {
+//     const parsed = JSON.parse(item as string);
+//     const attrs = parsed.product.attributes;
+//     if (JSON.stringify(attrs).toLowerCase().includes("fargate")) {
+//       fargateAttrs.push(attrs);
+//     }
+//   }
+
+//   nextToken = response.NextToken;
+// } while (nextToken);
+
+// console.log(`Found ${fargateAttrs.length} Fargate products:`);
+// for (const attrs of fargateAttrs) {
+//   console.log(JSON.stringify(attrs, null, 2));
+//   console.log("---");
+// }
+
+// export type ComputeCosts = {
+//   lambda: {
+//     gbSecondPrice: number;
+//     invocationPrice: number;
+//   };
+//   fargate: {
+//     vCpuPricePerHour: number;
+//     memoryGbPricePerHour: number;
+//   };
+// };
+
+// async function fetchLambdaComputePrice(
+//   region: string,
+// ): Promise<Pick<ComputeCosts, "lambda">> {
+//   const client = new PricingClient({ region: "us-east-1" });
+
+//   const [durationResponse, invocationResponse] = await Promise.all([
+//     client.send(
+//       new GetProductsCommand({
+//         ServiceCode: "AWSLambda",
+//         Filters: [
+//           { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+//           { Type: FilterType.TERM_MATCH, Field: "group", Value: "AWS-Lambda-Duration" },
+//         ],
+//         MaxResults: 1,
+//       }),
+//     ),
+//     client.send(
+//       new GetProductsCommand({
+//         ServiceCode: "AWSLambda",
+//         Filters: [
+//           { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+//           { Type: FilterType.TERM_MATCH, Field: "group", Value: "AWS-Lambda-Requests" },
+//         ],
+//         MaxResults: 1,
+//       }),
+//     ),
+//   ]);
+
+//   const durationItem = JSON.parse(durationResponse.PriceList![0] as string);
+//   const invocationItem = JSON.parse(invocationResponse.PriceList![0] as string);
+
+//   const durationDimensions = Object.values(
+//     Object.values(durationItem.terms.OnDemand as Record<string, any>)[0]
+//       .priceDimensions as Record<string, any>,
+//   ) as any[];
+
+//   const tier1 = durationDimensions.find((d: any) => d.beginRange === "0");
+
+//   const invocationDimensions = Object.values(
+//     Object.values(invocationItem.terms.OnDemand as Record<string, any>)[0]
+//       .priceDimensions as Record<string, any>,
+//   ) as any[];
+
+//   return {
+//     lambda: {
+//       gbSecondPrice: parseFloat(tier1.pricePerUnit.USD),
+//       invocationPrice: parseFloat(invocationDimensions[0].pricePerUnit.USD),
+//     },
+//   };
+// }
+
+// async function fetchFargateComputePrice(
+//   region: string,
+// ): Promise<Pick<ComputeCosts, "fargate">> {
+//   const client = new PricingClient({ region: "us-east-1" });
+
+//   const [vcpuResponse, memResponse] = await Promise.all([
+//     client.send(
+//       new GetProductsCommand({
+//         ServiceCode: "AmazonECS",
+//         Filters: [
+//           { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+//           { Type: FilterType.TERM_MATCH, Field: "usagetype", Value: "APS2-Fargate-vCPU-Hours:perCPU" },
+//         ],
+//         MaxResults: 1,
+//       }),
+//     ),
+//     client.send(
+//       new GetProductsCommand({
+//         ServiceCode: "AmazonECS",
+//         Filters: [
+//           { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+//           { Type: FilterType.TERM_MATCH, Field: "usagetype", Value: "APS2-Fargate-GB-Hours" },
+//         ],
+//         MaxResults: 1,
+//       }),
+//     ),
+//   ]);
+
+//   const vcpuItem = JSON.parse(vcpuResponse.PriceList![0] as string);
+//   const memItem = JSON.parse(memResponse.PriceList![0] as string);
+
+//   const vcpuPrice = parseFloat(
+//     Object.values(
+//       Object.values(vcpuItem.terms.OnDemand as Record<string, any>)[0]
+//         .priceDimensions as Record<string, any>,
+//     )[0].pricePerUnit.USD,
+//   );
+
+//   const memPrice = parseFloat(
+//     Object.values(
+//       Object.values(memItem.terms.OnDemand as Record<string, any>)[0]
+//         .priceDimensions as Record<string, any>,
+//     )[0].pricePerUnit.USD,
+//   );
+
+//   return {
+//     fargate: {
+//       vCpuPricePerHour: vcpuPrice,
+//       memoryGbPricePerHour: memPrice,
+//     },
+//   };
+// }
+
+// export async function fetchComputeCosts(
+//   region: string,
+// ): Promise<ComputeCosts> {
+//   const [lambda, fargate] = await Promise.all([
+//     fetchLambdaComputePrice(region),
+//     fetchFargateComputePrice(region),
+//   ]);
+
+//   return {
+//     ...lambda,
+//     ...fargate,
+//   };
+// }
+
+// import {
+//   defaultCopyDurationSeconds,
+//   DEFAULT_COPY_SPEED_MIBPS,
+//   FARGATE_MIN_BILLING_SECONDS,
+//   SIZE_THRESHOLD_BYTES,
+//   FARGATE_CPU_VCPU,
+//   FARGATE_MEMORY_MB,
+//   LAMBDA_MEMORY_MB,
+// } from "../packages/steps-s3-copy/lambda/common/constants";
+
+// export function estimateComputeCostLambda(
+//   memoryMb: number,
+//   sizeBytes: number,
+//   computeCosts: ComputeCosts,
+//   assumedCopySpeedMiBps: number = DEFAULT_COPY_SPEED_MIBPS,
+// ): number {
+//   const seconds = defaultCopyDurationSeconds(sizeBytes, assumedCopySpeedMiBps);
+//   const gbSeconds = (memoryMb / 1024) * seconds;
+//   return gbSeconds * computeCosts.lambda.gbSecondPrice + computeCosts.lambda.invocationPrice;
+// }
+
+// export function estimateComputeCostFargate(
+//   cpuVcpu: number,
+//   memGb: number,
+//   sizeBytes: number,
+//   computeCosts: ComputeCosts,
+//   assumedCopySpeedMiBps: number = DEFAULT_COPY_SPEED_MIBPS,
+// ): number {
+//   const seconds = defaultCopyDurationSeconds(sizeBytes, assumedCopySpeedMiBps);
+//   const billedSeconds = Math.max(seconds, FARGATE_MIN_BILLING_SECONDS);
+//   const hourFraction = billedSeconds / 3600;
+//   const cpuCost = cpuVcpu * computeCosts.fargate.vCpuPricePerHour * hourFraction;
+//   const memCost = memGb * computeCosts.fargate.memoryGbPricePerHour * hourFraction;
+//   return cpuCost + memCost;
+// }
+
+// export function estimateComputeCost(
+//   sizeBytes: number,
+//   computeCosts: ComputeCosts,
+// ): number {
+//   if (sizeBytes <= SIZE_THRESHOLD_BYTES) {
+//     return estimateComputeCostLambda(LAMBDA_MEMORY_MB, sizeBytes, computeCosts);
+//   } else {
+//     return estimateComputeCostFargate(
+//       FARGATE_CPU_VCPU,
+//       FARGATE_MEMORY_MB / 1024,
+//       sizeBytes,
+//       computeCosts,
+//     );
+//   }
+// }

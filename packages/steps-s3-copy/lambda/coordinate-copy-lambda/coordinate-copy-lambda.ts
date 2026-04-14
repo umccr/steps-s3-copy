@@ -226,7 +226,7 @@ async function computeStats(df: pl.DataFrame) {
     .field("coldStorageRetrievalCostUSD")
     .sum();
   const totalComputeCostAUD = costEstimates.struct
-    .field("computeCostAUD")
+    .field("computeCostUSD")
     .sum();
 
   return {
