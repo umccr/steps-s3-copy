@@ -37,9 +37,10 @@ jobs:
       - run: pnpm run package
 
       # if all the builds have completed - we can publish the package
-      # publib-npm needs newest NPM 11 to have trusted publisher mode
-
-      - run: npm install -g npm@next-11
+      # publib-npm needs newest NPM 11 to have trusted publisher mode.
+      # Currently node 22.22.2 has a broken npm, so use corepack directly.
+      - run: corepack enable npm
+      - run: corepack install -g npm@11
 
       - run: pnpm exec publib-npm
         working-directory: packages/steps-s3-copy
