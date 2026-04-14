@@ -74,7 +74,7 @@ export async function createHtmlReport(opts: {
     : 0;
 
   // Calculate total costs using only reportMetadata
-  const totalS3CrossRegionReadWriteCost = reportMetadata.reduce(
+  const totalCrossRegionCost = reportMetadata.reduce(
     (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.crossRegionCostUSD,
     0,
   );
@@ -87,8 +87,7 @@ export async function createHtmlReport(opts: {
     (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.computeCostUSD,
     0,
   );
-  const totalCost =
-    totalS3CrossRegionReadWriteCost + totalColdCost + totalComputeCost;
+  const totalCost = totalCrossRegionCost + totalColdCost + totalComputeCost;
 
   // Create cost estimation block HTML
 
@@ -99,7 +98,7 @@ export async function createHtmlReport(opts: {
   const computeCosts = await fetchComputeCosts("ap-southeast-2");
 
   const costEstimationBlock = createCostEstimationBlock(
-    totalS3CrossRegionReadWriteCost,
+    totalCrossRegionCost,
     totalColdCost,
     totalComputeCost,
     totalCost,

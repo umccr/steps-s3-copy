@@ -371,7 +371,7 @@ export function createFilesTableBlock(
  * Creates the cost estimation block as HTML, including the pie chart and cost breakdowns.
  */
 export function createCostEstimationBlock(
-  totalS3CrossRegionReadWriteCost: number,
+  totalCrossRegionCost: number,
   totalColdCost: number,
   totalComputeCost: number,
   totalCost: number,
@@ -381,15 +381,20 @@ export function createCostEstimationBlock(
 ): string {
   return `
 	<div class="row align-items-start">
-		<!-- Left: Cost values -->
-		<div class="col-lg-3 col-md-4 mb-3 d-flex flex-column">
+		<!-- Left: Cost values and pie chart -->
+		<div class="col-lg-5 col-md-4 mb-2 d-flex flex-column">
+      <!-- Pie chart -->
+      <div class="d-flex justify-content-center">
+    	<canvas id="costChart" style="max-width: 280px; max-height: 280px;"></canvas>
+      </div>
+      <br>
+      <br>
+      <!-- Cost breakdown -->
 			<ul class="list-unstyled mb-0 flex-grow-1 d-flex flex-column justify-content-center">
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
-					<strong>Cross-region read/write:</strong>
-					<span class="text-muted">$${totalS3CrossRegionReadWriteCost.toFixed(
-            4,
-          )} USD</span>
+					<strong>Cross-region:</strong>
+					<span class="text-muted">$${totalCrossRegionCost.toFixed(4)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
@@ -407,28 +412,24 @@ export function createCostEstimationBlock(
 				</li>
 			</ul>
 		</div>
-		<!-- Center: Pie chart -->
-		<div class="col-lg-4 col-md-4 mb-3 d-flex justify-content-center">
-			<canvas id="costChart" style="max-width: 280px; max-height: 280px;"></canvas>
-		</div>
 
 		<!-- Right: Explanation -->
-		<div class="col-lg-5 col-md-4 mb-3">
+		<div class="col-lg-7 col-md-4 mb-2">
 			<div class="p-3 bg-light rounded h-100">
 				<h6 class="mb-3">
 					<i class="bi bi-info-circle-fill text-info"></i>
 					How are costs calculated?
 				</h6>
 
-				<ul class="small text-secondary mb-0 ps-3">
+        <ul class="small text-secondary mb-0 ps-3">
 
-					<!-- Cross Region Costs -->
+          <!-- Cross Region Costs -->
           <li class="mb-2">
-            <strong>S3 cross-region read/write:</strong>
-            <ul class="mt-1 text-sm">
+            <strong>Cross-region:</strong>
+            <ul class="mt-1 ps-3">
               <li>
-                <strong>Egress (tiered, per GB):</strong>
-                <ul class="ml-4">
+                <span style="color:#527FFF;"><strong>Egress (tiered, per GB):</strong></span>
+                <ul class="ps-3" style="font-family:monospace; font-size: 95%;">
                   ${crossRegionCosts.egressPriceTiers
                     .map((t) =>
                       t.endRangeGb === Infinity
@@ -443,80 +444,96 @@ export function createCostEstimationBlock(
                 </ul>
               </li>
               <li class="mt-1">
-                <strong>PUT requests:</strong> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
+                <span style="color:#527FFF;"><strong>PUT requests:</strong></span> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
                   6,
                 )} USD/request</code>
               </li>
-              <li class="mt-1 text-gray-500">S3 in-region copies are free.</li>
+              <li class="mt-1 text-muted">S3 in-region copies are free.</li>
             </ul>
           </li>
 
-					<!-- Cold Storage Costs -->
+          <!-- Cold Storage Costs -->
           <li class="mb-2">
-          <strong>Cold storage retrieval <span class="text-muted small">(varies by thaw speed and storage class):</span></strong>
-          <ul class="mb-0 ps-3" style="font-family:monospace; font-size: 95%;">
-            <li>
-              <span style="color:#527FFF;"><strong>Glacier:</strong></span>
-              Bulk $${coldStorageRetrievalCosts.GLACIER.Bulk.perGB}/GB,
-              Standard $${coldStorageRetrievalCosts.GLACIER.Standard.perGB}/GB,
-              Expedited $${coldStorageRetrievalCosts.GLACIER.Expedited.perGB}/GB
-            </li>
-            <li>
-              <span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
-              Bulk $${coldStorageRetrievalCosts.DEEP_ARCHIVE.Bulk.perGB}/GB,
-              Standard $${
-                coldStorageRetrievalCosts.DEEP_ARCHIVE.Standard.perGB
-              }/GB
-            </li>
-            <li>
-              <span style="color:#527FFF;"><strong>Intelligent Tiering Archive Access:</strong></span>
-              Bulk $${
-                coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-                  .Bulk.perGB
-              }/GB,
-              Standard $${
-                coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-                  .Standard.perGB
-              }/GB,
-              Expedited $${
-                coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
-                  .Expedited.perGB
-              }/GB
-            </li>
-            <li>
-              <span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive Access:</strong></span>
-              Bulk $${
-                coldStorageRetrievalCosts
-                  .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk.perGB
-              }/GB,
-              Standard $${
-                coldStorageRetrievalCosts
-                  .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard.perGB
-              }/GB
-            </li>
-          </ul>
+            <strong>Cold storage retrieval <span class="text-muted fw-normal">(varies by thaw speed and storage class)</span></strong>
+            <ul class="mt-1 ps-3" style="font-family:monospace; font-size: 95%;">
+              <li>
+                <span style="color:#527FFF;"><strong>Glacier:</strong></span>
+                Bulk <code>$${
+                  coldStorageRetrievalCosts.GLACIER.Bulk.perGB
+                }/GB</code>,
+                Standard <code>$${
+                  coldStorageRetrievalCosts.GLACIER.Standard.perGB
+                }/GB</code>,
+                Expedited <code>$${
+                  coldStorageRetrievalCosts.GLACIER.Expedited.perGB
+                }/GB</code>
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Deep Archive:</strong></span>
+                Bulk <code>$${
+                  coldStorageRetrievalCosts.DEEP_ARCHIVE.Bulk.perGB
+                }/GB</code>,
+                Standard <code>$${
+                  coldStorageRetrievalCosts.DEEP_ARCHIVE.Standard.perGB
+                }/GB</code>
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Intelligent Tiering Archive:</strong></span>
+                Bulk <code>$${
+                  coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                    .Bulk.perGB
+                }/GB</code>,
+                Standard <code>$${
+                  coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                    .Standard.perGB
+                }/GB</code>,
+                Expedited <code>$${
+                  coldStorageRetrievalCosts.INTELLIGENT_TIERING_ARCHIVE_ACCESS
+                    .Expedited.perGB
+                }/GB</code>
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Intelligent Tiering Deep Archive:</strong></span>
+                Bulk <code>$${
+                  coldStorageRetrievalCosts
+                    .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Bulk.perGB
+                }/GB</code>,
+                Standard <code>$${
+                  coldStorageRetrievalCosts
+                    .INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS.Standard.perGB
+                }/GB</code>
+              </li>
+            </ul>
           </li>
 
-					<!-- Compute Costs -->
-
+          <!-- Compute Costs -->
           <li class="mb-2">
-              <strong>Compute:</strong>
-              <br>
-              <code>
-                  Lambda: $${
-                    computeCosts.lambda.gbSecondPrice
-                  } per GB-second × memory × duration, plus $${
-                    computeCosts.lambda.invocationPrice
-                  } per invocation<br>
-                  Fargate: $${
-                    computeCosts.fargate.vCpuPricePerHour
-                  } per vCPU-hour, $${
-                    computeCosts.fargate.memoryGbPricePerHour
-                  } per GB-hour (min ${FARGATE_MIN_BILLING_SECONDS}s)
-              </code>
+            <strong>Compute:</strong>
+            <ul class="mt-1 ps-3" style="font-family:monospace; font-size: 95%;">
+              <li>
+                <span style="color:#527FFF;"><strong>Lambda:</strong></span>
+                <code>$${
+                  computeCosts.lambda.gbSecondPrice
+                }</code> per GB-second × memory × duration,
+                plus <code>$${
+                  computeCosts.lambda.invocationPrice
+                }</code> per invocation
+              </li>
+              <li>
+                <span style="color:#527FFF;"><strong>Fargate:</strong></span>
+                <code>$${
+                  computeCosts.fargate.vCpuPricePerHour
+                }</code> per vCPU-hour,
+                <code>$${
+                  computeCosts.fargate.memoryGbPricePerHour
+                }</code> per GB-hour
+                <span class="text-muted">(min ${FARGATE_MIN_BILLING_SECONDS}s)</span>
+              </li>
+            </ul>
           </li>
 
-				</ul>
+        </ul>
+
 
         <p class="small text-muted fst-italic mb-0 mt-3">
 					Based on official <a href="${COST_CHECK_URL}" target="_blank" rel="noopener">AWS pricing</a> (ap-southeast-2).
@@ -532,9 +549,9 @@ export function createCostEstimationBlock(
 		new Chart(ctx, {
 			type: 'pie',
 			data: {
-				labels: ['S3 Cross-Region Read/Write', 'Cold Storage Retrieval', 'Compute'],
+				labels: ['Cross-Region', 'Cold Storage Retrieval', 'Compute'],
 				datasets: [{
-					data: [${totalS3CrossRegionReadWriteCost}, ${totalColdCost}, ${totalComputeCost}],
+					data: [${totalCrossRegionCost}, ${totalColdCost}, ${totalComputeCost}],
 					backgroundColor: ['#FF9900', '#1EA591', '#527FFF'],
 					borderWidth: 2,
 					borderColor: '#fff'
@@ -550,11 +567,10 @@ export function createCostEstimationBlock(
 					tooltip: {
 						callbacks: {
 							label: function(context) {
-								const label = context.label || '';
 								const value = context.parsed || 0;
 								const total = context.dataset.data.reduce((a, b) => a + b, 0);
 								const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
-								return label + ': $' + value.toFixed(4) + ' USD (' + percentage + '%)';
+								return '  $' + value.toFixed(4) + ' USD (' + percentage + '%)';
 							}
 						}
 					}
