@@ -389,6 +389,23 @@ export type ComputeCosts = {
   };
 };
 
+const regionPrefixMap: Record<string, string> = {
+  "us-east-1": "USE1",
+  "us-east-2": "USE2",
+  "us-west-1": "USW1",
+  "us-west-2": "USW2",
+  "ap-southeast-1": "APS1",
+  "ap-southeast-2": "APS2",
+  "ap-northeast-1": "APN1",
+  "ap-northeast-2": "APN2",
+  "ap-south-1": "APS3",
+  "eu-west-1": "EU",
+  "eu-west-2": "EUW2",
+  "eu-central-1": "EUC1",
+  "ca-central-1": "CAN1",
+  "sa-east-1": "SAE1",
+};
+
 async function fetchLambdaComputePrice(
   region: string,
 ): Promise<Pick<ComputeCosts, "lambda">> {
@@ -453,6 +470,8 @@ async function fetchFargateComputePrice(
 ): Promise<Pick<ComputeCosts, "fargate">> {
   const client = new PricingClient({ region: "us-east-1" });
 
+  const regionPrefix = regionPrefixMap[region];
+
   const [vcpuResponse, memResponse] = await Promise.all([
     client.send(
       new GetProductsCommand({
@@ -462,7 +481,7 @@ async function fetchFargateComputePrice(
           {
             Type: FilterType.TERM_MATCH,
             Field: "usagetype",
-            Value: "APS2-Fargate-vCPU-Hours:perCPU",
+            Value: `${regionPrefix}-Fargate-vCPU-Hours:perCPU`,
           },
         ],
         MaxResults: 1,
@@ -476,7 +495,7 @@ async function fetchFargateComputePrice(
           {
             Type: FilterType.TERM_MATCH,
             Field: "usagetype",
-            Value: "APS2-Fargate-GB-Hours",
+            Value: `${regionPrefix}-Fargate-GB-Hours`,
           },
         ],
         MaxResults: 1,
