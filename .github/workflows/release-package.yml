@@ -47,3 +47,5 @@ jobs:
         env:
           NPM_TRUSTED_PUBLISHER: true
           NPM_ACCESS_LEVEL: public
+          # Required for global corepack npm installation
+          COREPACK_ENABLE_STRICT: 0
