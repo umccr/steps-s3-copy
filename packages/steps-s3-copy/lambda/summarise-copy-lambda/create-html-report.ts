@@ -13,7 +13,7 @@ import {
   fetchColdStorageRetrievalCosts,
   fetchCrossRegionCosts,
   fetchComputeCosts,
-} from "../common/pricing.ts";
+} from "../common/cost-estimation.ts";
 
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(

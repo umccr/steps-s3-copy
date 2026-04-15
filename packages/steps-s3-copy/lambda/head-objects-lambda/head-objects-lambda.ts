@@ -16,7 +16,7 @@ import {
   estimateCrossRegionCost,
   fetchComputeCosts,
   estimateComputeCost,
-} from "../common/pricing";
+} from "../common/cost-estimation";
 
 /**
  * Cost estimate

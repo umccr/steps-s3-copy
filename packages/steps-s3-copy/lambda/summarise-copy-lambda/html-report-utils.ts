@@ -5,7 +5,7 @@ import type {
   ColdStorageRetrievalCosts,
   CrossRegionCosts,
   ComputeCosts,
-} from "../common/pricing";
+} from "../common/cost-estimation";
 
 export const COST_CHECK_URL = "https://aws.amazon.com/s3/pricing/"; // Link to AWS official pricing page
 
