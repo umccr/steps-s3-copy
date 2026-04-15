@@ -4,11 +4,7 @@
 import { writeFileSync } from "fs";
 import { join } from "path";
 import { createHtmlReport } from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/create-html-report";
-import type {
-  ReportMetadata,
-  FileCopySetsMetadata,
-  FileCopyResultMetadata,
-} from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/summarise-copy-lambda";
+import type { ReportMetadata } from "../packages/steps-s3-copy/lambda/summarise-copy-lambda/summarise-copy-lambda";
 import { execSync } from "child_process";
 
 // Parse CLI args

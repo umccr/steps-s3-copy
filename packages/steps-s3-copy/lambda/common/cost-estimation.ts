@@ -15,6 +15,12 @@ import {
   LAMBDA_MEMORY_MB,
 } from "./constants";
 
+export type CostEstimate = {
+  crossRegionCostUSD: number;
+  coldStorageRetrievalCostUSD: number;
+  computeCostUSD: number;
+};
+
 // --------------------------------------------------------------------------------------------
 // Thawing cost estimation (returns 0 for non-cold storage classes)
 // --------------------------------------------------------------------------------------------

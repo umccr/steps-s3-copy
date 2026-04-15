@@ -9,6 +9,7 @@ import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
 import { COLD_STORAGE_CLASSES, getThawParams } from "../common/constants";
 
+import type { CostEstimate } from "../common/cost-estimation";
 import {
   fetchColdStorageRetrievalCosts,
   estimateColdStorageRetrievalCost,
@@ -17,15 +18,6 @@ import {
   fetchComputeCosts,
   estimateComputeCost,
 } from "../common/cost-estimation";
-
-/**
- * Cost estimate
- */
-export type CostEstimate = {
-  crossRegionCostUSD: number; // Cost to copy S3 objects across regions (per object)
-  coldStorageRetrievalCostUSD: number; // Thawing from Glacier/Deep Archive
-  computeCostUSD: number; // Lambda execution cost
-};
 
 /**
  * The way this lambda will be invoked. We expect to be part of a Distributed Map -
