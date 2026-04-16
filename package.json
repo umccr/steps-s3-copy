@@ -3,14 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "description": "The root package of a mono repo for Steps S3 copy",
-  "packageManager": "pnpm@9.10.0",
+  "packageManager": "bun@1.3.12",
+  "workspaces": [
+    "dev",
+    "packages/*"
+  ],
   "scripts": {
-    "build": "pnpm --stream --filter \"./packages/**\" run build",
-    "watch": "pnpm --stream --filter \"./packages/**\" run build:watch",
-    "package": "pnpm --stream --filter \"./packages/**\" run package",
+    "build": "bun run --filter './packages/**' build",
+    "watch": "bun run --filter './packages/**' build:watch",
+    "package": "bun run --filter './packages/**' package",
     "clean": "git clean -fXd",
-    "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
-    "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy"
+    "dev-deploy": "cd dev && bun run --cwd .. build && bunx cdk deploy",
+    "dev-destroy": "cd dev && bun run --cwd .. build && bunx cdk destroy"
   },
   "keywords": [],
   "author": {

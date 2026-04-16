@@ -6,10 +6,10 @@
   "dependencies": {
     "aws-cdk-lib": "2.192.0",
     "constructs": "10.4.2",
-    "dev-constants": "link:../dev-constants",
-    "steps-s3-copy": "link:../packages/steps-s3-copy"
+    "@umccr/steps-s3-copy": "workspace:*"
   },
   "devDependencies": {
+    "@tsconfig/bun": "1.0.10",
     "aws-cdk": "2.1012.0"
   }
 }

@@ -33,7 +33,6 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
       {
         role: props.writerRole,
         entry: join(lambdaFolder, "coordinate-copy-lambda.ts"),
-        // note we need to specify this or else it attempts to use the top-level pnpm lock files
         depsLockFilePath: join(lambdaFolder, "package-lock.json"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.ARM_64,
