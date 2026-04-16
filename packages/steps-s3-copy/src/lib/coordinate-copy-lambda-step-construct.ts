@@ -19,18 +19,14 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const lambdaFolder = join(
-      __dirname,
-      "..",
-      "..",
-      "lambda",
-      "coordinate-copy-lambda",
-    );
+    const packageRoot = join(__dirname, "..", "..");
+    const lambdaFolder = join(packageRoot, "lambda", "coordinate-copy-lambda");
 
     const coordinateCopyLambda = new NodejsFunction(
       this,
       "CoordinateCopyFunction",
       {
+        projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaFolder, "coordinate-copy-lambda.ts"),
         depsLockFilePath: join(lambdaFolder, "package-lock.json"),
@@ -56,6 +52,7 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
             "nodejs-polars",
             "tmp",
             "@aws-sdk/client-s3",
+            "@aws-sdk/client-secrets-manager",
             "@aws-sdk/lib-storage",
           ],
         },

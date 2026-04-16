@@ -76,6 +76,9 @@ export class HeadObjectsMapConstruct extends Construct {
           "$invokeArguments.destinationFolderKey",
         ),
         maximumExpansion: 256,
+        "bucketDefinitions.$": JsonPath.stringAt(
+          "$invokeArguments.bucketDefinitions",
+        ),
       },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",
@@ -119,16 +122,23 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
 
+    const packageRoot = join(__dirname, "..", "..");
+
     this.lambda = new NodejsFunction(this, "HeadObjectsFunction", {
       // our pre-made role will have the ability to read source objects
       role: _props.writerRole,
+      projectRoot: packageRoot,
       entry: join(
-        __dirname,
-        "..",
-        "..",
+        packageRoot,
         "lambda",
         "head-objects-lambda",
         "head-objects-lambda.ts",
+      ),
+      depsLockFilePath: join(
+        packageRoot,
+        "lambda",
+        "head-objects-lambda",
+        "package-lock.json",
       ),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,

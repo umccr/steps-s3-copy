@@ -90,6 +90,14 @@ func main() {
 		}
 	}
 
+	var bucketDefinitions map[string]BucketDefinition
+	if definitionsJson, ok := os.LookupEnv("CB_BUCKET_DEFINITIONS"); ok {
+		err := json.Unmarshal([]byte(definitionsJson), &bucketDefinitions)
+		if err != nil {
+			log.Printf("Warning: could not parse CB_BUCKET_DEFINITIONS: %v", err)
+		}
+	}
+
 	toCopy := make([]*CopyArg, len(os.Args)-1)
 	toCopyResults := make([]*CopyResult, len(os.Args)-1)
 
@@ -128,7 +136,7 @@ func main() {
 		toCopy[i] = &copyArg
 	}
 
-	copyRunner(copyBinary, copyInterruptWait, &toCopy, &toCopyResults)
+	copyRunner(copyBinary, copyInterruptWait, bucketDefinitions, &toCopy, &toCopyResults)
 
 	// we have now attempted to copy every file and generated a stats dictionary in results[]
 
