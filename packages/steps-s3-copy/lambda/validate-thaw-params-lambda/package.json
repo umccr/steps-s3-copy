@@ -1,0 +1,5 @@
+{
+  "name": "validate-thaw-params-lambda",
+  "version": "1.0.0",
+  "main": "validate-thaw-params-lambda.ts"
+}

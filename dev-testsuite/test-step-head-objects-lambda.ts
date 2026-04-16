@@ -7,7 +7,7 @@ import {
   unitTestSetup,
   type UnitTestSetupState,
 } from "./setup.js";
-import { type HeadObjectsLambdaInvokeEvent } from "../packages/steps-s3-copy/lambda/head-objects-lambda/head-objects-lambda";
+import { type HeadObjectsLambdaInvokeEvent } from "head-objects-lambda/head-objects-lambda.ts";
 import { createTestObject } from "./lib/create-test-object";
 
 const sfnClient = new SFNClient({});

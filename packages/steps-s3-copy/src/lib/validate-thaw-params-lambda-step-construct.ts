@@ -32,6 +32,7 @@ export class ValidateThawParamsLambdaStepConstruct extends Construct {
     this.lambda = new NodejsFunction(this, "ValidateThawParamsFunction", {
       role: props.writerRole,
       entry: join(lambdaFolder, "validate-thaw-params-lambda.ts"),
+      depsLockFilePath: join(lambdaFolder, "package-lock.json"),
       runtime: Runtime.NODEJS_22_X,
       handler: "handler",
       bundling: { minify: false },

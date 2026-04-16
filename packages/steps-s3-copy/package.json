@@ -31,7 +31,10 @@
     "targets": {},
     "tsc": {
       "outDir": "out",
-      "rootDir": "src"
+      "rootDir": "src",
+      "types": [
+        "node"
+      ]
     }
   },
   "peerDependencies": {
@@ -39,11 +42,12 @@
     "constructs": "^10.4.2"
   },
   "devDependencies": {
+    "@types/node": "22.19.17",
     "aws-cdk-lib": "2.192.0",
     "constructs": "10.4.2",
-    "jsii": "5.9.22",
-    "jsii-pacmak": "1.125.0",
-    "jsii-rosetta": "5.9.26",
-    "publib": "0.2.1028"
+    "jsii": "5.9.37",
+    "jsii-pacmak": "1.128.0",
+    "jsii-rosetta": "5.9.39",
+    "publib": "0.2.1041"
   }
 }

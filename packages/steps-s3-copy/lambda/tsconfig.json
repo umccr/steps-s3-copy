@@ -4,7 +4,8 @@
     "noEmit": true,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "types": ["node"]
   },
   "exclude": ["node_modules"]
 }
