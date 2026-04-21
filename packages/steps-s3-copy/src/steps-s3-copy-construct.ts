@@ -21,15 +21,16 @@ import {
   Choice,
   Condition,
 } from "aws-cdk-lib/aws-stepfunctions";
-import { Duration, Stack } from "aws-cdk-lib";
-import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
-import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
   DRY_RUN_KEY_FIELD_NAME,
   INCLUDE_COPY_REPORT_FIELD_NAME,
   RETAIN_COPY_REPORT_FIELD_NAME,
   StepsS3CopyInvokeArguments,
 } from "./steps-s3-copy-input";
+import { Duration, Stack } from "aws-cdk-lib";
+import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
+import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
+import { PricingDataLambdaStepConstruct } from "./lib/pricing-data-lambda-step-construct";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
@@ -221,6 +222,12 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
+    const pricingDataLambdaStep = new PricingDataLambdaStepConstruct(
+      this,
+      "FetchPricingData",
+      { writerRole: this._workingRole },
+    );
+
     const validateThawParamsStep = new ValidateThawParamsLambdaStepConstruct(
       this,
       "ValidateThawParams",
@@ -366,6 +373,7 @@ export class StepsS3CopyConstruct extends Construct {
       assignInputsAndApplyDefaults
         .next(validateThawParamsStep.invocableLambda)
         .next(canWriteStep)
+        .next(pricingDataLambdaStep.invocableLambda)
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
         .next(dryRunChoice),

@@ -333,25 +333,25 @@ export function createFilesTableBlock(
                     r.copySetsMetadata.size,
                   )}</td>
                   <td class="text-center">${
-                    r.copySetsMetadata.FileCostEstimate?.crossRegionCostUSD !==
+                    r.copySetsMetadata.costEstimate?.crossRegionCostUSD !==
                     undefined
-                      ? r.copySetsMetadata.FileCostEstimate.crossRegionCostUSD.toFixed(
+                      ? r.copySetsMetadata.costEstimate.crossRegionCostUSD.toFixed(
                           6,
                         )
                       : "-"
                   }</td>
                   <td class="text-center">${
-                    r.copySetsMetadata.FileCostEstimate
+                    r.copySetsMetadata.costEstimate
                       ?.coldStorageRetrievalCostUSD !== undefined
-                      ? r.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostUSD.toFixed(
+                      ? r.copySetsMetadata.costEstimate.coldStorageRetrievalCostUSD.toFixed(
                           6,
                         )
                       : "-"
                   }</td>
                   <td class="text-center">${
-                    r.copySetsMetadata.FileCostEstimate?.computeCostUSD !==
+                    r.copySetsMetadata.costEstimate?.computeCostUSD !==
                     undefined
-                      ? r.copySetsMetadata.FileCostEstimate.computeCostUSD.toFixed(
+                      ? r.copySetsMetadata.costEstimate.computeCostUSD.toFixed(
                           6,
                         )
                       : "-"

@@ -43,7 +43,7 @@ interface InvokeEvent {
 
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 
-interface FileCostEstimate {
+interface costEstimate {
   crossRegionCostUSD: number;
   coldStorageRetrievalCostUSD: number;
   computeCostUSD: number;
@@ -52,7 +52,7 @@ interface FileCostEstimate {
 export interface FileCopySetsMetadata {
   name: string;
   size: number;
-  FileCostEstimate: FileCostEstimate;
+  costEstimate: costEstimate;
 }
 export interface FileCopyResultMetadata {
   name: string;
@@ -233,7 +233,14 @@ export async function handler(event: InvokeEvent) {
   }
 
   await client.send(putCommand);
-  return output;
+  return {
+    status: "OK",
+    csvS3Location: {
+      bucket: event.destinationBucket,
+      key: csvKey,
+    },
+    // Add other brief metadata if desired
+  };
 }
 
 /**
@@ -261,7 +268,7 @@ export async function readFileCopySetsFromJsonl(
       fileCopySets[name] = {
         name,
         size: obj.size,
-        FileCostEstimate: obj.costEstimate,
+        costEstimate: obj.costEstimate,
       };
     }
   }

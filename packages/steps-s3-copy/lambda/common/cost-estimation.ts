@@ -1,3 +1,4 @@
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   PricingClient,
   GetProductsCommand,
@@ -15,11 +16,22 @@ import {
   LAMBDA_MEMORY_MB,
 } from "./constants";
 
+// Cost estimation logic for thawing, cross-region transfer, and compute costs.
+// This is used by the fetch-pricing-data-lambda to fetch current costs from AWS Pricing API,
+// for use in the cost estimation.
+
 export type CostEstimate = {
   crossRegionCostUSD: number;
   coldStorageRetrievalCostUSD: number;
   computeCostUSD: number;
 };
+
+export interface PricingData {
+  coldStorageCosts: ColdStorageRetrievalCosts;
+  crossRegionCosts: CrossRegionCosts;
+  computeCosts: ComputeCosts;
+  fetchedAt: string;
+}
 
 // --------------------------------------------------------------------------------------------
 // Thawing cost estimation (returns 0 for non-cold storage classes)
@@ -585,4 +597,24 @@ export function estimateComputeCost(
       computeCosts,
     );
   }
+}
+
+// --------------------------------------------------------------------------------------------
+// Read cost data
+// --------------------------------------------------------------------------------------------
+
+/**
+ * Read pricing-data.json from S3 and return a strongly typed PricingData dictionary.
+ */
+export async function readPricingDataJsonFromS3(
+  client: S3Client,
+  bucket: string,
+  key: string,
+): Promise<PricingData> {
+  const obj = await client.send(
+    new GetObjectCommand({ Bucket: bucket, Key: key }),
+  );
+  const body = await obj.Body?.transformToString?.();
+  if (!body) throw new Error("No pricing data returned from S3!");
+  return JSON.parse(body) as PricingData;
 }

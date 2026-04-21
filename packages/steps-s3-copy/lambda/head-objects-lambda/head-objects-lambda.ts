@@ -10,12 +10,12 @@ import * as assert from "node:assert/strict";
 import { COLD_STORAGE_CLASSES, getThawParams } from "../common/constants";
 
 import type { CostEstimate } from "../common/cost-estimation";
+
+import { readPricingDataJsonFromS3 } from "../common/cost-estimation";
+import type { PricingData } from "../common/cost-estimation";
 import {
-  fetchColdStorageRetrievalCosts,
   estimateColdStorageRetrievalCost,
-  fetchCrossRegionCosts,
   estimateCrossRegionCost,
-  fetchComputeCosts,
   estimateComputeCost,
 } from "../common/cost-estimation";
 
@@ -209,13 +209,20 @@ export async function handler(
   // The region of the source bucket
   const sourceRegion = event.BatchInput.sourceRequiredRegion;
 
-  // Fetch cost info from API - Cost estimation is for of each item
-  const ColdStorageRetrievalCosts =
-    await fetchColdStorageRetrievalCosts(sourceRegion);
-  const crossRegionCosts = await fetchCrossRegionCosts(sourceRegion);
-  const computeCosts = await fetchComputeCosts(sourceRegion);
+  const bucket = "harcoded from now";
+  const key = "pricing-data.json";
 
-  // we build an array of details of objects that we find either from ListObjects
+  // Read Pricing Data fetcheched from the API
+  const pricingData: PricingData = await readPricingDataJsonFromS3(
+    client,
+    bucket,
+    key,
+  );
+
+  const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
+  const crossRegionCosts = pricingData.crossRegionCosts;
+  const computeCosts = pricingData.computeCosts;
+
   // *or* by calling HeadObject
   const resultObjects: HeadObjectsLambdaResultItem[] = [];
 
@@ -320,7 +327,7 @@ export async function handler(
                 storageClass,
                 retrievalSpeed,
                 restoreWindowDays,
-                ColdStorageRetrievalCosts,
+                coldStorageRetrievalCosts,
               ),
               computeCostUSD: estimateComputeCost(size, computeCosts),
             },
@@ -397,7 +404,7 @@ export async function handler(
             storageClass,
             retrievalSpeed,
             restoreWindowDays,
-            ColdStorageRetrievalCosts,
+            coldStorageRetrievalCosts,
           ),
           computeCostUSD: estimateComputeCost(size, computeCosts),
         },

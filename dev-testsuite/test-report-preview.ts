@@ -16,7 +16,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
     copySetsMetadata: {
       name: "file_1.fastq",
       size: 123456789,
-      FileCostEstimate: {
+      costEstimate: {
         crossRegionCostUSD: 0.12,
         coldStorageRetrievalCostUSD: 0.05,
         computeCostUSD: 0.01,
@@ -37,7 +37,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
     copySetsMetadata: {
       name: "file_2.bam",
       size: 987654321,
-      FileCostEstimate: {
+      costEstimate: {
         crossRegionCostUSD: 0.1,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
@@ -58,7 +58,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
     copySetsMetadata: {
       name: "file_3.fastq.ora",
       size: 345678901,
-      FileCostEstimate: {
+      costEstimate: {
         crossRegionCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
@@ -82,7 +82,7 @@ const reportMetadataCopy: ReportMetadata[] = [
     copySetsMetadata: {
       name: "file_1.fastq",
       size: 123456789,
-      FileCostEstimate: {
+      costEstimate: {
         crossRegionCostUSD: 0.12,
         coldStorageRetrievalCostUSD: 0.05,
         computeCostUSD: 0.01,
@@ -103,7 +103,7 @@ const reportMetadataCopy: ReportMetadata[] = [
     copySetsMetadata: {
       name: "file_2.bam",
       size: 987654321,
-      FileCostEstimate: {
+      costEstimate: {
         crossRegionCostUSD: 0.1,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
@@ -125,7 +125,7 @@ const reportMetadataCopy: ReportMetadata[] = [
     copySetsMetadata: {
       name: "file_3.fastq.ora",
       size: 345678901,
-      FileCostEstimate: {
+      costEstimate: {
         crossRegionCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,

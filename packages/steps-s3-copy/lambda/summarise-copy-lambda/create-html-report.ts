@@ -9,11 +9,9 @@ import {
   fill_template,
 } from "./html-report-utils.ts";
 
-import {
-  fetchColdStorageRetrievalCosts,
-  fetchCrossRegionCosts,
-  fetchComputeCosts,
-} from "../common/cost-estimation.ts";
+import { readPricingDataJsonFromS3 } from "../common/cost-estimation";
+import type { PricingData } from "../common/cost-estimation";
+import { S3Client } from "@aws-sdk/client-s3";
 
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
@@ -73,29 +71,40 @@ export async function createHtmlReport(opts: {
     ? rows.reduce((a, r) => a + (r.copyResultMetadata.speed || 0), 0) / total
     : 0;
 
-  // Calculate total costs using only reportMetadata
-  const totalCrossRegionCost = reportMetadata.reduce(
-    (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.crossRegionCostUSD,
-    0,
-  );
-  const totalColdCost = reportMetadata.reduce(
+  // Calculate total estimated costs
+  const totalCrossRegionCost = (reportMetadata ?? []).reduce(
     (sum, s) =>
-      sum + s.copySetsMetadata.FileCostEstimate.coldStorageRetrievalCostUSD,
+      sum + (s?.copySetsMetadata?.costEstimate?.crossRegionCostUSD ?? 0),
     0,
   );
-  const totalComputeCost = reportMetadata.reduce(
-    (sum, s) => sum + s.copySetsMetadata.FileCostEstimate.computeCostUSD,
+  const totalColdCost = (reportMetadata ?? []).reduce(
+    (sum, s) =>
+      sum +
+      (s?.copySetsMetadata?.costEstimate?.coldStorageRetrievalCostUSD ?? 0),
+    0,
+  );
+  const totalComputeCost = (reportMetadata ?? []).reduce(
+    (sum, s) => sum + (s?.copySetsMetadata?.costEstimate?.computeCostUSD ?? 0),
     0,
   );
   const totalCost = totalCrossRegionCost + totalColdCost + totalComputeCost;
 
   // Create cost estimation block HTML
 
-  // Fetch cost info from API - Cost estimation is for of each item
-  const coldStorageRetrievalCosts =
-    await fetchColdStorageRetrievalCosts("ap-southeast-2");
-  const crossRegionCosts = await fetchCrossRegionCosts("ap-southeast-2");
-  const computeCosts = await fetchComputeCosts("ap-southeast-2");
+  const client = new S3Client({});
+  const bucket = "harcodedfornow";
+  const key = "pricing-data.json";
+
+  // Read Pricing Data fetcheched from the API
+  const pricingData: PricingData = await readPricingDataJsonFromS3(
+    client,
+    bucket,
+    key,
+  );
+
+  const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
+  const crossRegionCosts = pricingData.crossRegionCosts;
+  const computeCosts = pricingData.computeCosts;
 
   const costEstimationBlock = createCostEstimationBlock(
     totalCrossRegionCost,
