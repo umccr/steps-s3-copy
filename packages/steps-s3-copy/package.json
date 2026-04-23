@@ -61,11 +61,13 @@
     "@types/tmp": "0.2.6",
     "aws-cdk-lib": "2.250.0",
     "constructs": "10.6.0",
+    "esbuild": "0.28.0",
     "jsii": "5.9.37",
     "jsii-pacmak": "1.128.0",
     "jsii-rosetta": "5.9.39",
     "nodejs-polars": "0.24.1",
     "publib": "0.2.1041",
-    "tsx": "4.21.0"
+    "tsx": "4.21.0",
+    "typescript": "6.0.2"
   }
 }

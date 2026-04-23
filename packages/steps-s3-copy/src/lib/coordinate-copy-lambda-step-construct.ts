@@ -1,6 +1,6 @@
 import { Construct } from "constructs";
 import { IRole } from "aws-cdk-lib/aws-iam";
-import { Duration, DockerImage } from "aws-cdk-lib";
+import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -40,10 +40,7 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
           minify: false,
           forceDockerBundling: true,
           nodeModules: ["nodejs-polars", "tmp", "@aws-sdk/lib-storage"],
-          dockerImage: DockerImage.fromBuild(lambdaFolder, {
-            file: "bundler.Dockerfile",
-            platform: "linux/arm64",
-          }),
+          platform: "linux/arm64",
         },
         // possibly this function needs to load some larger (GiB?) manifest files so we give it plenty
         // of time, though I expect it till not need this most of the time
