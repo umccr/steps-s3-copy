@@ -38,16 +38,34 @@
     }
   },
   "peerDependencies": {
-    "aws-cdk-lib": "^2.192.0",
-    "constructs": "^10.4.2"
+    "aws-cdk-lib": "^2.250.0",
+    "constructs": "^10.6.0"
   },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1030.0",
+    "@aws-sdk/client-secrets-manager": "3.1030.0",
+    "@aws-sdk/lib-storage": "3.1030.0",
+    "csv-stringify": "6.7.0",
+    "tmp": "0.2.5"
+  },
+  "bundledDependencies": [
+    "@aws-sdk/client-s3",
+    "@aws-sdk/client-secrets-manager",
+    "@aws-sdk/lib-storage",
+    "csv-stringify",
+    "tmp"
+  ],
   "devDependencies": {
+    "@types/aws-lambda": "8.10.161",
     "@types/node": "22.19.17",
-    "aws-cdk-lib": "2.192.0",
-    "constructs": "10.4.2",
+    "@types/tmp": "0.2.6",
+    "aws-cdk-lib": "2.250.0",
+    "constructs": "10.6.0",
     "jsii": "5.9.37",
     "jsii-pacmak": "1.128.0",
     "jsii-rosetta": "5.9.39",
-    "publib": "0.2.1041"
+    "nodejs-polars": "0.24.1",
+    "publib": "0.2.1041",
+    "tsx": "4.21.0"
   }
 }

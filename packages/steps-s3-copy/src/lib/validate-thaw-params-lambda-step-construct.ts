@@ -19,10 +19,9 @@ export class ValidateThawParamsLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
+    const packageRoot = join(__dirname, "..", "..");
     const lambdaFolder = join(
-      __dirname,
-      "..",
-      "..",
+      packageRoot,
       "lambda",
       "validate-thaw-params-lambda",
     );
@@ -30,9 +29,10 @@ export class ValidateThawParamsLambdaStepConstruct extends Construct {
     this.stateName = "Validate Thaw Params";
 
     this.lambda = new NodejsFunction(this, "ValidateThawParamsFunction", {
+      projectRoot: packageRoot,
       role: props.writerRole,
       entry: join(lambdaFolder, "validate-thaw-params-lambda.ts"),
-      depsLockFilePath: join(lambdaFolder, "package-lock.json"),
+      depsLockFilePath: join(packageRoot, "bun.lock"),
       runtime: Runtime.NODEJS_22_X,
       handler: "handler",
       bundling: { minify: false },

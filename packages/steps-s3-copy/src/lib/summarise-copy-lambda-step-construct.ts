@@ -39,21 +39,15 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
-        depsLockFilePath: join(lambdaRoot, "package-lock.json"),
+        depsLockFilePath: join(packageRoot, "bun.lock"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.X86_64,
         handler: "handler",
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
           minify: false,
-          // because we install node_modules we want to force the installation in a lambda compatible env
-          forceDockerBundling: true,
-          // and these are the modules we need to install
-          nodeModules: ["csv-stringify"],
           commandHooks: {
             beforeBundling(inputDir: string, outputDir: string) {
-              // inputDir === projectRoot (mounted as /asset-input)
-              // outputDir === /asset-output
               return [
                 `cp "${inputDir}/${lambdaRootRelative}/report_template.html" "${outputDir}/report_template.html"`,
               ];

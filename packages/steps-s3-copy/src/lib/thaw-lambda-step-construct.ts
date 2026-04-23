@@ -36,7 +36,7 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       role: _props.writerRole,
       projectRoot: packageRoot,
       entry: join(lambdaFolder, "can-read-objects-lambda.ts"),
-      depsLockFilePath: join(lambdaFolder, "package-lock.json"),
+      depsLockFilePath: join(packageRoot, "bun.lock"),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
       handler: "handler",

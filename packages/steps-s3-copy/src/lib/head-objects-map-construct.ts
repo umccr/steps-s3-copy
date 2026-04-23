@@ -134,12 +134,7 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
         "head-objects-lambda",
         "head-objects-lambda.ts",
       ),
-      depsLockFilePath: join(
-        packageRoot,
-        "lambda",
-        "head-objects-lambda",
-        "package-lock.json",
-      ),
+      depsLockFilePath: join(packageRoot, "bun.lock"),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
       handler: "handler",

@@ -5,8 +5,7 @@
   "description": "The root package of a mono repo for Steps S3 copy",
   "workspaces": [
     "dev",
-    "packages/*",
-    "packages/steps-s3-copy/lambda/*"
+    "packages/*"
   ],
   "scripts": {
     "build": "bun run --filter './packages/**' build",
@@ -14,7 +13,8 @@
     "package": "bun run --filter './packages/**' package",
     "clean": "git clean -fXd",
     "dev-deploy": "cd dev && bun run --cwd .. build && bunx cdk deploy",
-    "dev-destroy": "cd dev && bun run --cwd .. build && bunx cdk destroy"
+    "dev-destroy": "cd dev && bun run --cwd .. build && bunx cdk destroy",
+    "postinstall": "cp bun.lock packages/steps-s3-copy/bun.lock"
   },
   "keywords": [],
   "author": {
@@ -23,7 +23,6 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@tsconfig/node22": "22.0.5",
     "@types/node": "22.19.17",
     "esbuild": "0.28.0",
     "prettier": "3.8.3",

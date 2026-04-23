@@ -26,7 +26,7 @@ jobs:
 
       # first set the version tag of our package to the release version
 
-      - run: npm version ${{github.ref_name}}
+      - run: bun pm version ${{github.ref_name}}
         working-directory: packages/steps-s3-copy
 
       # build and package
