@@ -22,9 +22,10 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
     const packageRoot = join(__dirname, "..", "..");
     const lambdaFolder = join(packageRoot, "lambda", "coordinate-copy-lambda");
 
-    // nodejs-polars ships architecture-specific native .node binaries, so it is
-    // kept out of the esbuild bundle which would fail. It uses a docker bundler
-    // instead.
+    // nodejs-polars has native .node binaries, so it is removed from esbuild bundle. It's also intentionally only
+    // a devDependency, so that it doesn't need to be a bundledDependency according to jsii. This means that it won't
+    // unnecessarily bundle all architectures, and the NodejsFunction bundler doesn't mind finding it in
+    // devDependencies.
     const coordinateCopyLambda = new NodejsFunction(
       this,
       "CoordinateCopyFunction",
@@ -35,18 +36,28 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
         depsLockFilePath: join(packageRoot, "bun.lock"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.ARM_64,
-        handler: "handler",
-        bundling: {
-          minify: false,
-          forceDockerBundling: true,
-          nodeModules: ["nodejs-polars", "tmp", "@aws-sdk/lib-storage"],
-          platform: "linux/arm64",
-        },
         // possibly this function needs to load some larger (GiB?) manifest files so we give it plenty
         // of time, though I expect it till not need this most of the time
         timeout: Duration.minutes(5),
         // similarly for memory, it may have to put an entire (GiB?) manifest in memory
         memorySize: 8192,
+        handler: "handler",
+        bundling: {
+          minify: false,
+          // because we install node_modules we want to force the installation in a lambda compatible env
+          forceDockerBundling: true,
+          // we have difficulty bundling nodejs-polars due to esbuild not understanding
+          // *.node binary files in the dependent arch/platform builds - so we
+          // declare the parent npm package to be a module to install this means that the reference to
+          // nodejs-polars is left unchanged by esbuild, *and* we npm install nodejs-polars which brings in
+          // the large platform dependent binaries
+          nodeModules: [
+            "nodejs-polars",
+            "tmp",
+            "@aws-sdk/client-s3",
+            "@aws-sdk/lib-storage",
+          ],
+        },
       },
     );
 

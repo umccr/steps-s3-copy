@@ -1,4 +1,4 @@
 {
   "extends": "@tsconfig/bun/tsconfig.json",
-  "exclude": ["node_modules", "cdk.out"]
+  "exclude": ["cdk.out"]
 }

@@ -15,20 +15,20 @@
     "step-head-objects": "bun test ./test-step-head-objects-lambda.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "3.1030.0",
-    "@aws-sdk/client-s3": "3.1030.0",
-    "@aws-sdk/client-secrets-manager": "3.1030.0",
-    "@aws-sdk/client-sfn": "3.1030.0",
-    "@aws-sdk/client-sts": "3.1030.0",
-    "@aws-sdk/crc64-nvme-crt": "3.1030.0",
-    "@smithy/util-waiter": "4.2.15",
-    "aws-crt": "1.31.0",
-    "crc": "4.3.2",
-    "p-limit": "7.3.0"
+    "@aws-sdk/client-cloudformation": "^3.1035.0",
+    "@aws-sdk/client-s3": "^3.1035.0",
+    "@aws-sdk/client-secrets-manager": "^3.1035.0",
+    "@aws-sdk/client-sfn": "^3.1035.0",
+    "@aws-sdk/client-sts": "^3.1035.0",
+    "@aws-sdk/crc64-nvme-crt": "^3.1035.0",
+    "@smithy/util-waiter": "^4.2.16",
+    "aws-crt": "^1.31.0",
+    "crc": "^4.3.2",
+    "p-limit": "^7.3.0"
   },
   "devDependencies": {
-    "@tsconfig/bun": "1.0.10",
-    "@types/bun": "1.3.12",
-    "typescript": "6.0.2"
+    "@tsconfig/bun": "^1.0.10",
+    "@types/bun": "^1.3.13",
+    "typescript": "6.0.3"
   }
 }

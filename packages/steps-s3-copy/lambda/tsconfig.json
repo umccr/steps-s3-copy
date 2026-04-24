@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["es2024", "ESNext.Array", "ESNext.Collection", "ESNext.Iterator"],
+    "lib": ["es2024"],
     "target": "es2022",
     "strict": true,
     "esModuleInterop": true,
