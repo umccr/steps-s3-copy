@@ -24,6 +24,13 @@ To remove entirely
 bun run dev-destroy
 ```
 
+Note that in `dev/`, it's required to re-install after running the `build` command for
+the first time. This is because `dev/` consumes `@umccr/steps-s3-copy` through a `file:`
+dependency, which fails to see the package if it is not built, and therefore doesn't link
+it.
+
+When using the top-level `dev-deploy` or `dev-synth` this is automatically done.
+
 ## Graph
 
 ![Graph](stepfunctions_graph.svg)
