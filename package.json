@@ -3,18 +3,19 @@
   "private": true,
   "version": "0.0.0",
   "description": "The root package of a mono repo for Steps S3 copy",
+  "workspaces": [
+    "packages/*",
+    "dev",
+    "dev-testsuite"
+  ],
   "scripts": {
     "build": "cd packages/steps-s3-copy && bun run build",
     "watch": "cd packages/steps-s3-copy && bun run build:watch",
     "package": "cd packages/steps-s3-copy && bun run package",
     "clean": "git clean -fXd",
-    "dev-deploy": "bun run build && cd dev && bun install && bunx cdk deploy",
-    "dev-destroy": "bun run build && cd dev && bun install && bunx cdk destroy",
-    "dev-synth": "bun run build && cd dev && bun install && bunx cdk synth",
-    "install:steps-s3-copy": "cd packages/steps-s3-copy && bun install",
-    "install:dev": "cd dev && bun install",
-    "install:dev-testsuite": "cd dev-testsuite && bun install",
-    "postinstall": "bun run install:steps-s3-copy && bun run install:dev && bun run install:dev-testsuite"
+    "dev-deploy": "bun run build && cd dev && bunx cdk deploy",
+    "dev-destroy": "bun run build && cd dev && bunx cdk destroy",
+    "dev-synth": "bun run build && cd dev && bunx cdk synth"
   },
   "keywords": [],
   "author": {

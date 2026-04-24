@@ -39,7 +39,6 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
-        depsLockFilePath: join(packageRoot, "bun.lock"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.X86_64,
         handler: "handler",

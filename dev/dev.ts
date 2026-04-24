@@ -7,7 +7,7 @@ import {
   Duration,
   RemovalPolicy,
   Stack,
-  StackProps,
+  type StackProps,
 } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Bucket } from "aws-cdk-lib/aws-s3";

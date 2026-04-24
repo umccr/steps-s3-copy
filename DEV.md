@@ -24,12 +24,9 @@ To remove entirely
 bun run dev-destroy
 ```
 
-Note that in `dev/`, it's required to re-install after running the `build` command for
-the first time. This is because `dev/` consumes `@umccr/steps-s3-copy` through a `file:`
-dependency, which fails to see the package if it is not built, and therefore doesn't link
-it.
-
-When using the top-level `dev-deploy` or `dev-synth` this is automatically done.
+A single install in this repo will install all dependencies across packages, as the structure is set-up as a
+bun workspace. This also means that the consumer's lockfile is used for the steps-s3-copy package when bundling,
+but this shouldn't be an issue and is expected behaviour for a CDK consumer.
 
 ## Graph
 

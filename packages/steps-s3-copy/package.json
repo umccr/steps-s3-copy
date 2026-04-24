@@ -38,7 +38,7 @@
     }
   },
   "peerDependencies": {
-    "aws-cdk-lib": "^2.190.0",
+    "aws-cdk-lib": "^2.215.0",
     "constructs": "^10.0.0"
   },
   "dependencies": {
@@ -59,8 +59,8 @@
     "@types/aws-lambda": "^8.10.161",
     "@types/node": "^22.19.17",
     "@types/tmp": "^0.2.6",
-    "aws-cdk-lib": "2.190.0",
-    "constructs": "10.0.0",
+    "aws-cdk-lib": "^2.215.0",
+    "constructs": "^10.0.0",
     "esbuild": "^0.28.0",
     "jsii": "^5.9.37",
     "jsii-pacmak": "^1.128.0",

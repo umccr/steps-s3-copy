@@ -33,7 +33,6 @@ export class CanWriteLambdaStepConstruct extends Construct {
       projectRoot: packageRoot,
       role: props.writerRole,
       entry: join(lambdaFolder, "can-write-lambda.ts"),
-      depsLockFilePath: join(packageRoot, "bun.lock"),
       runtime: Runtime.NODEJS_22_X,
       handler: "handler",
       bundling: {

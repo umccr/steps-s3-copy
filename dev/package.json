@@ -4,15 +4,16 @@
   "version": "0.0.0",
   "description": "Manual CDK deployment for development at UMCCR",
   "dependencies": {
-    "aws-cdk-lib": "^2.250.0",
-    "constructs": "^10.6.0",
-    "@umccr/steps-s3-copy": "file:../packages/steps-s3-copy"
+    "aws-cdk-lib": "^2.215.0",
+    "constructs": "^10.0.0",
+    "@umccr/steps-s3-copy": "workspace:*"
   },
   "devDependencies": {
     "@tsconfig/bun": "^1.0.10",
     "@types/bun": "^1.3.13",
     "aws-cdk": "^2.1119.0",
     "esbuild": "^0.28.0",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@types/node": "^22.13.14"
   }
 }

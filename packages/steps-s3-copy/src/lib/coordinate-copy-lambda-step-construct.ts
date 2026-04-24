@@ -33,7 +33,6 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
         projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaFolder, "coordinate-copy-lambda.ts"),
-        depsLockFilePath: join(packageRoot, "bun.lock"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.ARM_64,
         // possibly this function needs to load some larger (GiB?) manifest files so we give it plenty

@@ -32,7 +32,6 @@ export class ValidateThawParamsLambdaStepConstruct extends Construct {
       projectRoot: packageRoot,
       role: props.writerRole,
       entry: join(lambdaFolder, "validate-thaw-params-lambda.ts"),
-      depsLockFilePath: join(packageRoot, "bun.lock"),
       runtime: Runtime.NODEJS_22_X,
       handler: "handler",
       bundling: { minify: false },
