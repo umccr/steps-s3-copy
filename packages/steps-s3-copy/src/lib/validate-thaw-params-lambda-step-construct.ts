@@ -29,7 +29,6 @@ export class ValidateThawParamsLambdaStepConstruct extends Construct {
     this.stateName = "Validate Thaw Params";
 
     this.lambda = new NodejsFunction(this, "ValidateThawParamsFunction", {
-      projectRoot: packageRoot,
       role: props.writerRole,
       entry: join(lambdaFolder, "validate-thaw-params-lambda.ts"),
       runtime: Runtime.NODEJS_22_X,

@@ -4,6 +4,7 @@ import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
@@ -22,6 +23,16 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
     const packageRoot = join(__dirname, "..", "..");
     const lambdaFolder = join(packageRoot, "lambda", "coordinate-copy-lambda");
 
+    const pkg = JSON.parse(
+      readFileSync(join(packageRoot, "package.json"), "utf8"),
+    );
+    const polarsVersion: string | undefined =
+      pkg.devDependencies?.["nodejs-polars"] ??
+      pkg.dependencies?.["nodejs-polars"];
+    if (!polarsVersion) {
+      throw new Error("nodejs-polars version not found in package.json");
+    }
+
     // nodejs-polars has native .node binaries, so it is removed from esbuild bundle. It's also intentionally only
     // a devDependency, so that it doesn't need to be a bundledDependency according to jsii. This means that it won't
     // unnecessarily bundle all architectures, and the NodejsFunction bundler doesn't mind finding it in
@@ -30,7 +41,6 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
       this,
       "CoordinateCopyFunction",
       {
-        projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaFolder, "coordinate-copy-lambda.ts"),
         runtime: Runtime.NODEJS_22_X,
@@ -50,12 +60,20 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
           // declare the parent npm package to be a module to install this means that the reference to
           // nodejs-polars is left unchanged by esbuild, *and* we npm install nodejs-polars which brings in
           // the large platform dependent binaries
-          nodeModules: [
-            "nodejs-polars",
-            "tmp",
-            "@aws-sdk/client-s3",
-            "@aws-sdk/lib-storage",
-          ],
+          externalModules: ["@aws-sdk/*", "nodejs-polars"],
+          commandHooks: {
+            beforeBundling() {
+              return [];
+            },
+            beforeInstall() {
+              return [];
+            },
+            afterBundling(_inputDir: string, outputDir: string) {
+              return [
+                `cd "${outputDir}" && npm install --no-save --omit=dev nodejs-polars@${polarsVersion}`,
+              ];
+            },
+          },
         },
       },
     );

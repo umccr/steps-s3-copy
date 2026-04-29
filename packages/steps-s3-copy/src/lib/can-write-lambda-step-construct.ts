@@ -30,7 +30,6 @@ export class CanWriteLambdaStepConstruct extends Construct {
     this.stateName = `Can Write To Destination Bucket?`;
 
     this.lambda = new NodejsFunction(this, "CanWriteFunction", {
-      projectRoot: packageRoot,
       role: props.writerRole,
       entry: join(lambdaFolder, "can-write-lambda.ts"),
       runtime: Runtime.NODEJS_22_X,

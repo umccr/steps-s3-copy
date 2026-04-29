@@ -4,7 +4,7 @@ import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type SummariseCopyLambdaStepProps = {
@@ -30,13 +30,11 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
 
     const packageRoot = join(__dirname, "..", "..");
     const lambdaRoot = join(packageRoot, "lambda", "summarise-copy-lambda");
-    const lambdaRootRelative = join("lambda", "summarise-copy-lambda");
 
     const summariseCopyLambda = new NodejsFunction(
       this,
       "SummariseCopyFunction",
       {
-        projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
         runtime: Runtime.NODEJS_22_X,
@@ -47,8 +45,9 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           minify: false,
           commandHooks: {
             beforeBundling(inputDir: string, outputDir: string) {
+              const rel = relative(inputDir, lambdaRoot);
               return [
-                `cp "${inputDir}/${lambdaRootRelative}/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/${rel}/report_template.html" "${outputDir}/report_template.html"`,
               ];
             },
             afterBundling() {
