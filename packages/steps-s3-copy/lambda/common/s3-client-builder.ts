@@ -22,6 +22,10 @@ export async function buildS3Client(
     bucketName in bucketDefinitions
   ) {
     const def = bucketDefinitions[bucketName];
+    if (def === undefined) {
+      throw new Error(`bucket "${bucketName}" is undefined`);
+    }
+
     const config: S3ClientConfig = {};
 
     if (def.endpointUrl !== undefined) {

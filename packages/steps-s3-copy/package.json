@@ -31,19 +31,43 @@
     "targets": {},
     "tsc": {
       "outDir": "out",
-      "rootDir": "src"
+      "rootDir": "src",
+      "types": [
+        "node"
+      ]
     }
   },
   "peerDependencies": {
-    "aws-cdk-lib": "^2.192.0",
-    "constructs": "^10.4.2"
+    "aws-cdk-lib": "^2.215.0",
+    "constructs": "^10.0.0"
   },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1035.0",
+    "@aws-sdk/client-secrets-manager": "^3.1035.0",
+    "@aws-sdk/lib-storage": "^3.1035.0",
+    "csv-stringify": "^6.7.0",
+    "tmp": "^0.2.5"
+  },
+  "bundledDependencies": [
+    "@aws-sdk/client-s3",
+    "@aws-sdk/client-secrets-manager",
+    "@aws-sdk/lib-storage",
+    "csv-stringify",
+    "tmp"
+  ],
   "devDependencies": {
-    "aws-cdk-lib": "2.192.0",
-    "constructs": "10.4.2",
-    "jsii": "5.9.22",
-    "jsii-pacmak": "1.125.0",
-    "jsii-rosetta": "5.9.26",
-    "publib": "0.2.1028"
+    "@types/aws-lambda": "^8.10.161",
+    "@types/node": "^22.19.17",
+    "@types/tmp": "^0.2.6",
+    "aws-cdk-lib": "2.215.0",
+    "constructs": "10.0.0",
+    "esbuild": "^0.28.0",
+    "jsii": "^5.9.37",
+    "jsii-pacmak": "^1.128.0",
+    "jsii-rosetta": "^5.9.42",
+    "publib": "^0.2.1042",
+    "tsx": "^4.21.0",
+    "typescript": "6.0.3",
+    "nodejs-polars": "^0.24.1"
   }
 }

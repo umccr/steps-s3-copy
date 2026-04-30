@@ -14,7 +14,11 @@ import { Hash } from "node:crypto";
 import crc from "crc";
 import { Transform } from "node:stream";
 import stream from "node:stream";
-import { BinaryLike, BinaryToTextEncoding, Encoding } from "crypto";
+import {
+  type BinaryLike,
+  type BinaryToTextEncoding,
+  type Encoding,
+} from "crypto";
 
 class CrcHash extends Transform {
   implementation: any;
@@ -42,12 +46,12 @@ class CrcHash extends Transform {
     };
   }
 
-  _transform(chunk: any, encoding: any, callback: any) {
+  override _transform(chunk: any, encoding: any, callback: any) {
     this.value = this.implementation(chunk, this.value);
     callback();
   }
 
-  _flush(callback: any) {
+  override _flush(callback: any) {
     var buffer = this.getResultBuffer();
     this.push(buffer);
     callback();
@@ -74,7 +78,7 @@ class CrcHash extends Transform {
         encoding = "binary";
       }
       // Create Buffer for data
-      data = Buffer.from(data, encoding);
+      data = Buffer.from(data.toString(), encoding);
     }
     // Update hash and return
     this.value = this.implementation(data, this.value);

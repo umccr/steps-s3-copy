@@ -1,4 +1,4 @@
 {
-  "app": "npx ts-node --prefer-ts-exts dev.ts",
+  "app": "bun run dev.ts",
   "context": {}
 }

@@ -127,18 +127,11 @@ export class HeadObjectsLambdaStepConstruct extends Construct {
     this.lambda = new NodejsFunction(this, "HeadObjectsFunction", {
       // our pre-made role will have the ability to read source objects
       role: _props.writerRole,
-      projectRoot: packageRoot,
       entry: join(
         packageRoot,
         "lambda",
         "head-objects-lambda",
         "head-objects-lambda.ts",
-      ),
-      depsLockFilePath: join(
-        packageRoot,
-        "lambda",
-        "head-objects-lambda",
-        "package-lock.json",
       ),
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,

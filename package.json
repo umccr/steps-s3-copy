@@ -3,26 +3,24 @@
   "private": true,
   "version": "0.0.0",
   "description": "The root package of a mono repo for Steps S3 copy",
-  "packageManager": "pnpm@9.10.0",
+  "workspaces": [
+    "packages/*",
+    "dev",
+    "dev-testsuite"
+  ],
   "scripts": {
-    "build": "pnpm --stream --filter \"./packages/**\" run build",
-    "watch": "pnpm --stream --filter \"./packages/**\" run build:watch",
-    "package": "pnpm --stream --filter \"./packages/**\" run package",
+    "build": "cd packages/steps-s3-copy && bun run build",
+    "watch": "cd packages/steps-s3-copy && bun run build:watch",
+    "package": "cd packages/steps-s3-copy && bun run package",
     "clean": "git clean -fXd",
-    "dev-deploy": "cd dev && pnpm -w run build && pnpx cdk deploy",
-    "dev-destroy": "cd dev && pnpm -w run build && pnpx cdk destroy"
+    "dev-deploy": "bun run build && cd dev && bunx cdk deploy",
+    "dev-destroy": "bun run build && cd dev && bunx cdk destroy",
+    "dev-synth": "bun run build && cd dev && bunx cdk synth"
   },
   "keywords": [],
   "author": {
     "name": "University of Melbourne Centre for Cancer Research",
     "organization": true
   },
-  "license": "MIT",
-  "devDependencies": {
-    "@tsconfig/node22": "22.0.2",
-    "@types/node": "22.15.26",
-    "esbuild": "0.25.5",
-    "prettier": "3.5.3",
-    "typescript": "5.8.3"
-  }
+  "license": "MIT"
 }

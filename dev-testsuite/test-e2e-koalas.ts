@@ -89,8 +89,12 @@ test(
 
     console.info("Copy finished");
 
-    // debug
-    // console.log(executionResult);
+    if (executionResult.state !== WaiterState.SUCCESS) {
+      console.error(
+        "execution failure detail:",
+        JSON.stringify(executionResult.reason, null, 2),
+      );
+    }
 
     assert(
       executionResult.state === WaiterState.SUCCESS,

@@ -10,23 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: "pnpm"
+      - run: bun install
 
-      - run: pnpm install
-
-      - run: pnpm run build
-#      - name: Setup Rclone
-#        uses: animmouse/setup-rclone@v1
-
-#      - run: ./test-go-direct.sh
-#        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
-
-#      - run: ./test-docker-direct.sh
-#        working-directory: packages/aws-copy-out-sharer/docker/rclone-batch-docker-image
-#      - run: pnpm run build
-#      - run: pnpm run package
+      - run: bun run build

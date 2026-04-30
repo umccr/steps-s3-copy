@@ -15,26 +15,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
 
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-          cache: "pnpm"
 
-      - run: pnpm install
+      - run: bun install
 
       # first set the version tag of our package to the release version
 
-      - run: pnpm version ${{github.ref_name}}
+      - run: bun pm version ${{github.ref_name}}
         working-directory: packages/steps-s3-copy
 
       # build and package
 
-      - run: pnpm run build
+      - run: bun run build
 
-      - run: pnpm run package
+      - run: bun run package
 
       # if all the builds have completed - we can publish the package
       # publib-npm needs newest NPM 11 to have trusted publisher mode.
@@ -42,7 +41,7 @@ jobs:
       - run: corepack enable npm
       - run: corepack install -g npm@11
 
-      - run: pnpm exec publib-npm
+      - run: bunx publib-npm
         working-directory: packages/steps-s3-copy
         env:
           NPM_TRUSTED_PUBLISHER: true

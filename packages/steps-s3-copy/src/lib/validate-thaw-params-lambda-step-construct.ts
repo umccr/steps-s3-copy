@@ -19,10 +19,9 @@ export class ValidateThawParamsLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
+    const packageRoot = join(__dirname, "..", "..");
     const lambdaFolder = join(
-      __dirname,
-      "..",
-      "..",
+      packageRoot,
       "lambda",
       "validate-thaw-params-lambda",
     );

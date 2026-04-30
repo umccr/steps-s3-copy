@@ -4,7 +4,7 @@ import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type SummariseCopyLambdaStepProps = {
@@ -30,32 +30,24 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
 
     const packageRoot = join(__dirname, "..", "..");
     const lambdaRoot = join(packageRoot, "lambda", "summarise-copy-lambda");
-    const lambdaRootRelative = join("lambda", "summarise-copy-lambda");
 
     const summariseCopyLambda = new NodejsFunction(
       this,
       "SummariseCopyFunction",
       {
-        projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
-        depsLockFilePath: join(lambdaRoot, "package-lock.json"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.X86_64,
         handler: "handler",
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
           minify: false,
-          // because we install node_modules we want to force the installation in a lambda compatible env
-          forceDockerBundling: true,
-          // and these are the modules we need to install
-          nodeModules: ["csv-stringify"],
           commandHooks: {
             beforeBundling(inputDir: string, outputDir: string) {
-              // inputDir === projectRoot (mounted as /asset-input)
-              // outputDir === /asset-output
+              const rel = relative(inputDir, lambdaRoot);
               return [
-                `cp "${inputDir}/${lambdaRootRelative}/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/${rel}/report_template.html" "${outputDir}/report_template.html"`,
               ];
             },
             afterBundling() {

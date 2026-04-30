@@ -125,7 +125,8 @@ export async function handler(event: LambdaEvent) {
     // is fine for the moment - we just allocate a decent amount of memory to this lambda
     const getSuccessContent = await getSuccessResult.Body!.transformToString();
 
-    const df = pl.readJSON(getSuccessContent, {
+    // Buffer path goes to native `readJson` which supports "lines"
+    const df = pl.readJSON(Buffer.from(getSuccessContent), {
       // we infer the schema from the entire table
       inferSchemaLength: null,
       format: "lines",

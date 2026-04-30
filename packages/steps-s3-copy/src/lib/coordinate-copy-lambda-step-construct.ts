@@ -4,6 +4,7 @@ import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
@@ -22,15 +23,26 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
     const packageRoot = join(__dirname, "..", "..");
     const lambdaFolder = join(packageRoot, "lambda", "coordinate-copy-lambda");
 
+    const pkg = JSON.parse(
+      readFileSync(join(packageRoot, "package.json"), "utf8"),
+    );
+    const polarsVersion: string | undefined =
+      pkg.devDependencies?.["nodejs-polars"] ??
+      pkg.dependencies?.["nodejs-polars"];
+    if (!polarsVersion) {
+      throw new Error("nodejs-polars version not found in package.json");
+    }
+
+    // nodejs-polars has native .node binaries, so it is removed from esbuild bundle. It's also intentionally only
+    // a devDependency, so that it doesn't need to be a bundledDependency according to jsii. This means that it won't
+    // unnecessarily bundle all architectures, and the NodejsFunction bundler doesn't mind finding it in
+    // devDependencies.
     const coordinateCopyLambda = new NodejsFunction(
       this,
       "CoordinateCopyFunction",
       {
-        projectRoot: packageRoot,
         role: props.writerRole,
         entry: join(lambdaFolder, "coordinate-copy-lambda.ts"),
-        // note we need to specify this or else it attempts to use the top-level pnpm lock files
-        depsLockFilePath: join(lambdaFolder, "package-lock.json"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.ARM_64,
         // possibly this function needs to load some larger (GiB?) manifest files so we give it plenty
@@ -45,17 +57,23 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
           forceDockerBundling: true,
           // we have difficulty bundling nodejs-polars due to esbuild not understanding
           // *.node binary files in the dependent arch/platform builds - so we
-          // declare the parent npm package to be external *and* a module to install
-          // this means that the reference to nodejs-polars is left unchanged by esbuild, *and*
-          // we npm install nodejs-polars which brings in the large platform dependent binaries
-          externalModules: ["nodejs-polars"],
-          nodeModules: [
-            "nodejs-polars",
-            "tmp",
-            "@aws-sdk/client-s3",
-            "@aws-sdk/client-secrets-manager",
-            "@aws-sdk/lib-storage",
-          ],
+          // declare the parent npm package to be a module to install this means that the reference to
+          // nodejs-polars is left unchanged by esbuild, *and* we npm install nodejs-polars which brings in
+          // the large platform dependent binaries
+          externalModules: ["@aws-sdk/*", "nodejs-polars"],
+          commandHooks: {
+            beforeBundling() {
+              return [];
+            },
+            beforeInstall() {
+              return [];
+            },
+            afterBundling(_inputDir: string, outputDir: string) {
+              return [
+                `cd "${outputDir}" && npm install --no-save --omit=dev nodejs-polars@${polarsVersion}`,
+              ];
+            },
+          },
         },
       },
     );

@@ -5,7 +5,7 @@ import { execSync } from "node:child_process";
 import { createHtmlReport, type FileResult } from "./create-html-report.ts";
 
 // Run:
-//   npx tsx packages/steps-s3-copy/lambda/summarise-copy-lambda/preview-copy-report.ts
+//   bun run packages/steps-s3-copy/lambda/summarise-copy-lambda/preview-copy-report.ts
 //
 // It will write dev_copy_report.html next to this file and try to open it.
 
