@@ -41,6 +41,12 @@ jobs:
       - run: corepack enable npm
       - run: corepack install -g npm@11
 
+      # Bun has an issue with installing bundledDependencies without symlinks which
+      # breaks the published package, so a prepack script is required to ensure that
+      # package is properly bundled.
+      - run: npm install --omit=dev --no-package-lock --legacy-peer-deps --ignore-scripts --workspaces=false
+        working-directory: packages/steps-s3-copy
+
       - run: bunx publib-npm
         working-directory: packages/steps-s3-copy
         env:
