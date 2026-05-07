@@ -29,23 +29,23 @@ jobs:
       - run: bun pm version ${{github.ref_name}}
         working-directory: packages/steps-s3-copy
 
-      # build and package
+      # build
 
       - run: bun run build
 
-      - run: bun run package
-
-      # if all the builds have completed - we can publish the package
       # publib-npm needs newest NPM 11 to have trusted publisher mode.
       # Currently node 22.22.2 has a broken npm, so use corepack directly.
       - run: corepack enable npm
       - run: corepack install -g npm@11
+
 
       # Bun has an issue with installing bundledDependencies without symlinks which
       # breaks the published package, so a prepack script is required to ensure that
       # package is properly bundled.
       - run: rm -rf node_modules && npm install --no-package-lock --ignore-scripts --workspaces=false
         working-directory: packages/steps-s3-copy
+
+      - run: bun run package
 
       - run: bunx publib-npm
         working-directory: packages/steps-s3-copy
