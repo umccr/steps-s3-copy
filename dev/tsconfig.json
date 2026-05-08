@@ -1,4 +1,7 @@
 {
-  "extends": "@tsconfig/node22/tsconfig.json",
-  "exclude": ["node_modules", "cdk.out"]
+  "extends": "@tsconfig/bun/tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun"]
+  },
+  "exclude": ["cdk.out"]
 }

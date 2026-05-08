@@ -146,7 +146,6 @@ test(
       state.workingBucket,
       state.testDestPrefix,
       sourceObjectParams,
-      testObjects,
     );
   },
   TEST_EXPECTED_SECONDS * 1000,

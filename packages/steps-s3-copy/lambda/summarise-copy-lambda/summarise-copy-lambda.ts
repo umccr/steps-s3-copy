@@ -6,7 +6,9 @@ import {
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
 import { dirname } from "path/posix";
-import { createHtmlReport } from "./create-html-report.ts";
+import { createHtmlReport } from "./create-html-report";
+import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+import { buildS3Client } from "../common/s3-client-builder";
 
 interface InvokeEvent {
   rcloneResultsLarge: {
@@ -30,6 +32,7 @@ interface InvokeEvent {
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
   copyInstructionsKey: string;
+  bucketDefinitions?: Record<string, BucketDefinition>;
   includeCopyReport?: boolean;
   retainCopyReport?: boolean;
   dryRun?: boolean;
@@ -82,13 +85,13 @@ export async function handler(event: InvokeEvent) {
   // debug input event
   console.debug(JSON.stringify(event, null, 2));
 
-  // TODO: requestChecksumCalculation/responseChecksumValidation set to WHEN_REQUIRED as a workaround
-  // for "Unable to calculate hash for flowing readable stream" error introduced in @aws-sdk/client-s3 3.787.0.
-  // It need a proper fix
-  const client = new S3Client({
-    requestChecksumCalculation: "WHEN_REQUIRED",
-    responseChecksumValidation: "WHEN_REQUIRED",
-  });
+  // For the working bucket, no bucket definitions are required.
+  const workingClient = await buildS3Client();
+  // Need to account for bucket definitions for the destination bucket.
+  const destClient = await buildS3Client(
+    event.destinationBucket,
+    event.bucketDefinitions,
+  );
 
   // Determine if we need to generate and store the HTML report(s)
   const includeReport = event.includeCopyReport;
@@ -106,7 +109,7 @@ export async function handler(event: InvokeEvent) {
   ];
 
   const fileCopySetsMetadata = await readFileCopySetsFromJsonl(
-    client,
+    workingClient,
     event.workingBucket,
     copySetsKeys,
   );
@@ -142,7 +145,7 @@ export async function handler(event: InvokeEvent) {
 
     // Read and collate the copy results from the manifest result files, to get a complete set of copy results for all files.
     fileCopyResults = await readFileCopyResultsFromManifests(
-      client,
+      workingClient,
       event.workingBucket,
       manifestKeys,
     );
@@ -207,7 +210,7 @@ export async function handler(event: InvokeEvent) {
 
     // 1) Copy to the destination bucket/folder
     if (includeReport) {
-      await client.send(
+      await destClient.send(
         new PutObjectCommand({
           Bucket: event.destinationBucket,
           Key: htmlKey,
@@ -221,7 +224,7 @@ export async function handler(event: InvokeEvent) {
       const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
       const retainReportKey = sourceFilePrefix + htmlReportName;
 
-      await client.send(
+      await workingClient.send(
         new PutObjectCommand({
           Bucket: event.workingBucket,
           Key: retainReportKey,
@@ -232,7 +235,7 @@ export async function handler(event: InvokeEvent) {
     }
   }
 
-  await client.send(putCommand);
+  await destClient.send(putCommand);
   return {
     status: "OK",
     csvS3Location: {
@@ -305,7 +308,7 @@ async function readFileCopyResultsFromManifests(
       Key: manifestKey,
     });
 
-    const getManifestResult = await client.send(getManifestCommand);
+    const getManifestResult = await workingClient.send(getManifestCommand);
     if (!getManifestResult.Body) {
       throw new Error("Manifest S3 object Body is undefined");
     }
@@ -363,7 +366,7 @@ async function readFileCopyResultsFromManifests(
       Key: succeededFile["Key"],
     });
 
-    const getSuccessResult = await client.send(getSuccessCommand);
+    const getSuccessResult = await workingClient.send(getSuccessCommand);
     if (!getSuccessResult.Body) {
       throw new Error("Success S3 object Body is undefined");
     }

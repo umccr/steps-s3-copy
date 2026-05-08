@@ -1,4 +1,4 @@
-import { StepsS3CopyConstruct } from "steps-s3-copy";
+import { StepsS3CopyConstruct } from "@umccr/steps-s3-copy";
 import { TEST_BUCKET_ONE_DAY_PREFIX } from "../dev-constants/constants";
 import { SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import {
@@ -7,7 +7,7 @@ import {
   Duration,
   RemovalPolicy,
   Stack,
-  StackProps,
+  type StackProps,
 } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { Bucket } from "aws-cdk-lib/aws-s3";

@@ -50,13 +50,26 @@ These tests will establish a source or destination (per test) folder in the work
 bucket and copy from one to the other. The test objects should expire after 1 day
 (using lifecycle rules in a folder called "1day/").
 
-| Test                    | Time Est | Rationale                                                                 |
-| ----------------------- | -------- | ------------------------------------------------------------------------- |
-| `bun run e2e-dryrun`    | < 1min   | Creates a few files and executes in dryrun mode (does no actual copying)  |
-| `bun run e2e-thawing`   | hours    | Creates a variety of sized files in cold storage and restore/copies them  |
-| `bun run e2e-koalas`    | < 5min   | Copies some external data (AWS OpenData koala genomes)                    |
-| `bun run e2e-realistic` | < 5min   | Generates a realistic set of files and copies them including wildcards    |
-| `bun run e2e-large`     | < 2min   | Generates a set of files and creates the copy and estimation html reports |
+| Test                    | Time Est | Rationale                                                                                              |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `bun run e2e-dryrun`    | < 1min   | Creates a few files and executes in dryrun mode (does no actual copying)                               |
+| `bun run e2e-thawing`   | hours    | Creates a variety of sized files in cold storage and restore/copies them                               |
+| `bun run e2e-koalas`    | < 5min   | Copies some external data (AWS OpenData koala genomes)                                                 |
+| `bun run e2e-realistic` | < 5min   | Generates a realistic set of files and copies them including wildcards                                 |
+| `bun run e2e-report`    | < 2min   | Generates a set of files and creates the copy and estimation html reports                              |
+| `bun run e2e-ceph`      | < 10min  | Generates a realistic set of files and copies from S3 to the UniMelb Ceph endpoint using an AWS secret |
+
+### S3 compatible test configuration
+
+The `e2e-ceph` test defaults to the UniMelb Ceph endpoint and bucket. This can be changed to test a different
+S3 compatible endpoint using the following envs:
+
+| Variable                  | Default                                  |
+| ------------------------- | ---------------------------------------- |
+| `STEPS_TEST_ENDPOINT_URL` | `https://objects.storage.unimelb.edu.au` |
+| `STEPS_TEST_SECRET_NAME`  | `ceph-5690-guardians-dev`                |
+| `STEPS_TEST_BUCKET`       | `5690-guardians-dev`                     |
+| `STEPS_TEST_REGION`       | `ap-southeast-2`                         |
 
 ## Local HTML Report Preview
 

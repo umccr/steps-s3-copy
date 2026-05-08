@@ -100,6 +100,11 @@ export class CopyRunTaskConstruct extends Construct {
               // we want to attempt to do the heartbeat some factor more often than the actual timeout
               value: Math.floor(this.HEARTBEAT_TIMEOUT_SECONDS / 4).toString(),
             },
+            {
+              name: "CB_BUCKET_DEFINITIONS",
+              value:
+                "{% $states.input.BatchInput.bucketDefinitions ? $string($states.input.BatchInput.bucketDefinitions) : '{}' %}",
+            },
           ],
         },
       ],

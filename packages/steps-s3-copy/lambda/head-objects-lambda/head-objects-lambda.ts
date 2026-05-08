@@ -7,6 +7,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
+import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+import { createS3ClientCache } from "../common/s3-client-builder";
 import { COLD_STORAGE_CLASSES, getThawParams } from "../common/constants";
 
 import type { CostEstimate } from "../common/cost-estimation";
@@ -28,6 +30,7 @@ export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
     destinationFolderKey: string;
     maximumExpansion: number;
+    bucketDefinitions?: Record<string, BucketDefinition>;
     sourceRequiredRegion: string;
     destinationRequiredRegion: string;
     thawParams?: {
@@ -229,6 +232,8 @@ export async function handler(
   // this is a new list of input items we have not dealt with yet
   const toHeadItems: HeadObjectsLambdaItem[] = [];
 
+  const getClient = createS3ClientCache(event.BatchInput.bucketDefinitions);
+
   // first step is to expand out any entries we note are wildcards
   for (const o of event.Items || []) {
     // expand wildcard
@@ -248,8 +253,9 @@ export async function handler(
 
       let expansionCount = 0;
 
+      const client = await getClient(o.sourceBucket, o.sourceNoSignRequest);
       for await (const data of paginateListObjectsV2(
-        { client: o.sourceNoSignRequest ? anonClient : client },
+        { client },
         {
           Bucket: o.sourceBucket,
           Prefix: sourceKeyPrefix,
@@ -307,8 +313,8 @@ export async function handler(
               o.destinationRelativeFolderKey,
             ),
             etag: item.ETag,
-            size: size,
-            storageClass: storageClass,
+            size: item.Size!,
+            storageClass: item.StorageClass ?? "STANDARD",
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
             sums: undefined,
@@ -345,15 +351,14 @@ export async function handler(
 
   for (const o of toHeadItems) {
     try {
+      const client = await getClient(o.sourceBucket, o.sourceNoSignRequest);
       // find the details of the object
       const headCommand = new HeadObjectCommand({
         Bucket: o.sourceBucket,
         Key: o.sourceKey,
       });
 
-      const headResult = o.sourceNoSignRequest
-        ? await anonClient.send(headCommand)
-        : await client.send(headCommand);
+      const headResult = await client.send(headCommand);
 
       assert.ok(headResult.ETag);
       assert.ok(headResult.LastModified);
@@ -384,7 +389,7 @@ export async function handler(
           o.destinationRelativeFolderKey,
         ),
         etag: headResult.ETag,
-        size: size,
+        size: headResult.ContentLength!,
         // as per spec - storage class is always returned by head object EXCEPT for standard
         // for our downstream processing - we mind as well rectify this so it is always present
         storageClass: storageClass,

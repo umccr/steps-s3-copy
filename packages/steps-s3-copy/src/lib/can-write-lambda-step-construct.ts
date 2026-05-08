@@ -24,13 +24,8 @@ export class CanWriteLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const lambdaFolder = join(
-      __dirname,
-      "..",
-      "..",
-      "lambda",
-      "can-write-lambda",
-    );
+    const packageRoot = join(__dirname, "..", "..");
+    const lambdaFolder = join(packageRoot, "lambda", "can-write-lambda");
 
     this.stateName = `Can Write To Destination Bucket?`;
 

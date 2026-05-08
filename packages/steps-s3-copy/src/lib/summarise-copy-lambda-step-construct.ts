@@ -4,7 +4,7 @@ import { Duration } from "aws-cdk-lib";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { QueryLanguage, TaskInput } from "aws-cdk-lib/aws-stepfunctions";
 
 type SummariseCopyLambdaStepProps = {
@@ -29,13 +29,8 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
     super(scope, id);
     this.stateName = id;
 
-    const lambdaRoot = join(
-      __dirname,
-      "..",
-      "..",
-      "lambda",
-      "summarise-copy-lambda",
-    );
+    const packageRoot = join(__dirname, "..", "..");
+    const lambdaRoot = join(packageRoot, "lambda", "summarise-copy-lambda");
 
     const summariseCopyLambda = new NodejsFunction(
       this,
@@ -43,7 +38,6 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       {
         role: props.writerRole,
         entry: join(lambdaRoot, "summarise-copy-lambda.ts"),
-        depsLockFilePath: join(lambdaRoot, "package-lock.json"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.X86_64,
         // Set projectRoot to lambda/ directory to enable bundling of shared modules from lambda/common/
@@ -53,16 +47,11 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
           minify: false,
-          // because we install node_modules we want to force the installation in a lambda compatible env
-          forceDockerBundling: true,
-          // and these are the modules we need to install
-          nodeModules: ["csv-stringify"],
           commandHooks: {
             beforeBundling(inputDir: string, outputDir: string) {
-              // inputDir === packages/steps-s3-copy/lambda/summarise-copy-lambda (mounted as /asset-input)
-              // outputDir === /asset-output
+              const rel = relative(inputDir, lambdaRoot);
               return [
-                `cp "${inputDir}/summarise-copy-lambda/report_template.html" "${outputDir}/report_template.html"`,
+                `cp "${inputDir}/${rel}/report_template.html" "${outputDir}/report_template.html"`,
               ];
             },
             afterBundling() {
@@ -99,6 +88,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           "{% $exists($states.input[type='NeedThawSmall']) ? $states.input[type='NeedThawSmall'] : {} %}",
         rcloneResultsNeedThawLarge:
           "{% $exists($states.input[type='NeedThawLarge']) ? $states.input[type='NeedThawLarge'] : {}  %}",
+        bucketDefinitions: "{% $invokeArguments.bucketDefinitions %}",
         includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
         retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
         dryRun: "{% $invokeArguments.dryRun %}",

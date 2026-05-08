@@ -192,6 +192,7 @@ export class CopyMapConstruct extends Construct {
       maxConcurrency: props.maxConcurrency,
       batchInput: {
         "thawParams.$": "$invokeArguments.thawParams",
+        "bucketDefinitions.$": "$invokeArguments.bucketDefinitions",
       },
       inputPath: props.inputPath,
       itemReader: {

@@ -6,23 +6,27 @@ On check-out (once only) (note that `pre-commit` is presumed installed externall
 pre-commit install
 ```
 
-For package installation (note that `pnpm` is presumed installed externally)
+For package installation (note that `bun` is presumed installed externally)
 
 ```shell
-pnpm install
+bun install
 ```
 
 Edit the packages and deploy to dev
 
 ```shell
-pnpm run dev-deploy
+bun run dev-deploy
 ```
 
 To remove entirely
 
 ```shell
-pnpm run dev-destroy
+bun run dev-destroy
 ```
+
+A single install in this repo will install all dependencies across packages, as the structure is set-up as a
+bun workspace. This also means that the consumer's lockfile is used for the steps-s3-copy package when bundling,
+but this shouldn't be an issue and is expected behaviour for a CDK consumer.
 
 ## Graph
 

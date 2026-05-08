@@ -1,6 +1,6 @@
 import { createHash as createHashCrypto, Hash } from "node:crypto";
 import { createHash as createHashCrc } from "./crc-hash.mjs";
-import { BinaryToTextEncoding } from "crypto";
+import { type BinaryToTextEncoding } from "crypto";
 import { BufferSplit } from "./buffer-split.mjs";
 
 export type Checksums = {

@@ -88,6 +88,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       maxItemsPerBatch: props.maxItemsPerBatch,
       batchInput: {
         "thawParams.$": "$invokeArguments.thawParams",
+        "bucketDefinitions.$": "$invokeArguments.bucketDefinitions",
       },
       inputPath: props.inputPath,
       itemReader: {
