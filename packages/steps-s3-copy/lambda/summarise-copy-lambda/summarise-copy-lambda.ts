@@ -301,10 +301,14 @@ export async function handler(event: InvokeEvent) {
   const includeReport = event.includeCopyReport;
   const retainReport = event.retainCopyReport;
   const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
+  const htmlReportName = "ENDED_COPY_REPORT.html";
+
+  // Outputs
+  let htmlKey = undefined;
+  let workingCsvKey = undefined;
+  let workingHtmlKey = undefined;
 
   if (includeReport || retainReport) {
-    const htmlReportName = "ENDED_COPY_REPORT.html";
-
     // Generate the HTML report
     const html = createHtmlReport({
       title: "Copy Results Report",
@@ -316,7 +320,7 @@ export async function handler(event: InvokeEvent) {
     // 1) Copy to the destination bucket/folder
     if (includeReport) {
       // TODO: define a better naming scheme for the HTML report (?)
-      const htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
+      htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
 
       await destClient.send(
         new PutObjectCommand({
@@ -330,12 +334,12 @@ export async function handler(event: InvokeEvent) {
 
     // 2) Extra copy to a specific S3 URI (sender retention)
     if (retainReport) {
-      const retainReportKey = sourceFilePrefix + htmlReportName;
+      workingHtmlKey = sourceFilePrefix + htmlReportName;
 
       await workingClient.send(
         new PutObjectCommand({
           Bucket: event.workingBucket,
-          Key: retainReportKey,
+          Key: workingHtmlKey,
           Body: html,
           ContentType: "text/html; charset=utf-8",
         }),
@@ -346,14 +350,23 @@ export async function handler(event: InvokeEvent) {
   await destClient.send(putCommand);
 
   if (event.retainCopyCsv) {
+    workingCsvKey =
+      sourceFilePrefix + basename(event.destinationEndCopyRelativeKey);
     await workingClient.send(
       new PutObjectCommand({
         Bucket: event.workingBucket,
-        Key: sourceFilePrefix + basename(event.destinationEndCopyRelativeKey),
+        Key: workingCsvKey,
         Body: output,
       }),
     );
   }
 
-  return { csvKey };
+  return {
+    destinationBucket: event.destinationBucket,
+    workingBucket: event.workingBucket,
+    csvKey,
+    htmlKey,
+    workingCsvKey,
+    workingHtmlKey,
+  };
 }
