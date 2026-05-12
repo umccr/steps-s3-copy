@@ -1,4 +1,9 @@
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { WaiterState } from "@smithy/util-waiter";
 import { makeObjectDictionaryJsonl } from "./util.mjs";
 import { testSetup, type TestSetupState } from "./setup";
@@ -6,6 +11,7 @@ import { beforeAll, test } from "bun:test";
 import { createTestObject, type TestObject } from "./lib/create-test-object";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import assert from "node:assert";
+import { dirname } from "node:path/posix";
 import { assertDestinations } from "./lib/assert-destinations.mjs";
 import {
   REALISTIC_SOURCE_OBJECTS,
@@ -78,6 +84,8 @@ test(
           destinationBucket: state.workingBucket,
           destinationFolderKey: `${state.testDestPrefix}${DEST}`,
           maxItemsPerBatch: 3,
+          retainCopyReport: true,
+          retainCopyCsv: true,
         }),
       }),
     );
@@ -98,6 +106,35 @@ test(
       state.workingBucket,
       `${state.testDestPrefix}${DEST}`,
       sourceObjects,
+    );
+
+    const s3Client = new S3Client({});
+    const retainPrefix = dirname(state.testInstructionsRelative) + "/";
+
+    const csvObject = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: state.workingBucket,
+        Key: `${state.testDestPrefix}${DEST}ENDED_COPY.csv`,
+      }),
+    );
+    const csvContent = await csvObject.Body!.transformToString();
+    assert.equal(
+      csvContent.trim().split("\n").length,
+      Object.keys(sourceObjects).length + 1,
+      "CSV row count does not match source objects length + header",
+    );
+
+    await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: state.workingBucket,
+        Key: `${retainPrefix}ENDED_COPY.csv`,
+      }),
+    );
+    await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: state.workingBucket,
+        Key: `${retainPrefix}ENDED_COPY_REPORT.html`,
+      }),
     );
   },
   TEST_EXPECTED_SECONDS * 1000,
