@@ -76,6 +76,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         destinationEndCopyRelativeKey:
           "{% $invokeArguments.destinationEndCopyRelativeKey %}",
         workingBucket: "{% $invokeSettings.workingBucket %}",
+        workingBucketPrefixKey: "{% $invokeSettings.workingBucketPrefixKey %}",
         rcloneResultsSmall: "{% $states.input[type='Small'] %}",
         rcloneResultsLarge: "{% $states.input[type='Large'] %}",
         rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",

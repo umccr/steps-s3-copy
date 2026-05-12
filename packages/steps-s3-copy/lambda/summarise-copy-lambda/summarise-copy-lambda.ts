@@ -26,6 +26,7 @@ interface InvokeEvent {
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
+  workingBucketPrefixKey: string;
   copyInstructionsKey: string;
   bucketDefinitions?: Record<string, BucketDefinition>;
   includeCopyReport?: boolean;
@@ -299,7 +300,8 @@ export async function handler(event: InvokeEvent) {
   // Determine if we need to generate and store the HTML report(s)
   const includeReport = event.includeCopyReport;
   const retainReport = event.retainCopyReport;
-  const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
+  const sourceFilePrefix =
+    event.workingBucketPrefixKey + dirname(event.copyInstructionsKey) + "/";
   const htmlReportName = "ENDED_COPY_REPORT.html";
 
   // Outputs
