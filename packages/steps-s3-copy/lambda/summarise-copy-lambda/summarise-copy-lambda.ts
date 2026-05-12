@@ -1,7 +1,6 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { basename } from "path/posix";
+import { basename, dirname, join } from "path/posix";
 import { stringify } from "csv-stringify/sync";
-import { dirname } from "path/posix";
 import { createHtmlReport } from "./create-html-report";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { buildS3Client } from "../common/s3-client-builder";
@@ -320,7 +319,7 @@ export async function handler(event: InvokeEvent) {
     // 1) Copy to the destination bucket/folder
     if (includeReport) {
       // TODO: define a better naming scheme for the HTML report (?)
-      htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
+      htmlKey = join(dirname(csvKey), htmlReportName);
 
       await destClient.send(
         new PutObjectCommand({
