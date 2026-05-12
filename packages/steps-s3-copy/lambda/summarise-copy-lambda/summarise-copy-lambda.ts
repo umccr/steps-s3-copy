@@ -27,10 +27,11 @@ interface InvokeEvent {
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
-  sourceFilesCsvKey: string;
+  copyInstructionsKey: string;
   bucketDefinitions?: Record<string, BucketDefinition>;
   includeCopyReport?: boolean;
   retainCopyReport?: boolean;
+  retainCopyCsv?: boolean;
 }
 
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
@@ -299,6 +300,7 @@ export async function handler(event: InvokeEvent) {
   // Determine if we need to generate and store the HTML report(s)
   const includeReport = event.includeCopyReport;
   const retainReport = event.retainCopyReport;
+  const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
 
   if (includeReport || retainReport) {
     const htmlReportName = "ENDED_COPY_REPORT.html";
@@ -328,7 +330,6 @@ export async function handler(event: InvokeEvent) {
 
     // 2) Extra copy to a specific S3 URI (sender retention)
     if (retainReport) {
-      const sourceFilePrefix = dirname(event.sourceFilesCsvKey) + "/";
       const retainReportKey = sourceFilePrefix + htmlReportName;
 
       await workingClient.send(
@@ -343,5 +344,16 @@ export async function handler(event: InvokeEvent) {
   }
 
   await destClient.send(putCommand);
-  return output;
+
+  if (event.retainCopyCsv) {
+    await workingClient.send(
+      new PutObjectCommand({
+        Bucket: event.workingBucket,
+        Key: sourceFilePrefix + basename(event.destinationEndCopyRelativeKey),
+        Body: output,
+      }),
+    );
+  }
+
+  return { csvKey };
 }
