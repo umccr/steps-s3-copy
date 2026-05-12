@@ -61,6 +61,11 @@ export type StepsS3CopyInvokeArguments = {
   readonly retainCopyReport?: boolean;
 
   /**
+   * If set, also save the ended copy CSV to the working bucket alongside the copy instructions file.
+   */
+  readonly retainCopyCsv?: boolean;
+
+  /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
    * and per-field defaults are applied by the thaw step Lambda (`*ThawDays` = 1, `*ThawSpeed` = "Bulk").
    */
@@ -122,6 +127,9 @@ export const INCLUDE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
 
 export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
   "retainCopyReport";
+
+export const RETAIN_COPY_CSV_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "retainCopyCsv";
 
 /**
  * Common fields shared by all bucket definitions.

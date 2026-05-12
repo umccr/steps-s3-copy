@@ -83,6 +83,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         bucketDefinitions: "{% $invokeArguments.bucketDefinitions %}",
         includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
         retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
+        retainCopyCsv: "{% $invokeArguments.retainCopyCsv %}",
         copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",
       }),
       payloadResponseOnly: true,
