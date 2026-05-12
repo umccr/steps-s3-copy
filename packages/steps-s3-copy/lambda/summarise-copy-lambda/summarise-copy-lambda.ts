@@ -303,9 +303,9 @@ export async function handler(event: InvokeEvent) {
   const htmlReportName = "ENDED_COPY_REPORT.html";
 
   // Outputs
-  let htmlKey = undefined;
-  let workingCsvKey = undefined;
-  let workingHtmlKey = undefined;
+  let htmlKey: string | undefined = undefined;
+  let workingCsvKey: string | undefined = undefined;
+  let workingHtmlKey: string | undefined = undefined;
 
   if (includeReport || retainReport) {
     // Generate the HTML report
