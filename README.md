@@ -151,10 +151,18 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationRequiredRegion?: string;
 
   /**
-   * The relative path (relative to `workingBucketPrefixKey`) to the copy-instructions input file.
-   * This file is JSONL: one `CopyInstruction` per line.
+   * The slash-terminated folder (relative to `workingBucketPrefixKey`) that contains the
+   * copy-instructions JSONL input file. This directory is expected to contain a JSONL file
+   * with the name of `copyInstructionsFileName`. Use `""` to place it at the root of
+   * `workingBucketPrefixKey`.
    */
-  readonly copyInstructionsKey: string;
+  readonly copyInstructionsFolder: string;
+
+  /**
+   * The name of the JSONL copy-instructions file inside `copyInstructionsFolder`. Defaults
+   * to `INSTRUCTIONS.jsonl` if not specified.
+   */
+  readonly copyInstructionsFileName?: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -170,8 +178,23 @@ export type StepsS3CopyInvokeArguments = {
   readonly copyConcurrency: number;
   readonly maxItemsPerBatch: number;
 
-  readonly destinationStartCopyRelativeKey: string;
-  readonly destinationEndCopyRelativeKey: string;
+  /**
+   * Relative key (under `destinationFolderKey`) of the start-of-copy marker object.
+   * Defaults to `STARTED_COPY.txt` if omitted.
+   */
+  readonly destinationStartCopyRelativeKey?: string;
+
+  /**
+   * Relative key (under `destinationFolderKey`) of the start copy marker. Defaults to `STARTED_COPY.txt`
+   * if omitted.
+   */
+  readonly destinationEndCopyRelativeKey?: string;
+
+  /**
+   * Relative key (under `destinationFolderKey`) of the end copy CSV once the copy completes. Defaults
+   * to `ENDED_COPY.csv` if omitted.
+   */
+  readonly destinationEndCopyReportRelativeKey?: string;
 
   /**
    * If present and true, instructs the copier to go through the motions of
@@ -181,13 +204,16 @@ export type StepsS3CopyInvokeArguments = {
   readonly dryRun?: boolean;
 
   /**
-   * If present and true, generate html copy report (COPY_REPORT.html)  in the destination.
+   * If present and true, generate the HTML copy report in the destination
+   * (named by `destinationEndCopyReportRelativeKey`).
    * If omitted, defaults to false.
    */
   readonly includeCopyReport?: boolean;
 
   /**
-   * If set, also save a copy report (COPY_REPORT.html) in the same bucket and prefix as the source file.
+   * If set, also save a copy of the HTML report (named by the basename of
+   * `destinationEndCopyReportRelativeKey`) in the working bucket alongside the copy
+   * instructions file.
    */
   readonly retainCopyReport?: boolean;
 
@@ -250,7 +276,100 @@ type BucketDefinition = {
 };
 ```
 
-Note that the `copyInstructionsKey` points to the JSONL copy-instructions file (relative to the working folder). For instance if we uploaded the JSONL copy instructions to `s3://my-working-bucket/a-working-folder/instructions.jsonl`, we would specify a `copyInstructionsKey` of `instructions.jsonl`.
+`copyInstructionsFolder` points to the slash-terminated folder (relative to the working folder) that
+holds the JSONL copy-instructions file, and `copyInstructionsFileName` names the file itself.
+For instance, if we uploaded the JSONL copy instructions to
+`s3://my-working-bucket/a-working-folder/job/INSTRUCTIONS.jsonl`, we would specify
+`copyInstructionsFolder` of `job/` and leave `copyInstructionsFileName` unset (or set it to
+`INSTRUCTIONS.jsonl`).
+
+Outputs of the copy run also land in this same folder, e.g. CSV/HTML reports if
+`retainCopyCsv`/`retainCopyReport` are set, and the distributed-map result manifests.
+
+Note, it is expected that `copyInstructionsFolder` represents a single copy invocation. A new copy
+should have a different `copyInstructionsFolder`. If it is re-used, the reports and output files will be
+overwritten.
+
+### File structure in the working and destination buckets
+
+Two buckets are involved in any copy run:
+
+- The **working bucket** (set at deploy time via `workingBucket` + `workingBucketPrefixKey`) holds
+  the JSONL copy-instructions, the per-map result manifests, and any retained copies of the
+  CSV summary and HTML report.
+- The **destination bucket** (set per invocation via `destinationBucket` + `destinationFolderKey`)
+  receives the copied objects, the start copy marker, the CSV summary, and optionally the HTML report.
+
+The `workingBucketPrefixKey`, `copyInstructionsFolder`, and `destinationFolderKey` inputs must be either an empty string `""`
+or end with a slash.
+
+#### Where each file lands
+
+The below table summarises each output:
+
+| Artifact                         | Bucket      | Key                                                                                                                                                            | Controlled by                                                |
+| -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Copy instructions JSONL          | working     | `<workingBucketPrefixKey><copyInstructionsFolder><copyInstructionsFileName>`                                                                                   | uploaded by caller before invocation                         |
+| Distributed map result manifests | working     | `<workingBucketPrefixKey><copyInstructionsFolder><MapRunArn>/manifest.json` and `<workingBucketPrefixKey><copyInstructionsFolder><MapRunArn>/SUCCEEDED_*.json` | HeadObjects, Small, Large, NeedThawSmall, NeedThawLarge maps |
+| Copy set JSONL files             | working     | `<workingBucketPrefixKey><copyInstructionsFolder><HeadObjectsMapRunArn>/{small,large,smallThaw,largeThaw}.jsonl`                                               | CoordinateCopy lambda                                        |
+| Retained CSV summary             | working     | `<workingBucketPrefixKey><copyInstructionsFolder><basename(destinationEndCopyRelativeKey)>`                                                                    | `retainCopyCsv: true`                                        |
+| Retained HTML report             | working     | `<workingBucketPrefixKey><copyInstructionsFolder><basename(destinationEndCopyReportRelativeKey)>`                                                              | `retainCopyReport: true`                                     |
+| Start copy marker                | destination | `<destinationFolderKey><destinationStartCopyRelativeKey>`                                                                                                      | CanWrite lambda                                              |
+| End copy CSV                     | destination | `<destinationFolderKey><destinationEndCopyRelativeKey>`                                                                                                        | SummariseCopy lambda                                         |
+| HTML report                      | destination | `<destinationFolderKey><destinationEndCopyReportRelativeKey>`                                                                                                  | `includeCopyReport: true`                                    |
+| Copied objects                   | destination | `<destinationFolderKey><destinationKey>`                                                                                                                       | per copy-instruction                                         |
+
+For example, take the following settings to see how files would be laid out.
+
+Construct props:
+
+```typescript
+new StepsS3CopyConstruct(this, "Copy", {
+  vpc,
+  vpcSubnetSelection: SubnetType.PRIVATE_WITH_EGRESS,
+  workingBucket: "my-working-bucket",
+  workingBucketPrefixKey: "copy-out/",
+});
+```
+
+Invoke args:
+
+```json
+{
+  "copyInstructionsFolder": "job-a/",
+  "destinationBucket": "destination",
+  "destinationFolderKey": "datasets/release/",
+  "includeCopyReport": true,
+  "retainCopyReport": true,
+  "retainCopyCsv": true,
+  "copyConcurrency": 80,
+  "maxItemsPerBatch": 8
+}
+```
+
+In the working bucket, the following would be the structure:
+
+```
+s3://my-working-bucket/
+└── copy-out/
+    └── job-a/
+        ├── INSTRUCTIONS.jsonl
+        ├── ENDED_COPY.csv
+        ├── ENDED_COPY_REPORT.html
+        └── <HeadObjects/Small/Large/NeedThaw*MapRunArn>/{manifest.json, ...}
+```
+
+In the destination bucket, the following would be the structure:
+
+```
+s3://destination/
+└── datasets/
+    └── release/
+        ├── STARTED_COPY.txt
+        ├── ENDED_COPY.csv
+        ├── ENDED_COPY_REPORT.html
+        └── <copied objects>
+```
 
 ### Copying to S3-compatible endpoints
 
@@ -263,7 +382,7 @@ For example, copying to a Ceph bucket using credentials in Secrets Manager:
 
 ```json
 {
-  "copyInstructionsKey": "instructions.jsonl",
+  "copyInstructionsFolder": "job/",
   "destinationBucket": "<bucket-name>",
   "destinationFolderKey": "output/",
   "bucketDefinitions": {

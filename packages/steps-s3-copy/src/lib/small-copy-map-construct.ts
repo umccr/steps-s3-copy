@@ -1,9 +1,6 @@
 import { Construct } from "constructs";
 import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
-import {
-  DESTINATION_BUCKET_FIELD_NAME,
-  COPY_INSTRUCTIONS_KEY_FIELD_NAME,
-} from "../steps-s3-copy-input";
+import { DESTINATION_BUCKET_FIELD_NAME } from "../steps-s3-copy-input";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { State } from "aws-cdk-lib/aws-stepfunctions";
@@ -115,13 +112,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
         "Bucket.$": "$invokeSettings.workingBucket",
-        "Prefix.$": JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
+        "Prefix.$": "$mapResultWriterPrefix",
       },
       resultSelector: {
         type: id,

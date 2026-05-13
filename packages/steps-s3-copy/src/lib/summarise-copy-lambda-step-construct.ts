@@ -75,6 +75,8 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         destinationPrefixKey: "{% $invokeArguments.destinationFolderKey %}",
         destinationEndCopyRelativeKey:
           "{% $invokeArguments.destinationEndCopyRelativeKey %}",
+        destinationEndCopyReportRelativeKey:
+          "{% $invokeArguments.destinationEndCopyReportRelativeKey %}",
         workingBucket: "{% $invokeSettings.workingBucket %}",
         workingBucketPrefixKey: "{% $invokeSettings.workingBucketPrefixKey %}",
         rcloneResultsSmall: "{% $states.input[type='Small'] %}",
@@ -85,7 +87,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
         retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
         retainCopyCsv: "{% $invokeArguments.retainCopyCsv %}",
-        copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",
+        copyInstructionsFolder: "{% $invokeArguments.copyInstructionsFolder %}",
       }),
       payloadResponseOnly: true,
     });

@@ -23,7 +23,6 @@ import {
 import {
   DESTINATION_BUCKET_FIELD_NAME,
   MAX_ITEMS_PER_BATCH_FIELD_NAME,
-  COPY_INSTRUCTIONS_KEY_FIELD_NAME,
 } from "../steps-s3-copy-input";
 import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
@@ -172,13 +171,7 @@ export class CopyMapConstruct extends Construct {
       }),
       resultWriterV2: new ResultWriterV2({
         // bucket: JsonPath.stringAt("$invokeSettings.workingBucket"),
-        prefix: JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
+        prefix: JsonPath.stringAt("$mapResultWriterPrefix"),
         writerConfig: new WriterConfig({
           transformation: Transformation.FLATTEN,
           outputType: OutputType.JSONL,
@@ -219,13 +212,7 @@ export class CopyMapConstruct extends Construct {
       // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
         "Bucket.$": "$invokeSettings.workingBucket",
-        "Prefix.$": JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
+        "Prefix.$": "$mapResultWriterPrefix",
       },
       resultSelector: {
         type: id,

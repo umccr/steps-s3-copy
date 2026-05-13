@@ -1,5 +1,5 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { basename, dirname, join } from "path/posix";
+import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
 import { createHtmlReport } from "./create-html-report";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
@@ -25,9 +25,10 @@ interface InvokeEvent {
   destinationBucket: string;
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
+  destinationEndCopyReportRelativeKey: string;
   workingBucket: string;
   workingBucketPrefixKey: string;
-  copyInstructionsKey: string;
+  copyInstructionsFolder: string;
   bucketDefinitions?: Record<string, BucketDefinition>;
   includeCopyReport?: boolean;
   retainCopyReport?: boolean;
@@ -181,7 +182,7 @@ export async function handler(event: InvokeEvent) {
       // looking
 
       const source = row["source"];
-      // The name is the basename of the source..
+      // The name is the basename of the source.
 
       // Original values
       // const errors: number = rcloneRow["errors"];
@@ -300,9 +301,9 @@ export async function handler(event: InvokeEvent) {
   // Determine if we need to generate and store the HTML report(s)
   const includeReport = event.includeCopyReport;
   const retainReport = event.retainCopyReport;
+  // This is the in the working bucket where the copy-instructions JSONL lives.
   const sourceFilePrefix =
-    event.workingBucketPrefixKey + dirname(event.copyInstructionsKey) + "/";
-  const htmlReportName = "ENDED_COPY_REPORT.html";
+    event.workingBucketPrefixKey + event.copyInstructionsFolder;
 
   // Outputs
   let htmlKey: string | undefined = undefined;
@@ -320,8 +321,8 @@ export async function handler(event: InvokeEvent) {
 
     // 1) Copy to the destination bucket/folder
     if (includeReport) {
-      // TODO: define a better naming scheme for the HTML report (?)
-      htmlKey = join(dirname(csvKey), htmlReportName);
+      htmlKey =
+        event.destinationPrefixKey + event.destinationEndCopyReportRelativeKey;
 
       await destClient.send(
         new PutObjectCommand({
@@ -335,7 +336,8 @@ export async function handler(event: InvokeEvent) {
 
     // 2) Extra copy to a specific S3 URI (sender retention)
     if (retainReport) {
-      workingHtmlKey = sourceFilePrefix + htmlReportName;
+      workingHtmlKey =
+        sourceFilePrefix + basename(event.destinationEndCopyReportRelativeKey);
 
       await workingClient.send(
         new PutObjectCommand({

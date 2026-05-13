@@ -20,10 +20,18 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationRequiredRegion?: string;
 
   /**
-   * The relative path (relative to `workingBucketPrefixKey`) to the copy-instructions input file.
-   * This file is JSONL: one `CopyInstruction` per line.
+   * The slash-terminated folder (relative to `workingBucketPrefixKey`) that contains the
+   * copy-instructions JSONL input file. This directory is expected to contain a JSONL file
+   * with the name of `copyInstructionsFileName`. Use `""` to place it at the root of
+   * `workingBucketPrefixKey`.
    */
-  readonly copyInstructionsKey: string;
+  readonly copyInstructionsFolder: string;
+
+  /**
+   * The name of the JSONL copy-instructions file inside `copyInstructionsFolder`. Defaults
+   * to `INSTRUCTIONS.jsonl` if not specified.
+   */
+  readonly copyInstructionsFileName?: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -39,8 +47,23 @@ export type StepsS3CopyInvokeArguments = {
   readonly copyConcurrency: number;
   readonly maxItemsPerBatch: number;
 
-  readonly destinationStartCopyRelativeKey: string;
-  readonly destinationEndCopyRelativeKey: string;
+  /**
+   * Relative key (under `destinationFolderKey`) of the start copy marker. Defaults to `STARTED_COPY.txt`
+   * if omitted.
+   */
+  readonly destinationStartCopyRelativeKey?: string;
+
+  /**
+   * Relative key (under `destinationFolderKey`) of the end copy CSV once the copy completes. Defaults
+   * to `ENDED_COPY.csv` if omitted.
+   */
+  readonly destinationEndCopyRelativeKey?: string;
+
+  /**
+   * Relative key (under `destinationFolderKey`) of the end copy HTML report written  when `includeCopyReport`
+   * is also set. Defaults to `ENDED_COPY_REPORT.html` if not specified.
+   */
+  readonly destinationEndCopyReportRelativeKey?: string;
 
   /**
    * If present and true, instructs the copier to go through the motions of
@@ -104,8 +127,13 @@ export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
 // this odd construct just makes sure that the JSON paths we specify
 // here correspond with fields in the master "input" schema for the
 // overall Steps function
-export const COPY_INSTRUCTIONS_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "copyInstructionsKey";
+export const COPY_INSTRUCTIONS_FOLDER_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "copyInstructionsFolder";
+
+export const COPY_INSTRUCTIONS_FILE_NAME_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "copyInstructionsFileName";
+
+export const DEFAULT_COPY_INSTRUCTIONS_FILE_NAME = "INSTRUCTIONS.jsonl";
 
 export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
   "maxItemsPerBatch";
@@ -119,6 +147,13 @@ export const DESTINATION_START_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachine
   "destinationStartCopyRelativeKey";
 export const DESTINATION_END_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
   "destinationEndCopyRelativeKey";
+export const DESTINATION_END_COPY_REPORT_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
+  "destinationEndCopyReportRelativeKey";
+
+export const DEFAULT_DESTINATION_START_COPY_RELATIVE_KEY = "STARTED_COPY.txt";
+export const DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY = "ENDED_COPY.csv";
+export const DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY =
+  "ENDED_COPY_REPORT.html";
 
 export const DRY_RUN_KEY_FIELD_NAME: CopyOutStateMachineInputKeys = "dryRun";
 

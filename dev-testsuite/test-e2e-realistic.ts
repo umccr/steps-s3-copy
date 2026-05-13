@@ -11,12 +11,15 @@ import { beforeAll, test } from "bun:test";
 import { createTestObject, type TestObject } from "./lib/create-test-object";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import assert from "node:assert";
-import { dirname } from "node:path/posix";
 import { assertDestinations } from "./lib/assert-destinations.mjs";
 import {
   REALISTIC_SOURCE_OBJECTS,
   REALISTIC_WILDCARD_PREFIX,
 } from "./lib/realistic-source-objects";
+import {
+  DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY,
+  DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY,
+} from "../packages/steps-s3-copy/src/steps-s3-copy-input";
 
 // we have a few large objects so this can take a few minutes
 const TEST_EXPECTED_SECONDS = 60 * 10;
@@ -80,7 +83,8 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          copyInstructionsKey: state.testInstructionsRelative,
+          copyInstructionsFolder: state.testInstructionsFolder,
+          copyInstructionsFileName: state.testInstructionsFileName,
           destinationBucket: state.workingBucket,
           destinationFolderKey: `${state.testDestPrefix}${DEST}`,
           maxItemsPerBatch: 3,
@@ -109,12 +113,12 @@ test(
     );
 
     const s3Client = new S3Client({});
-    const retainPrefix = dirname(state.testInstructionsRelative) + "/";
+    const retainPrefix = state.testInstructionsFolder;
 
     const csvObject = await s3Client.send(
       new GetObjectCommand({
         Bucket: state.workingBucket,
-        Key: `${state.testDestPrefix}${DEST}ENDED_COPY.csv`,
+        Key: `${state.testDestPrefix}${DEST}${DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY}`,
       }),
     );
     const csvContent = await csvObject.Body!.transformToString();
@@ -127,13 +131,13 @@ test(
     await s3Client.send(
       new HeadObjectCommand({
         Bucket: state.workingBucket,
-        Key: `${retainPrefix}ENDED_COPY.csv`,
+        Key: `${retainPrefix}${DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY}`,
       }),
     );
     await s3Client.send(
       new HeadObjectCommand({
         Bucket: state.workingBucket,
-        Key: `${retainPrefix}ENDED_COPY_REPORT.html`,
+        Key: `${retainPrefix}${DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY}`,
       }),
     );
   },

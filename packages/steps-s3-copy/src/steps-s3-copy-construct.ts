@@ -23,6 +23,10 @@ import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
+  DEFAULT_COPY_INSTRUCTIONS_FILE_NAME,
+  DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY,
+  DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY,
+  DEFAULT_DESTINATION_START_COPY_RELATIVE_KEY,
   DRY_RUN_KEY_FIELD_NAME,
   INCLUDE_COPY_REPORT_FIELD_NAME,
   RETAIN_COPY_CSV_FIELD_NAME,
@@ -170,14 +174,16 @@ export class StepsS3CopyConstruct extends Construct {
       copyConcurrency:
         "{% [ $number($states.input.copyConcurrency), 80 ][0] %}",
 
-      copyInstructionsKey: `{% $exists($states.input.copyInstructionsKey) ? $states.input.copyInstructionsKey : $error("Missing copyInstructionsKey") %}`,
+      copyInstructionsFolder: `{% $exists($states.input.copyInstructionsFolder) ? $states.input.copyInstructionsFolder : $error("Missing copyInstructionsFolder") %}`,
+      copyInstructionsFileName: `{% [ $states.input.copyInstructionsFileName, "${DEFAULT_COPY_INSTRUCTIONS_FILE_NAME}" ][0] %}`,
       destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
       // set a slash terminated folder to copy into, or by default we just copy into the top level of the destination bucket
       destinationFolderKey: `{% [ $states.input.destinationFolderKey, "" ][0] %}`,
 
       // these are the default objects that will be created in the destination prefix area
-      destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "STARTED_COPY.txt" ][0] %}`,
-      destinationEndCopyRelativeKey: `{% [ $states.input.destinationEndCopyRelativeKey, "ENDED_COPY.csv" ][0] %}`,
+      destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "${DEFAULT_DESTINATION_START_COPY_RELATIVE_KEY}" ][0] %}`,
+      destinationEndCopyRelativeKey: `{% [ $states.input.destinationEndCopyRelativeKey, "${DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY}" ][0] %}`,
+      destinationEndCopyReportRelativeKey: `{% [ $states.input.destinationEndCopyReportRelativeKey, "${DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY}" ][0] %}`,
       // if thawParams is not passed in, we use an empty object
       thawParams: `{% $exists($states.input.thawParams) ? $states.input.thawParams : {} %}`,
 
@@ -202,6 +208,12 @@ export class StepsS3CopyConstruct extends Construct {
       workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
     };
 
+    // The Distributed Map result writer appends `/<MapRunArn>/...` to its prefix. This produces
+    // a double-slash in the key, so remove it here and pass it into each construct to be referenced.
+    const mapResultWriterPrefix = `{% $replace("${
+      props.workingBucketPrefixKey ?? ""
+    }" & $states.input.copyInstructionsFolder, /\\/$/, "") %}`;
+
     const assignInputsAndApplyDefaults = new Pass(
       this,
       "Assign Inputs to State and Apply Defaults",
@@ -212,6 +224,7 @@ export class StepsS3CopyConstruct extends Construct {
         assign: {
           invokeArguments: jsonataInvokeArgumentsWithDefaults,
           invokeSettings: jsonataInvokeSettings,
+          mapResultWriterPrefix: mapResultWriterPrefix,
         },
       },
     );
