@@ -206,6 +206,7 @@ export async function handler(event: InvokeEvent) {
       destinationFolderKey: event.destinationPrefixKey,
       reportMetadata: reportMetadata,
       dryRun: dryRun,
+      workingBucket: event.workingBucket,
     });
 
     // 1) Copy to the destination bucket/folder
@@ -308,7 +309,7 @@ async function readFileCopyResultsFromManifests(
       Key: manifestKey,
     });
 
-    const getManifestResult = await workingClient.send(getManifestCommand);
+    const getManifestResult = await client.send(getManifestCommand);
     if (!getManifestResult.Body) {
       throw new Error("Manifest S3 object Body is undefined");
     }
@@ -366,7 +367,7 @@ async function readFileCopyResultsFromManifests(
       Key: succeededFile["Key"],
     });
 
-    const getSuccessResult = await workingClient.send(getSuccessCommand);
+    const getSuccessResult = await client.send(getSuccessCommand);
     if (!getSuccessResult.Body) {
       throw new Error("Success S3 object Body is undefined");
     }

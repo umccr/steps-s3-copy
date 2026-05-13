@@ -28,6 +28,7 @@ import {
  */
 export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
+    workingBucket: string;
     destinationFolderKey: string;
     maximumExpansion: number;
     bucketDefinitions?: Record<string, BucketDefinition>;
@@ -212,7 +213,7 @@ export async function handler(
   // The region of the source bucket
   const sourceRegion = event.BatchInput.sourceRequiredRegion;
 
-  const bucket = "harcoded from now";
+  const bucket = event.BatchInput.workingBucket;
   const key = "pricing-data.json";
 
   // Read Pricing Data fetcheched from the API

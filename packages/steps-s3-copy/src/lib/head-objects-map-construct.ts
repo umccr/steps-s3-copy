@@ -85,6 +85,7 @@ export class HeadObjectsMapConstruct extends Construct {
         "destinationRequiredRegion.$": JsonPath.stringAt(
           "$invokeArguments.destinationRequiredRegion",
         ),
+        "workingBucket.$": JsonPath.stringAt("$invokeSettings.workingBucket"),
       },
       itemReader: {
         "Bucket.$": "$invokeSettings.workingBucket",

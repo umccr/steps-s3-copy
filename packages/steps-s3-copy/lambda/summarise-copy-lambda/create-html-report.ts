@@ -39,6 +39,7 @@ export async function createHtmlReport(opts: {
   destinationFolderKey: string;
   reportMetadata: ReportMetadata[];
   dryRun: boolean;
+  workingBucket: string;
 }): Promise<string> {
   const {
     title,
@@ -46,6 +47,7 @@ export async function createHtmlReport(opts: {
     destinationFolderKey,
     reportMetadata = [],
     dryRun,
+    workingBucket,
   } = opts;
 
   // Combine all FileSummary entries into one array for the report
@@ -92,7 +94,7 @@ export async function createHtmlReport(opts: {
   // Create cost estimation block HTML
 
   const client = new S3Client({});
-  const bucket = "harcodedfornow";
+  const bucket = workingBucket;
   const key = "pricing-data.json";
 
   // Read Pricing Data fetcheched from the API

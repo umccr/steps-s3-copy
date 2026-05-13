@@ -42,7 +42,7 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
         architecture: Architecture.X86_64,
         // Set projectRoot to lambda/ directory to enable bundling of shared modules from lambda/common/
         // for example allowing all lambdas to import the constant defined in ../common/constants
-        projectRoot: join(__dirname, "..", "..", "lambda"),
+        projectRoot: join(__dirname, "..", "..", "..", ".."),
         handler: "handler",
         bundling: {
           // we don't exactly need the performance benefits of minifying, and it is easier to debug without
