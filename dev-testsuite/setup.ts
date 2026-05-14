@@ -24,11 +24,11 @@ export type TestSetupState = {
 
   // the settings of the state machine under test
   workingBucket: string;
-  workingBucketPrefixKey: string;
+  workingBucketPrefix: string;
 
   // paths for creating various test artefacts
   testInstructionsFolder: string;
-  testInstructionsFileName: string;
+  testInstructionsKey: string;
   testInstructionsAbsolute: string;
   testSrcPrefix: string;
   testDestPrefix: string;
@@ -147,11 +147,11 @@ export async function testSetup(): Promise<TestSetupState> {
     uniqueTestId: unique,
     smArn,
     workingBucket,
-    workingBucketPrefixKey: workingBucketPrefix,
+    workingBucketPrefix,
 
-    // the instructions is inside a folder (relative to workingBucketPrefixKey)
+    // the instructions is inside a folder (relative to workingBucketPrefix)
     testInstructionsFolder: `${unique}/`,
-    testInstructionsFileName: objectsToCopyName,
+    testInstructionsKey: objectsToCopyName,
     testInstructionsAbsolute: `${workingBucketPrefix}${unique}/${objectsToCopyName}`,
 
     testSrcPrefix: `${TEST_BUCKET_ONE_DAY_PREFIX}${unique}SRC/`,

@@ -113,7 +113,7 @@ beforeAll(async () => {
 test.serial("basic functionality", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
+      destinationPrefix: DESTINATION_PREFIX,
       maximumExpansion: 5,
     },
     Items: [
@@ -166,7 +166,7 @@ test.serial(
   async () => {
     const input: HeadObjectsLambdaInvokeEvent = {
       BatchInput: {
-        destinationFolderKey: DESTINATION_PREFIX,
+        destinationPrefix: DESTINATION_PREFIX,
         maximumExpansion: 5,
       },
       Items: [
@@ -226,7 +226,7 @@ test.serial(
 
     const input: HeadObjectsLambdaInvokeEvent = {
       BatchInput: {
-        destinationFolderKey: DESTINATION_PREFIX,
+        destinationPrefix: DESTINATION_PREFIX,
         maximumExpansion: 5,
       },
       Items: [
@@ -287,7 +287,7 @@ test.serial(
 test.serial("wildcard expansion with destination prefix", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
+      destinationPrefix: DESTINATION_PREFIX,
       maximumExpansion: 5,
     },
     Items: [
@@ -349,7 +349,7 @@ test.serial("wildcard expansion with destination prefix", async () => {
 test.serial("sums data is passed through", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
+      destinationPrefix: DESTINATION_PREFIX,
       maximumExpansion: 5,
     },
     Items: [
@@ -385,7 +385,7 @@ test.serial("sums data is passed through", async () => {
 test.serial("missing object will fail", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
+      destinationPrefix: DESTINATION_PREFIX,
       maximumExpansion: 5,
     },
     Items: [
@@ -412,7 +412,7 @@ test.serial("missing object will fail", async () => {
 test("wildcard expansion will fail if too many", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
+      destinationPrefix: DESTINATION_PREFIX,
       maximumExpansion: 5,
     },
     Items: [
@@ -439,7 +439,7 @@ test("wildcard expansion will fail if too many", async () => {
 test.serial("wildcard expansion will fail if none", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
     BatchInput: {
-      destinationFolderKey: DESTINATION_PREFIX,
+      destinationPrefix: DESTINATION_PREFIX,
       maximumExpansion: 5,
     },
     Items: [

@@ -41,7 +41,7 @@ export interface StepsS3CopyConstructProps {
    * If undefined or the empty string, then artifacts will be created in the root
    * of the bucket.
    */
-  readonly workingBucketPrefixKey?: string;
+  readonly workingBucketPrefix?: string;
 
   /**
    * Whether the stack should use duration/timeouts that are more suited

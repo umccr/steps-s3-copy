@@ -100,10 +100,10 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          copyInstructionsFolder: state.testInstructionsFolder,
-          copyInstructionsFileName: state.testInstructionsFileName,
+          instructionsPrefix: state.testInstructionsFolder,
+          instructionsKey: state.testInstructionsKey,
           destinationBucket: state.workingBucket,
-          destinationFolderKey: state.testDestPrefix,
+          destinationPrefix: state.testDestPrefix,
           thawParams: {
             // Glacier Flexible Retrieval  -->  Expedited
             glacierFlexibleRetrievalThawDays: 1,

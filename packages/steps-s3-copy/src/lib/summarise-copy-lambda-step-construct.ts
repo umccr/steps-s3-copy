@@ -71,23 +71,10 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       payload: TaskInput.fromObject({
         invokeArguments: "{% $invokeArguments %}",
         invokeSettings: "{% $invokeSettings %}",
-        destinationBucket: "{% $invokeArguments.destinationBucket %}",
-        destinationPrefixKey: "{% $invokeArguments.destinationFolderKey %}",
-        destinationEndCopyRelativeKey:
-          "{% $invokeArguments.destinationEndCopyRelativeKey %}",
-        destinationEndCopyReportRelativeKey:
-          "{% $invokeArguments.destinationEndCopyReportRelativeKey %}",
-        workingBucket: "{% $invokeSettings.workingBucket %}",
-        workingBucketPrefixKey: "{% $invokeSettings.workingBucketPrefixKey %}",
         rcloneResultsSmall: "{% $states.input[type='Small'] %}",
         rcloneResultsLarge: "{% $states.input[type='Large'] %}",
         rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
         rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
-        bucketDefinitions: "{% $invokeArguments.bucketDefinitions %}",
-        includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
-        retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
-        retainCopyCsv: "{% $invokeArguments.retainCopyCsv %}",
-        copyInstructionsFolder: "{% $invokeArguments.copyInstructionsFolder %}",
       }),
       payloadResponseOnly: true,
     });

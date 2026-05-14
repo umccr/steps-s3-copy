@@ -23,14 +23,10 @@ import { Duration, Stack } from "aws-cdk-lib";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
-  DEFAULT_COPY_INSTRUCTIONS_FILE_NAME,
-  DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY,
-  DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY,
-  DEFAULT_DESTINATION_START_COPY_RELATIVE_KEY,
-  DRY_RUN_KEY_FIELD_NAME,
-  INCLUDE_COPY_REPORT_FIELD_NAME,
-  RETAIN_COPY_CSV_FIELD_NAME,
-  RETAIN_COPY_REPORT_FIELD_NAME,
+  DEFAULT_HTML_REPORT_KEY,
+  DEFAULT_INSTRUCTIONS_KEY,
+  DEFAULT_START_MARKER_KEY,
+  DEFAULT_SUMMARY_CSV_KEY,
   StepsS3CopyInvokeArguments,
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
@@ -57,7 +53,7 @@ export { SubnetType } from "aws-cdk-lib/aws-ec2";
 
 export type StepsS3CopyInvokeSettings = {
   readonly workingBucket: string;
-  readonly workingBucketPrefixKey: string;
+  readonly workingBucketPrefix: string;
 };
 
 /**
@@ -76,15 +72,15 @@ export class StepsS3CopyConstruct extends Construct {
   constructor(scope: Construct, id: string, props: StepsS3CopyConstructProps) {
     super(scope, id);
 
-    // the working bucket prefix key must be undefined or "" which means use the root, or a key with
+    // the working bucket prefix must be undefined or "" which means use the root, or a key with
     // a trailing slash
-    if (props.workingBucketPrefixKey)
+    if (props.workingBucketPrefix)
       if (
-        props.workingBucketPrefixKey !== "" &&
-        !props.workingBucketPrefixKey.endsWith("/")
+        props.workingBucketPrefix !== "" &&
+        !props.workingBucketPrefix.endsWith("/")
       )
         throw new Error(
-          "If specified, the working bucket prefix key must end with a slash or be the empty string",
+          "If specified, the working bucket prefix must end with a slash or be the empty string",
         );
 
     // we define a fargate cluster in which we will be spinning up all of our compute
@@ -153,49 +149,38 @@ export class StepsS3CopyConstruct extends Construct {
         'Invalid thaw parameters (unsupported restore tier). See the "Validate Thaw Params" task failure details for the specific field and value.',
     });
 
+    // The default region is the region the orchestration is installed in.
+    const installedRegion = Stack.of(this).region;
+
     // jsonata representing all input values to the state machine but with defaults for absent fields
     const jsonataInvokeArgumentsWithDefaults: {
       [K in keyof StepsS3CopyInvokeArguments]: string;
     } = {
-      // out of the box - the copy requires both source and destination buckets to be in the
-      // same region as the deployed software. This minimises the chance of large egress
-      // fees
-      // the expected region can be altered in the input to the copy
-      // specifying an empty string for either of these will allow *any* region
-      sourceRequiredRegion: `{% [ $states.input.sourceRequiredRegion, "${
-        Stack.of(this).region
-      }" ][0] %}`,
-      destinationRequiredRegion: `{% [ $states.input.destinationRequiredRegion, "${
-        Stack.of(this).region
-      }" ][0] %}`,
+      sourceRequiredRegion: `{% [ $states.input.sourceRequiredRegion, "${installedRegion}" ][0] %}`,
+      destinationRequiredRegion: `{% [ $states.input.destinationRequiredRegion, "${installedRegion}" ][0] %}`,
 
-      maxItemsPerBatch:
-        "{% [ $number($states.input.maxItemsPerBatch), 8 ][0] %}",
+      destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
+      destinationPrefix: `{% [ $states.input.destinationPrefix, "" ][0] %}`,
+
+      instructionsPrefix: `{% $exists($states.input.instructionsPrefix) ? $states.input.instructionsPrefix : $error("Missing instructionsPrefix") %}`,
+      instructionsKey: `{% [ $states.input.instructionsKey, "${DEFAULT_INSTRUCTIONS_KEY}" ][0] %}`,
+
+      startMarkerKey: `{% [ $states.input.startMarkerKey, "${DEFAULT_START_MARKER_KEY}" ][0] %}`,
+      summaryCsvKey: `{% [ $states.input.summaryCsvKey, "${DEFAULT_SUMMARY_CSV_KEY}" ][0] %}`,
+      htmlReportKey: `{% [ $states.input.htmlReportKey, "${DEFAULT_HTML_REPORT_KEY}" ][0] %}`,
+
+      htmlReport: "{% [ $states.input.htmlReport, false ][0] %}",
+      retainHtmlReport: "{% [ $states.input.retainHtmlReport, false ][0] %}",
+      retainSummaryCsv: "{% [ $states.input.retainSummaryCsv, false ][0] %}",
+
+      dryRun: "{% [ $states.input.dryRun, false ][0] %}",
       copyConcurrency:
         "{% [ $number($states.input.copyConcurrency), 80 ][0] %}",
+      maxItemsPerBatch:
+        "{% [ $number($states.input.maxItemsPerBatch), 8 ][0] %}",
 
-      copyInstructionsFolder: `{% $exists($states.input.copyInstructionsFolder) ? $states.input.copyInstructionsFolder : $error("Missing copyInstructionsFolder") %}`,
-      copyInstructionsFileName: `{% [ $states.input.copyInstructionsFileName, "${DEFAULT_COPY_INSTRUCTIONS_FILE_NAME}" ][0] %}`,
-      destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
-      // set a slash terminated folder to copy into, or by default we just copy into the top level of the destination bucket
-      destinationFolderKey: `{% [ $states.input.destinationFolderKey, "" ][0] %}`,
-
-      // these are the default objects that will be created in the destination prefix area
-      destinationStartCopyRelativeKey: `{% [ $states.input.destinationStartCopyRelativeKey, "${DEFAULT_DESTINATION_START_COPY_RELATIVE_KEY}" ][0] %}`,
-      destinationEndCopyRelativeKey: `{% [ $states.input.destinationEndCopyRelativeKey, "${DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY}" ][0] %}`,
-      destinationEndCopyReportRelativeKey: `{% [ $states.input.destinationEndCopyReportRelativeKey, "${DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY}" ][0] %}`,
       // if thawParams is not passed in, we use an empty object
       thawParams: `{% $exists($states.input.thawParams) ? $states.input.thawParams : {} %}`,
-
-      // typecast any input to a boolean, if left blank or not passed in, we will end up with false
-      [DRY_RUN_KEY_FIELD_NAME]: `{% [ $states.input.${DRY_RUN_KEY_FIELD_NAME}, false ][0] %}`,
-
-      // if not passed, default to false
-      [INCLUDE_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${INCLUDE_COPY_REPORT_FIELD_NAME}, false ][0] %}`,
-
-      // if not passed, default to false
-      [RETAIN_COPY_REPORT_FIELD_NAME]: `{% [ $states.input.${RETAIN_COPY_REPORT_FIELD_NAME}, false ][0] %}`,
-      [RETAIN_COPY_CSV_FIELD_NAME]: `{% [ $states.input.${RETAIN_COPY_CSV_FIELD_NAME}, false ][0] %}`,
 
       // bucket definitions default to empty object when not provided
       bucketDefinitions: `{% $exists($states.input.bucketDefinitions) ? $states.input.bucketDefinitions : {} %}`,
@@ -205,14 +190,14 @@ export class StepsS3CopyConstruct extends Construct {
     } = {
       workingBucket: props.workingBucket,
       // note: if undefined we instead use an empty string to mean "no leading prefix" in the working bucket
-      workingBucketPrefixKey: props.workingBucketPrefixKey ?? "",
+      workingBucketPrefix: props.workingBucketPrefix ?? "",
     };
 
     // The Distributed Map result writer appends `/<MapRunArn>/...` to its prefix. This produces
     // a double-slash in the key, so remove it here and pass it into each construct to be referenced.
     const mapResultWriterPrefix = `{% $replace("${
-      props.workingBucketPrefixKey ?? ""
-    }" & $states.input.copyInstructionsFolder, /\\/$/, "") %}`;
+      props.workingBucketPrefix ?? ""
+    }" & $states.input.instructionsPrefix, /\\/$/, "") %}`;
 
     const assignInputsAndApplyDefaults = new Pass(
       this,

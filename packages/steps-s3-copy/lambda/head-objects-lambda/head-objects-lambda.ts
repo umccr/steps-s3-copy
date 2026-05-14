@@ -16,7 +16,7 @@ import { createS3ClientCache } from "../common/s3-client-builder";
  */
 export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
-    destinationFolderKey: string;
+    destinationPrefix: string;
     maximumExpansion: number;
     bucketDefinitions?: Record<string, BucketDefinition>;
   };
@@ -97,23 +97,23 @@ export async function handler(
   // and again and they will be rejected (contrasting this to whether an object does or does not
   // exist for instance - which is a different kind of error)
 
-  // note here that destinationFolderKey CAN BE THE EMPTY STRING - so we do not check for "false" values
-  if (typeof event?.BatchInput?.destinationFolderKey !== "string")
-    throw new DestinationFolderKeyFieldInvalid(
-      "destinationFolderKey must be a slash terminated string or the empty string",
+  // note here that destinationPrefix CAN BE THE EMPTY STRING - so we do not check for "false" values
+  if (typeof event?.BatchInput?.destinationPrefix !== "string")
+    throw new DestinationPrefixFieldInvalid(
+      "destinationPrefix must be a slash terminated string or the empty string",
     );
 
   if (
-    event.BatchInput.destinationFolderKey !== "" &&
-    !event.BatchInput.destinationFolderKey.endsWith("/")
+    event.BatchInput.destinationPrefix !== "" &&
+    !event.BatchInput.destinationPrefix.endsWith("/")
   )
-    throw new DestinationFolderKeyFieldInvalid(
-      "destinationFolderKey must be a slash terminated string or the empty string",
+    throw new DestinationPrefixFieldInvalid(
+      "destinationPrefix must be a slash terminated string or the empty string",
     );
 
-  if (event.BatchInput.destinationFolderKey.includes(".."))
-    throw new DestinationFolderKeyFieldInvalid(
-      "destinationFolderKey cannot contain '..' (which may be interpreted by some systems as a relative path access)",
+  if (event.BatchInput.destinationPrefix.includes(".."))
+    throw new DestinationPrefixFieldInvalid(
+      "destinationPrefix cannot contain '..' (which may be interpreted by some systems as a relative path access)",
     );
 
   for (const o of event.Items || []) {
@@ -247,7 +247,7 @@ export async function handler(
             destinationKey: computeDestinationKey(
               item.Key,
               sourceKeyPrefix + "/",
-              event.BatchInput.destinationFolderKey,
+              event.BatchInput.destinationPrefix,
               o.destinationRelativeFolderKey,
             ),
             etag: item.ETag,
@@ -289,7 +289,7 @@ export async function handler(
         destinationKey: computeDestinationKey(
           o.sourceKey,
           o.sourceRootFolderKey,
-          event.BatchInput.destinationFolderKey,
+          event.BatchInput.destinationPrefix,
           o.destinationRelativeFolderKey,
         ),
         etag: headResult.ETag,
@@ -396,10 +396,10 @@ export class SourceObjectNotFound extends Error {
   }
 }
 
-export class DestinationFolderKeyFieldInvalid extends Error {
+export class DestinationPrefixFieldInvalid extends Error {
   constructor(message: string) {
     super();
-    this.name = "DestinationFolderKeyFieldInvalid";
+    this.name = "DestinationPrefixFieldInvalid";
     this.message = message;
   }
 }

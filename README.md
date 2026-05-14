@@ -66,7 +66,7 @@ export interface StepsS3CopyConstructProps {
    * If undefined or the empty string, then artifacts will be created in the root
    * of the bucket.
    */
-  readonly workingBucketPrefixKey?: string;
+  readonly workingBucketPrefix?: string;
 
   /**
    * Whether the stack should use duration/timeouts that are more suited
@@ -90,7 +90,7 @@ export interface StepsS3CopyConstructProps {
 In order to allow copying objects at the scale we expect (potentially millions of objects) - the input
 list of objects to copy (the "copy instructions")
 is created as a JSONL formatted text file. That file must be
-stored in `workingBucket`/`workingBucketPrefixKey`/... .
+stored in `workingBucket`/`workingBucketPrefix`/... .
 
 Each individual "copy instruction" meets the following schema
 
@@ -137,32 +137,16 @@ orchestration can then be invoked with the following input schema.
 ```typescript
 export type StepsS3CopyInvokeArguments = {
   /**
-   * The region that source buckets MUST be in.
-   *
-   * If undefined, will default to the region that the orchestration is installed into.
+   * The region that source buckets MUST be in. If undefined, defaults to the region the
+   * orchestration is installed in.
    */
   readonly sourceRequiredRegion?: string;
 
   /**
-   * The region that destination bucket MUST be in.
-   *
-   * If undefined, will default to the region that the orchestration is installed into.
+   * The region that the destination bucket MUST be in. If undefined, defaults to the region
+   * the orchestration is installed in.
    */
   readonly destinationRequiredRegion?: string;
-
-  /**
-   * The slash-terminated folder (relative to `workingBucketPrefixKey`) that contains the
-   * copy-instructions JSONL input file. This directory is expected to contain a JSONL file
-   * with the name of `copyInstructionsFileName`. Use `""` to place it at the root of
-   * `workingBucketPrefixKey`.
-   */
-  readonly copyInstructionsFolder: string;
-
-  /**
-   * The name of the JSONL copy-instructions file inside `copyInstructionsFolder`. Defaults
-   * to `INSTRUCTIONS.jsonl` if not specified.
-   */
-  readonly copyInstructionsFileName?: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -170,52 +154,69 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationBucket: string;
 
   /**
-   * A slash terminated folder key in which to root the destination
-   * objects, or "" to mean place objects in the root of the bucket.
+   * A slash-terminated prefix in the destination bucket under which copied objects (and the
+   * markers / reports below) are placed. Use `""` to copy into the root of the bucket.
    */
-  readonly destinationFolderKey: string;
-
-  readonly copyConcurrency: number;
-  readonly maxItemsPerBatch: number;
+  readonly destinationPrefix?: string;
 
   /**
-   * Relative key (under `destinationFolderKey`) of the start-of-copy marker object.
-   * Defaults to `STARTED_COPY.txt` if omitted.
+   * Slash-terminated prefix (relative to the deploy-time `workingBucketPrefix`) that holds the
+   * input copy-instructions JSONL. Distributed-map result manifests and any retained outputs are
+   * also written here. Use `""` to place at the root of `workingBucketPrefix`.
    */
-  readonly destinationStartCopyRelativeKey?: string;
+  readonly instructionsPrefix: string;
 
   /**
-   * Relative key (under `destinationFolderKey`) of the start copy marker. Defaults to `STARTED_COPY.txt`
-   * if omitted.
+   * Key (relative to `instructionsPrefix`) of the JSONL copy-instructions file. Defaults to
+   * `INSTRUCTIONS.jsonl`. May contain slashes to place the file under a sub-prefix.
    */
-  readonly destinationEndCopyRelativeKey?: string;
+  readonly instructionsKey?: string;
 
   /**
-   * Relative key (under `destinationFolderKey`) of the end copy CSV once the copy completes. Defaults
-   * to `ENDED_COPY.csv` if omitted.
+   * Key (relative to `destinationPrefix`) of the start-of-copy marker object. Defaults to
+   * `STARTED_COPY.txt`.
    */
-  readonly destinationEndCopyReportRelativeKey?: string;
+  readonly startMarkerKey?: string;
 
   /**
-   * If present and true, instructs the copier to go through the motions of
-   * doing a copy (including checking for existence of all the objects) - but not
-   * actually perform the copy.
+   * Key (relative to `destinationPrefix`) of the end-of-copy CSV summary. Defaults to
+   * `ENDED_COPY.csv`.
+   */
+  readonly summaryCsvKey?: string;
+
+  /**
+   * Key (relative to `destinationPrefix`) of the end-of-copy HTML report, written when
+   * `htmlReport` is true. Defaults to `ENDED_COPY_REPORT.html`.
+   */
+  readonly htmlReportKey?: string;
+
+  /**
+   * If true, generate and write the HTML report to `destinationPrefix/htmlReportKey` in the
+   * destination bucket. Defaults to false.
+   */
+  readonly htmlReport?: boolean;
+
+  /**
+   * If true, also save the HTML report in the working bucket at
+   * `<workingBucketPrefix><instructionsPrefix><htmlReportKey>`. Generates the report even when
+   * `htmlReport` is false. Defaults to false.
+   */
+  readonly retainHtmlReport?: boolean;
+
+  /**
+   * If true, also save the end-of-copy CSV in the working bucket at
+   * `<workingBucketPrefix><instructionsPrefix><summaryCsvKey>`. Defaults to false.
+   */
+  readonly retainSummaryCsv?: boolean;
+
+  /**
+   * If true, go through the motions of doing a copy (including checking for existence of all the
+   * objects) - but do not actually perform the copy. Defaults to false.
    */
   readonly dryRun?: boolean;
 
-  /**
-   * If present and true, generate the HTML copy report in the destination
-   * (named by `destinationEndCopyReportRelativeKey`).
-   * If omitted, defaults to false.
-   */
-  readonly includeCopyReport?: boolean;
-
-  /**
-   * If set, also save a copy of the HTML report (named by the basename of
-   * `destinationEndCopyReportRelativeKey`) in the working bucket alongside the copy
-   * instructions file.
-   */
-  readonly retainCopyReport?: boolean;
+  readonly copyConcurrency?: number;
+  readonly maxItemsPerBatch?: number;
 
   /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
@@ -223,101 +224,113 @@ export type StepsS3CopyInvokeArguments = {
    */
   readonly thawParams?: {
     readonly glacierFlexibleRetrievalThawDays?: number;
-    readonly glacierFlexibleRetrievalThawSpeed?: string;
+    readonly glacierFlexibleRetrievalThawSpeed?:
+      | "Bulk"
+      | "Standard"
+      | "Expedited";
 
     readonly glacierDeepArchiveThawDays?: number;
-    readonly glacierDeepArchiveThawSpeed?: string;
+    readonly glacierDeepArchiveThawSpeed?: "Bulk" | "Standard";
 
     readonly intelligentTieringArchiveThawDays?: number;
-    readonly intelligentTieringArchiveThawSpeed?: string;
+    readonly intelligentTieringArchiveThawSpeed?:
+      | "Bulk"
+      | "Standard"
+      | "Expedited";
 
     readonly intelligentTieringDeepArchiveThawDays?: number;
-    readonly intelligentTieringDeepArchiveThawSpeed?: string;
+    readonly intelligentTieringDeepArchiveThawSpeed?: "Bulk" | "Standard";
   };
 
   /**
-   * When a source or destination bucket matches a key in this map, the BucketDefinition
-   * is used to configure access for the bucket. Access settings here override sourceRequiredRegion,
-   * destinationRequiredRegion, or sourceNoSignRequest for that bucket.
+   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used to
+   * configure the credentials used to access the bucket.
+   *
+   * Settings here will override `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` if
+   * using the no-credential `CredentialProvider`.
    */
   readonly bucketDefinitions?: Record<string, BucketDefinition>;
 };
 
-type BucketDefinition = {
-  /** The AWS region for this bucket. */
+/**
+ * Common fields shared by all bucket definitions.
+ */
+type BaseBucketDefinition = {
+  /**
+   * The AWS region for this bucket.
+   */
   readonly region?: string;
 
-  /** A custom S3 endpoint URL. */
+  /**
+   * A custom S3 endpoint URL
+   */
   readonly endpointUrl?: string;
 
-  /** Enables S3-compatible mode for endpoints like Ceph. Defaults to true when `endpointUrl` is set,
-   *  although it can be set here to explicitly override.
+  /**
+   * Enables compatibility mode for S3-compatible endpoints.
+   * Defaults to `true` when `endpointUrl` is set. Set explicitly to override this.
    */
   readonly s3Compatible?: boolean;
-
-  /**
-   * Specifies how the copier should connect to a specific bucket.
-   *
-   * - `"default-environment"` - use the default SDK credential chain.
-   * - `"no-credentials"` - no request signing.
-   * - `"aws-secret"` - fetch credentials from an AWS Secrets Manager secret.
-   */
-  readonly credentialProvider?:
-    | "default-environment"
-    | "no-credentials"
-    | "aws-secret";
-
-  /**
-   * The name or ARN of the Secrets Manager secret containing credentials.
-   * This option is required when credentialProvider is "aws-secret". The secret
-   * must be a JSON with `access_key_id`, `secret_access_key`, and optionally `session_token`.
-   */
-  readonly secret?: string;
 };
+
+/**
+ * Specifies how the copier should connect to a specific bucket.
+ *
+ * - `"default-environment"` - use the default SDK credential chain.
+ * - `"no-credentials"` - no request signing.
+ * - `"aws-secret"` - fetch credentials from an AWS Secrets Manager secret.
+ *   The secret must contain JSON with `access_key_id`, `secret_access_key`,
+ *   and optionally `session_token`.
+ */
+export type BucketDefinition = BaseBucketDefinition &
+  (
+    | { readonly credentialProvider?: "default-environment" | "no-credentials" }
+    | { readonly credentialProvider: "aws-secret"; readonly secret: string }
+  );
 ```
 
-`copyInstructionsFolder` points to the slash-terminated folder (relative to the working folder) that
-holds the JSONL copy-instructions file, and `copyInstructionsFileName` names the file itself.
+`instructionsPrefix` points to the slash-terminated prefix (relative to the working folder) that
+holds the JSONL copy-instructions file, and `instructionsKey` names the file itself.
 For instance, if we uploaded the JSONL copy instructions to
 `s3://my-working-bucket/a-working-folder/job/INSTRUCTIONS.jsonl`, we would specify
-`copyInstructionsFolder` of `job/` and leave `copyInstructionsFileName` unset (or set it to
+`instructionsPrefix` of `job/` and leave `instructionsKey` unset (or set it to
 `INSTRUCTIONS.jsonl`).
 
-Outputs of the copy run also land in this same folder, e.g. CSV/HTML reports if
-`retainCopyCsv`/`retainCopyReport` are set, and the distributed-map result manifests.
+Outputs of the copy run also land in this same prefix, e.g. CSV/HTML reports if
+`retainSummaryCsv`/`retainHtmlReport` are set, and the distributed-map result manifests.
 
-Note, it is expected that `copyInstructionsFolder` represents a single copy invocation. A new copy
-should have a different `copyInstructionsFolder`. If it is re-used, the reports and output files will be
+Note, it is expected that `instructionsPrefix` represents a single copy invocation. A new copy
+should have a different `instructionsPrefix`. If it is re-used, the reports and output files will be
 overwritten.
 
 ### File structure in the working and destination buckets
 
 Two buckets are involved in any copy run:
 
-- The **working bucket** (set at deploy time via `workingBucket` + `workingBucketPrefixKey`) holds
+- The **working bucket** (set at deploy time via `workingBucket` + `workingBucketPrefix`) holds
   the JSONL copy-instructions, the per-map result manifests, and any retained copies of the
   CSV summary and HTML report.
-- The **destination bucket** (set per invocation via `destinationBucket` + `destinationFolderKey`)
+- The **destination bucket** (set per invocation via `destinationBucket` + `destinationPrefix`)
   receives the copied objects, the start copy marker, the CSV summary, and optionally the HTML report.
 
-The `workingBucketPrefixKey`, `copyInstructionsFolder`, and `destinationFolderKey` inputs must be either an empty string `""`
+The `workingBucketPrefix`, `instructionsPrefix`, and `destinationPrefix` inputs must be either an empty string `""`
 or end with a slash.
 
 #### Where each file lands
 
 The below table summarises each output:
 
-| Artifact                         | Bucket      | Key                                                                                                                                                            | Controlled by                                                |
-| -------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Copy instructions JSONL          | working     | `<workingBucketPrefixKey><copyInstructionsFolder><copyInstructionsFileName>`                                                                                   | uploaded by caller before invocation                         |
-| Distributed map result manifests | working     | `<workingBucketPrefixKey><copyInstructionsFolder><MapRunArn>/manifest.json` and `<workingBucketPrefixKey><copyInstructionsFolder><MapRunArn>/SUCCEEDED_*.json` | HeadObjects, Small, Large, NeedThawSmall, NeedThawLarge maps |
-| Copy set JSONL files             | working     | `<workingBucketPrefixKey><copyInstructionsFolder><HeadObjectsMapRunArn>/{small,large,smallThaw,largeThaw}.jsonl`                                               | CoordinateCopy lambda                                        |
-| Retained CSV summary             | working     | `<workingBucketPrefixKey><copyInstructionsFolder><basename(destinationEndCopyRelativeKey)>`                                                                    | `retainCopyCsv: true`                                        |
-| Retained HTML report             | working     | `<workingBucketPrefixKey><copyInstructionsFolder><basename(destinationEndCopyReportRelativeKey)>`                                                              | `retainCopyReport: true`                                     |
-| Start copy marker                | destination | `<destinationFolderKey><destinationStartCopyRelativeKey>`                                                                                                      | CanWrite lambda                                              |
-| End copy CSV                     | destination | `<destinationFolderKey><destinationEndCopyRelativeKey>`                                                                                                        | SummariseCopy lambda                                         |
-| HTML report                      | destination | `<destinationFolderKey><destinationEndCopyReportRelativeKey>`                                                                                                  | `includeCopyReport: true`                                    |
-| Copied objects                   | destination | `<destinationFolderKey><destinationKey>`                                                                                                                       | per copy-instruction                                         |
+| Artifact                         | Bucket      | Key                                                                                                          | Controlled by                                                |
+| -------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Copy instructions JSONL          | working     | `<workingBucketPrefix><instructionsPrefix><instructionsKey>`                                                 | uploaded by caller before invocation                         |
+| Distributed map result manifests | working     | `<workingBucketPrefix><instructionsPrefix><MapRunArn>/manifest.json` and `<...><MapRunArn>/SUCCEEDED_*.json` | HeadObjects, Small, Large, NeedThawSmall, NeedThawLarge maps |
+| Copy set JSONL files             | working     | `<workingBucketPrefix><instructionsPrefix><HeadObjectsMapRunArn>/{small,large,smallThaw,largeThaw}.jsonl`    | CoordinateCopy lambda                                        |
+| Retained CSV summary             | working     | `<workingBucketPrefix><instructionsPrefix><summaryCsvKey>`                                                   | `retainSummaryCsv: true`                                     |
+| Retained HTML report             | working     | `<workingBucketPrefix><instructionsPrefix><htmlReportKey>`                                                   | `retainHtmlReport: true`                                     |
+| Start copy marker                | destination | `<destinationPrefix><startMarkerKey>`                                                                        | CanWrite lambda                                              |
+| End copy CSV                     | destination | `<destinationPrefix><summaryCsvKey>`                                                                         | SummariseCopy lambda                                         |
+| HTML report                      | destination | `<destinationPrefix><htmlReportKey>`                                                                         | `htmlReport: true`                                           |
+| Copied objects                   | destination | `<destinationPrefix><destinationKey>`                                                                        | per copy-instruction                                         |
 
 For example, take the following settings to see how files would be laid out.
 
@@ -328,7 +341,7 @@ new StepsS3CopyConstruct(this, "Copy", {
   vpc,
   vpcSubnetSelection: SubnetType.PRIVATE_WITH_EGRESS,
   workingBucket: "my-working-bucket",
-  workingBucketPrefixKey: "copy-out/",
+  workingBucketPrefix: "copy-out/",
 });
 ```
 
@@ -336,12 +349,12 @@ Invoke args:
 
 ```json
 {
-  "copyInstructionsFolder": "job-a/",
+  "instructionsPrefix": "job-a/",
   "destinationBucket": "destination",
-  "destinationFolderKey": "datasets/release/",
-  "includeCopyReport": true,
-  "retainCopyReport": true,
-  "retainCopyCsv": true,
+  "destinationPrefix": "datasets/release/",
+  "htmlReport": true,
+  "retainHtmlReport": true,
+  "retainSummaryCsv": true,
   "copyConcurrency": 80,
   "maxItemsPerBatch": 8
 }
@@ -382,9 +395,9 @@ For example, copying to a Ceph bucket using credentials in Secrets Manager:
 
 ```json
 {
-  "copyInstructionsFolder": "job/",
+  "instructionsPrefix": "job/",
   "destinationBucket": "<bucket-name>",
-  "destinationFolderKey": "output/",
+  "destinationPrefix": "output/",
   "bucketDefinitions": {
     "<bucket-name>": {
       "credentialProvider": "aws-secret",

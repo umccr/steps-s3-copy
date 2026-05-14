@@ -5,10 +5,6 @@ import {
   StateGraph,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
-import {
-  COPY_INSTRUCTIONS_FILE_NAME_FIELD_NAME,
-  COPY_INSTRUCTIONS_FOLDER_FIELD_NAME,
-} from "../steps-s3-copy-input";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
@@ -44,29 +40,6 @@ export class HeadObjectsMapConstruct extends Construct {
       `Map ${id} Iterator`,
     );
 
-    /*new DistributedMap(this, "HOMAP", {
-      toleratedFailurePercentage: 0,
-      itemBatcher: new ItemBatcher({
-        maxInputBytesPerBatch: 16384,
-        batchInput: {
-          "destinationFolderKey.$": JsonPath.stringAt(
-            "$invokeArguments.destinationFolderKey",
-          ),
-          maximumExpansion: 256,
-        },
-      }),
-      itemReader: new S3JsonItemReader({
-        bucketNamePath: "$invokeSettings.workingBucket",
-        key: JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
-      }),
-    }); */
-
     this.distributedMap = new S3JsonlDistributedMap(this, "HeadObjectsMap", {
       // this phase is used to detect errors so we have zero tolerance for files being missing (for instance)
       toleratedFailurePercentage: 0,
@@ -75,8 +48,8 @@ export class HeadObjectsMapConstruct extends Construct {
       // so that means we can fit 256 of them in the standard Steps result payload (256kb)
       maxItemsPerBatch: 1,
       batchInput: {
-        "destinationFolderKey.$": JsonPath.stringAt(
-          "$invokeArguments.destinationFolderKey",
+        "destinationPrefix.$": JsonPath.stringAt(
+          "$invokeArguments.destinationPrefix",
         ),
         maximumExpansion: 256,
         "bucketDefinitions.$": JsonPath.stringAt(
@@ -87,13 +60,9 @@ export class HeadObjectsMapConstruct extends Construct {
         "Bucket.$": "$invokeSettings.workingBucket",
         "Key.$": JsonPath.format(
           "{}{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_FOLDER_FIELD_NAME}`,
-          ),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_FILE_NAME_FIELD_NAME}`,
-          ),
+          JsonPath.stringAt("$invokeSettings.workingBucketPrefix"),
+          JsonPath.stringAt("$invokeArguments.instructionsPrefix"),
+          JsonPath.stringAt("$invokeArguments.instructionsKey"),
         ),
       },
       iterator: graph,

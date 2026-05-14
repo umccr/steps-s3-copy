@@ -27,11 +27,12 @@ test.serial("basic", async () => {
       variables: JSON.stringify({
         invokeArguments: {
           destinationBucket: state.workingBucket,
-          destinationPrefixKey: "",
+          destinationPrefix: "",
+          startMarkerKey: "STARTED_COPY.txt",
         },
         invokeSettings: {
           workingBucket: "abcd",
-          workingBucketPrefixKey: "aasd/",
+          workingBucketPrefix: "aasd/",
         },
       }),
     }),
@@ -52,11 +53,12 @@ test.serial("destination bucket in different region", async () => {
           // (there is no way we would ever be able to actually write to this bucket - but the error
           // should occur before we try)
           destinationBucket: "tcga-2-controlled",
-          destinationPrefixKey: "abcd/",
+          destinationPrefix: "abcd/",
+          startMarkerKey: "STARTED_COPY.txt",
         },
         invokeSettings: {
           workingBucket: state.workingBucket,
-          workingBucketPrefixKey: state.workingBucketPrefixKey,
+          workingBucketPrefix: state.workingBucketPrefix,
         },
       }),
     }),

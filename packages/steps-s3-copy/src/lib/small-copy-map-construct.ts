@@ -1,6 +1,5 @@
 import { Construct } from "constructs";
 import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
-import { DESTINATION_BUCKET_FIELD_NAME } from "../steps-s3-copy-input";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { State } from "aws-cdk-lib/aws-stepfunctions";
@@ -102,9 +101,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
         ),
         "d.$": JsonPath.format(
           "s3://{}/{}",
-          JsonPath.stringAt(
-            `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
-          ),
+          JsonPath.stringAt("$invokeArguments.destinationBucket"),
           JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
         ),
       },

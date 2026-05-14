@@ -17,8 +17,8 @@ import {
   REALISTIC_WILDCARD_PREFIX,
 } from "./lib/realistic-source-objects";
 import {
-  DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY,
-  DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY,
+  DEFAULT_HTML_REPORT_KEY,
+  DEFAULT_SUMMARY_CSV_KEY,
 } from "../packages/steps-s3-copy/src/steps-s3-copy-input";
 
 // we have a few large objects so this can take a few minutes
@@ -83,13 +83,13 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          copyInstructionsFolder: state.testInstructionsFolder,
-          copyInstructionsFileName: state.testInstructionsFileName,
+          instructionsPrefix: state.testInstructionsFolder,
+          instructionsKey: state.testInstructionsKey,
           destinationBucket: state.workingBucket,
-          destinationFolderKey: `${state.testDestPrefix}${DEST}`,
+          destinationPrefix: `${state.testDestPrefix}${DEST}`,
           maxItemsPerBatch: 3,
-          retainCopyReport: true,
-          retainCopyCsv: true,
+          retainHtmlReport: true,
+          retainSummaryCsv: true,
         }),
       }),
     );
@@ -118,7 +118,7 @@ test(
     const csvObject = await s3Client.send(
       new GetObjectCommand({
         Bucket: state.workingBucket,
-        Key: `${state.testDestPrefix}${DEST}${DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY}`,
+        Key: `${state.testDestPrefix}${DEST}${DEFAULT_SUMMARY_CSV_KEY}`,
       }),
     );
     const csvContent = await csvObject.Body!.transformToString();
@@ -131,13 +131,13 @@ test(
     await s3Client.send(
       new HeadObjectCommand({
         Bucket: state.workingBucket,
-        Key: `${retainPrefix}${DEFAULT_DESTINATION_END_COPY_RELATIVE_KEY}`,
+        Key: `${retainPrefix}${DEFAULT_SUMMARY_CSV_KEY}`,
       }),
     );
     await s3Client.send(
       new HeadObjectCommand({
         Bucket: state.workingBucket,
-        Key: `${retainPrefix}${DEFAULT_DESTINATION_END_COPY_REPORT_RELATIVE_KEY}`,
+        Key: `${retainPrefix}${DEFAULT_HTML_REPORT_KEY}`,
       }),
     );
   },

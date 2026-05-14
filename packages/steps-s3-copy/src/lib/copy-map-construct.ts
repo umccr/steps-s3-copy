@@ -20,10 +20,6 @@ import {
   ICluster,
   TaskDefinition,
 } from "aws-cdk-lib/aws-ecs";
-import {
-  DESTINATION_BUCKET_FIELD_NAME,
-  MAX_ITEMS_PER_BATCH_FIELD_NAME,
-} from "../steps-s3-copy-input";
 import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
@@ -156,16 +152,11 @@ export class CopyMapConstruct extends Construct {
         key: JsonPath.stringAt("$.key"),
       }),
       itemBatcher: new ItemBatcher({
-        maxItemsPerBatchPath: `$invokeArguments.${MAX_ITEMS_PER_BATCH_FIELD_NAME}`,
+        maxItemsPerBatchPath: "$invokeArguments.maxItemsPerBatch",
         batchInput: {
           "rcloneDestination.$": JsonPath.format(
             "s3:{}/{}",
-            JsonPath.stringAt(
-              `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
-            ),
-            //JsonPath.stringAt(
-            //    `$invokeArguments.${DESTINATION_FOLDER_KEY_FIELD_NAME}`,
-            //),
+            JsonPath.stringAt("$invokeArguments.destinationBucket"),
           ),
         },
       }),
@@ -202,9 +193,7 @@ export class CopyMapConstruct extends Construct {
         ),
         "d.$": JsonPath.format(
           "s3://{}/{}",
-          JsonPath.stringAt(
-            `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
-          ),
+          JsonPath.stringAt("$invokeArguments.destinationBucket"),
           JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
         ),
       },
