@@ -21,3 +21,11 @@ export class DestinationPrefixKeyNoTrailingSlashError extends Error {
     this.message = message;
   }
 }
+
+export class InstructionsPrefixNoTrailingSlashError extends Error {
+  constructor(message: string) {
+    super();
+    this.name = "InstructionsPrefixNoTrailingSlashError";
+    this.message = message;
+  }
+}

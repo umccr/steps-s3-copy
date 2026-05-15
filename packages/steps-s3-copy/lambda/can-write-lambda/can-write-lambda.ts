@@ -2,6 +2,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   AccessDeniedError,
   DestinationPrefixKeyNoTrailingSlashError,
+  InstructionsPrefixNoTrailingSlashError,
   WrongRegionError,
 } from "./errors";
 import type {
@@ -23,6 +24,10 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
     event.invokeArguments.startMarkerKey,
     "startMarkerKey",
   );
+  assertInvokeArgumentString(
+    event.invokeArguments.instructionsPrefix,
+    "instructionsPrefix",
+  );
 
   if (
     event.invokeArguments.destinationPrefix &&
@@ -30,6 +35,14 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
   )
     throw new DestinationPrefixKeyNoTrailingSlashError(
       "The destination prefix must either be an empty string or a string with a trailing slash",
+    );
+
+  if (
+    event.invokeArguments.instructionsPrefix &&
+    !event.invokeArguments.instructionsPrefix.endsWith("/")
+  )
+    throw new InstructionsPrefixNoTrailingSlashError(
+      "The instructions prefix must either be an empty string or a string with a trailing slash",
     );
 
   // we are being super specific here - more so than our normal client creation
