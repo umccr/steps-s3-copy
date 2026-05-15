@@ -178,6 +178,10 @@ export function createFilesTableBlock(
     border-bottom: none;
     z-index: 2;
   }
+  .table-scroll-y {
+    max-height: 400px; /* or height: 400px */
+    overflow-y: auto;
+  }
 </style>
 <div>
   <ul class="nav nav-tabs" id="fileTableTabs" role="tablist">
@@ -290,12 +294,12 @@ export function createFilesTableBlock(
       </div>
     </div>
 
-    <div class="tab-pane" id="costs" role="tabpanel" aria-labelledby="costs-tab" style="margin-left: 12.5px;">
+    <div class="tab-pane" id="costs" role="tabpanel" aria-labelledby="costs-tab">
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle table-fixed">
+        <table id="costs-table" class="table table-sm table-hover align-middle table-fixed">
           <colgroup>
-            <col style="width:15.5ch;">  <!-- Object -->
-            <col style="width:14ch;">  <!-- Size -->
+            <col style="width:18.2ch;">  <!-- Object -->
+            <col style="width:7.9ch;">  <!-- Size -->
             <col style="width:18ch;">  <!-- Cross-Region Cost -->
             <col style="width:18ch;">  <!-- Cold Storage Retrieval Cost -->
             <col style="width:18ch;">  <!-- Compute Cost -->

@@ -18,6 +18,18 @@
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
     />
+    <!-- DataTable -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"
+    />
+    <script defer src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script
+      defer
+      src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"
+    ></script>
+
+    <!--  -->
 
     <style>
       /* Set the height of the top row */
@@ -210,7 +222,7 @@
         white-space: nowrap;
       }
 
-      /* Optional: keep headers aligned to the right for numeric cols */
+      /* Keep headers aligned to the right for numeric cols */
       th.text-end,
       td.text-end {
         text-align: right;
@@ -243,13 +255,6 @@
       /* Disable Bootstrap table-hover effect (optional) */
       .table-hover > tbody > tr:hover > * {
         --bs-table-accent-bg: transparent;
-      }
-
-      /* Add horizontal breathing room per cell */
-      #copy-results th,
-      #copy-results td {
-        padding-left: 1rem;
-        padding-right: 1rem;
       }
     </style>
   </head>
@@ -437,6 +442,60 @@
         document
           .querySelectorAll('[data-bs-toggle="popover"]')
           .forEach((el) => new bootstrap.Popover(el));
+      });
+    </script>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const initDataTables = () => {
+          const resultsTable = $("#copy-results").DataTable({
+            pageLength: 10,
+            lengthMenu: [10, 25, 50],
+            paging: true,
+            searching: true,
+            ordering: true,
+            info: true,
+            autoWidth: false,
+            deferRender: true,
+            columnDefs: [
+              { targets: 0, width: "32ch" },
+              { targets: 1, width: "14ch" },
+            ],
+          });
+
+          const costsTable = $("#costs-table").DataTable({
+            pageLength: 10,
+            lengthMenu: [10, 25, 50],
+            paging: true,
+            searching: true,
+            ordering: true,
+            info: true,
+            autoWidth: false,
+            deferRender: true,
+            columnDefs: [
+              { targets: 0, width: "32ch" },
+              { targets: 1, width: "14ch" },
+            ],
+          });
+
+          $('button[data-bs-toggle="tab"]').on("shown.bs.tab", function (e) {
+            const target = $(e.target).attr("data-bs-target");
+
+            if (target === "#results") {
+              resultsTable.columns.adjust().draw();
+            }
+
+            if (target === "#costs") {
+              costsTable.columns.adjust().draw();
+            }
+          });
+        };
+
+        if (window.jQuery && $.fn.DataTable) {
+          initDataTables();
+        } else {
+          console.error("jQuery or DataTables failed to load.");
+        }
       });
     </script>
   </body>
