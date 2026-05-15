@@ -11,6 +11,7 @@ import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { join } from "node:path";
 import { Architecture, Function, Runtime } from "aws-cdk-lib/aws-lambda";
+import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
 type Props = {
   readonly writerRole: IRole;
@@ -49,25 +50,25 @@ export class HeadObjectsMapConstruct extends Construct {
       maxItemsPerBatch: 1,
       batchInput: {
         "destinationPrefix.$": JsonPath.stringAt(
-          "$invokeArguments.destinationPrefix",
+          invokeArg("destinationPrefix"),
         ),
         maximumExpansion: 256,
         "bucketDefinitions.$": JsonPath.stringAt(
-          "$invokeArguments.bucketDefinitions",
+          invokeArg("bucketDefinitions"),
         ),
       },
       itemReader: {
-        "Bucket.$": "$invokeSettings.workingBucket",
+        "Bucket.$": invokeSetting("workingBucket"),
         "Key.$": JsonPath.format(
           "{}{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefix"),
-          JsonPath.stringAt("$invokeArguments.instructionsPrefix"),
-          JsonPath.stringAt("$invokeArguments.instructionsKey"),
+          JsonPath.stringAt(invokeSetting("workingBucketPrefix")),
+          JsonPath.stringAt(invokeArg("instructionsPrefix")),
+          JsonPath.stringAt(invokeArg("instructionsKey")),
         ),
       },
       iterator: graph,
       resultWriter: {
-        "Bucket.$": "$invokeSettings.workingBucket",
+        "Bucket.$": invokeSetting("workingBucket"),
         "Prefix.$": "$mapResultWriterPrefix",
       },
       assign: {

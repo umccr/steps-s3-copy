@@ -28,6 +28,8 @@ import {
   DEFAULT_START_MARKER_KEY,
   DEFAULT_SUMMARY_CSV_KEY,
   StepsS3CopyInvokeArguments,
+  StepsS3CopyInvokeSettings,
+  stateInput,
 } from "./steps-s3-copy-input";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
@@ -49,12 +51,8 @@ import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
+export { StepsS3CopyInvokeSettings } from "./steps-s3-copy-input";
 export { SubnetType } from "aws-cdk-lib/aws-ec2";
-
-export type StepsS3CopyInvokeSettings = {
-  readonly workingBucket: string;
-  readonly workingBucketPrefix: string;
-};
 
 /**
  * A construct that makes a state machine for bulk copying large lists of
@@ -156,34 +154,60 @@ export class StepsS3CopyConstruct extends Construct {
     const jsonataInvokeArgumentsWithDefaults: {
       [K in keyof StepsS3CopyInvokeArguments]: string;
     } = {
-      sourceRequiredRegion: `{% [ $states.input.sourceRequiredRegion, "${installedRegion}" ][0] %}`,
-      destinationRequiredRegion: `{% [ $states.input.destinationRequiredRegion, "${installedRegion}" ][0] %}`,
+      sourceRequiredRegion: `{% [ ${stateInput(
+        "sourceRequiredRegion",
+      )}, "${installedRegion}" ][0] %}`,
+      destinationRequiredRegion: `{% [ ${stateInput(
+        "destinationRequiredRegion",
+      )}, "${installedRegion}" ][0] %}`,
 
-      destinationBucket: `{% $exists($states.input.destinationBucket) ? $states.input.destinationBucket : $error("Missing destinationBucket") %}`,
-      destinationPrefix: `{% [ $states.input.destinationPrefix, "" ][0] %}`,
+      destinationBucket: `{% $exists(${stateInput(
+        "destinationBucket",
+      )}) ? ${stateInput(
+        "destinationBucket",
+      )} : $error("Missing destinationBucket") %}`,
+      destinationPrefix: `{% [ ${stateInput("destinationPrefix")}, "" ][0] %}`,
 
-      instructionsPrefix: `{% $exists($states.input.instructionsPrefix) ? $states.input.instructionsPrefix : $error("Missing instructionsPrefix") %}`,
-      instructionsKey: `{% [ $states.input.instructionsKey, "${DEFAULT_INSTRUCTIONS_KEY}" ][0] %}`,
+      instructionsPrefix: `{% $exists(${stateInput(
+        "instructionsPrefix",
+      )}) ? ${stateInput(
+        "instructionsPrefix",
+      )} : $error("Missing instructionsPrefix") %}`,
+      instructionsKey: `{% [ ${stateInput(
+        "instructionsKey",
+      )}, "${DEFAULT_INSTRUCTIONS_KEY}" ][0] %}`,
 
-      startMarkerKey: `{% [ $states.input.startMarkerKey, "${DEFAULT_START_MARKER_KEY}" ][0] %}`,
-      summaryCsvKey: `{% [ $states.input.summaryCsvKey, "${DEFAULT_SUMMARY_CSV_KEY}" ][0] %}`,
-      htmlReportKey: `{% [ $states.input.htmlReportKey, "${DEFAULT_HTML_REPORT_KEY}" ][0] %}`,
+      startMarkerKey: `{% [ ${stateInput(
+        "startMarkerKey",
+      )}, "${DEFAULT_START_MARKER_KEY}" ][0] %}`,
+      summaryCsvKey: `{% [ ${stateInput(
+        "summaryCsvKey",
+      )}, "${DEFAULT_SUMMARY_CSV_KEY}" ][0] %}`,
+      htmlReportKey: `{% [ ${stateInput(
+        "htmlReportKey",
+      )}, "${DEFAULT_HTML_REPORT_KEY}" ][0] %}`,
 
-      htmlReport: "{% [ $states.input.htmlReport, false ][0] %}",
-      retainHtmlReport: "{% [ $states.input.retainHtmlReport, false ][0] %}",
-      retainSummaryCsv: "{% [ $states.input.retainSummaryCsv, false ][0] %}",
+      htmlReport: `{% [ ${stateInput("htmlReport")}, false ][0] %}`,
+      retainHtmlReport: `{% [ ${stateInput("retainHtmlReport")}, false ][0] %}`,
+      retainSummaryCsv: `{% [ ${stateInput("retainSummaryCsv")}, false ][0] %}`,
 
-      dryRun: "{% [ $states.input.dryRun, false ][0] %}",
-      copyConcurrency:
-        "{% [ $number($states.input.copyConcurrency), 80 ][0] %}",
-      maxItemsPerBatch:
-        "{% [ $number($states.input.maxItemsPerBatch), 8 ][0] %}",
+      dryRun: `{% [ ${stateInput("dryRun")}, false ][0] %}`,
+      copyConcurrency: `{% [ $number(${stateInput(
+        "copyConcurrency",
+      )}), 80 ][0] %}`,
+      maxItemsPerBatch: `{% [ $number(${stateInput(
+        "maxItemsPerBatch",
+      )}), 8 ][0] %}`,
 
       // if thawParams is not passed in, we use an empty object
-      thawParams: `{% $exists($states.input.thawParams) ? $states.input.thawParams : {} %}`,
+      thawParams: `{% $exists(${stateInput("thawParams")}) ? ${stateInput(
+        "thawParams",
+      )} : {} %}`,
 
       // bucket definitions default to empty object when not provided
-      bucketDefinitions: `{% $exists($states.input.bucketDefinitions) ? $states.input.bucketDefinitions : {} %}`,
+      bucketDefinitions: `{% $exists(${stateInput(
+        "bucketDefinitions",
+      )}) ? ${stateInput("bucketDefinitions")} : {} %}`,
     };
     const jsonataInvokeSettings: {
       [K in keyof StepsS3CopyInvokeSettings]: string;
@@ -197,7 +221,7 @@ export class StepsS3CopyConstruct extends Construct {
     // a double-slash in the key, so remove it here and pass it into each construct to be referenced.
     const mapResultWriterPrefix = `{% $replace("${
       props.workingBucketPrefix ?? ""
-    }" & $states.input.instructionsPrefix, /\\/$/, "") %}`;
+    }" & ${stateInput("instructionsPrefix")}, /\\/$/, "") %}`;
 
     const assignInputsAndApplyDefaults = new Pass(
       this,

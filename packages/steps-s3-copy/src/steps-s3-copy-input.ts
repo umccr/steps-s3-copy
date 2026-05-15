@@ -118,6 +118,39 @@ export type StepsS3CopyInvokeArguments = {
   readonly bucketDefinitions?: Record<string, BucketDefinition>;
 };
 
+/**
+ * Settings the construct bakes into the state machine at deploy time, as opposed to
+ * `StepsS3CopyInvokeArguments` which are supplied per execution.
+ */
+export type StepsS3CopyInvokeSettings = {
+  readonly workingBucket: string;
+  readonly workingBucketPrefix: string;
+};
+
+/**
+ * Builds a JSONPath reference into the `$invokeArguments` state variable.
+ */
+export const invokeArg = (key: keyof StepsS3CopyInvokeArguments): string =>
+  `$invokeArguments.${key}`;
+
+/**
+ * Builds a JSONPath reference into the `$invokeSettings` state variable.
+ */
+export const invokeSetting = (key: keyof StepsS3CopyInvokeSettings): string =>
+  `$invokeSettings.${key}`;
+
+/**
+ * Builds a JSONata reference to a field of the raw caller `$states.input` variable.
+ */
+export const stateInput = (key: keyof StepsS3CopyInvokeArguments): string =>
+  `$states.input.${key}`;
+
+/**
+ * Builds a JSONata reference to a field of the batch `$states.input.BatchInput.<key>` object.
+ */
+export const batchArg = (key: keyof StepsS3CopyInvokeArguments): string =>
+  `$states.input.BatchInput.${key}`;
+
 // Default file names used when the corresponding input override is not supplied.
 export const DEFAULT_INSTRUCTIONS_KEY = "INSTRUCTIONS.jsonl";
 export const DEFAULT_START_MARKER_KEY = "STARTED_COPY.txt";

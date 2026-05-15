@@ -15,6 +15,7 @@ import {
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { JitterType } from "aws-cdk-lib/aws-stepfunctions";
 import { join } from "path";
+import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
 type Props = {
   readonly writerRole: IRole;
@@ -83,8 +84,8 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
       batchInput: {
-        "thawParams.$": "$invokeArguments.thawParams",
-        "bucketDefinitions.$": "$invokeArguments.bucketDefinitions",
+        "thawParams.$": invokeArg("thawParams"),
+        "bucketDefinitions.$": invokeArg("bucketDefinitions"),
       },
       inputPath: props.inputPath,
       itemReader: {
@@ -101,14 +102,14 @@ export class SmallObjectsCopyMapConstruct extends Construct {
         ),
         "d.$": JsonPath.format(
           "s3://{}/{}",
-          JsonPath.stringAt("$invokeArguments.destinationBucket"),
+          JsonPath.stringAt(invokeArg("destinationBucket")),
           JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
         ),
       },
       iterator: graph,
       // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
-        "Bucket.$": "$invokeSettings.workingBucket",
+        "Bucket.$": invokeSetting("workingBucket"),
         "Prefix.$": "$mapResultWriterPrefix",
       },
       resultSelector: {
