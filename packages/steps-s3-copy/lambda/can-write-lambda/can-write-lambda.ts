@@ -15,9 +15,6 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
   console.log("canWrite()");
   console.debug(JSON.stringify(event, null, 2));
 
-  // Optional invokeArguments fields are defaulted in the state machine's
-  // "Assign Inputs to State and Apply Defaults" Pass state. These asserts catch the case
-  // where that defaulting was bypassed (e.g. a test invoking this lambda directly).
   assertInvokeArgumentString(
     event.invokeArguments.destinationPrefix,
     "destinationPrefix",

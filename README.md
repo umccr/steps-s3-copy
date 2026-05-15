@@ -154,57 +154,57 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationBucket: string;
 
   /**
-   * A slash-terminated prefix in the destination bucket under which copied objects (and the
-   * markers / reports below) are placed. Use `""` to copy into the root of the bucket.
+   * A slash-terminated prefix in the destination bucket which copied objects are placed.
+   * Use `""` to copy into the root of the bucket.
    */
   readonly destinationPrefix?: string;
 
   /**
-   * Slash-terminated prefix (relative to the deploy-time `workingBucketPrefix`) that holds the
-   * input copy-instructions JSONL. Distributed-map result manifests and any retained outputs are
-   * also written here. Use `""` to place at the root of `workingBucketPrefix`.
+   * A slash-terminated prefix, relative to `workingBucketPrefix` that holds the
+   * input copy instructions JSONL. Distributed map result manifests and any retained
+   * outputs are also written here. Use `""` to place at the root of `workingBucketPrefix`.
    */
   readonly instructionsPrefix: string;
 
   /**
-   * Key (relative to `instructionsPrefix`) of the JSONL copy-instructions file. Defaults to
-   * `INSTRUCTIONS.jsonl`. May contain slashes to place the file under a sub-prefix.
+   * The key, relative to `instructionsPrefix` of the JSONL copy instructions file. Defaults to
+   * `INSTRUCTIONS.jsonl`.
    */
   readonly instructionsKey?: string;
 
   /**
-   * Key (relative to `destinationPrefix`) of the start-of-copy marker object. Defaults to
+   * The key, relative to `destinationPrefix` of the start copy marker. Defaults to
    * `STARTED_COPY.txt`.
    */
   readonly startMarkerKey?: string;
 
   /**
-   * Key (relative to `destinationPrefix`) of the end-of-copy CSV summary. Defaults to
+   * The key, relative to `destinationPrefix` of the end copy CSV summary. Defaults to
    * `ENDED_COPY.csv`.
    */
   readonly summaryCsvKey?: string;
 
   /**
-   * Key (relative to `destinationPrefix`) of the end-of-copy HTML report, written when
+   * The key, relative to `destinationPrefix` of the end copy HTML report, written when
    * `htmlReport` is true. Defaults to `ENDED_COPY_REPORT.html`.
    */
   readonly htmlReportKey?: string;
 
   /**
-   * If true, generate and write the HTML report to `destinationPrefix/htmlReportKey` in the
+   * If true, generate and write the HTML report to `<destinationPrefix><htmlReportKey>` in the
    * destination bucket. Defaults to false.
    */
   readonly htmlReport?: boolean;
 
   /**
    * If true, also save the HTML report in the working bucket at
-   * `<workingBucketPrefix><instructionsPrefix><htmlReportKey>`. Generates the report even when
-   * `htmlReport` is false. Defaults to false.
+   * `<workingBucketPrefix><instructionsPrefix><htmlReportKey>`. This will work
+   * for the working bucket even if `htmlReport` is false. Defaults to false.
    */
   readonly retainHtmlReport?: boolean;
 
   /**
-   * If true, also save the end-of-copy CSV in the working bucket at
+   * If true, also save the end copy CSV in the working bucket at
    * `<workingBucketPrefix><instructionsPrefix><summaryCsvKey>`. Defaults to false.
    */
   readonly retainSummaryCsv?: boolean;
@@ -243,11 +243,9 @@ export type StepsS3CopyInvokeArguments = {
   };
 
   /**
-   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used to
-   * configure the credentials used to access the bucket.
-   *
-   * Settings here will override `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` if
-   * using the no-credential `CredentialProvider`.
+   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used
+   * to configure the credentials used to access the bucket. Settings here override
+   * `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` for that bucket.
    */
   readonly bucketDefinitions?: Record<string, BucketDefinition>;
 };
@@ -316,7 +314,7 @@ Two buckets are involved in any copy run:
 The `workingBucketPrefix`, `instructionsPrefix`, and `destinationPrefix` inputs must be either an empty string `""`
 or end with a slash.
 
-#### Where each file lands
+#### Where each file end up
 
 The below table summarises each output:
 
