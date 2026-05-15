@@ -85,9 +85,10 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          copyInstructionsKey: state.testInstructionsRelative,
+          instructionsPrefix: state.testInstructionsFolder,
+          instructionsKey: state.testInstructionsKey,
           destinationBucket: S3_BUCKET,
-          destinationFolderKey: `${state.testDestPrefix}${DEST}`,
+          destinationPrefix: `${state.testDestPrefix}${DEST}`,
           // the destination is not in AWS so disable the region check
           destinationRequiredRegion: "",
           maxItemsPerBatch: 3,

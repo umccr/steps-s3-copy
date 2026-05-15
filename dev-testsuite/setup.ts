@@ -24,10 +24,11 @@ export type TestSetupState = {
 
   // the settings of the state machine under test
   workingBucket: string;
-  workingBucketPrefixKey: string;
+  workingBucketPrefix: string;
 
   // paths for creating various test artefacts
-  testInstructionsRelative: string;
+  testInstructionsFolder: string;
+  testInstructionsKey: string;
   testInstructionsAbsolute: string;
   testSrcPrefix: string;
   testDestPrefix: string;
@@ -139,13 +140,6 @@ export async function testSetup(): Promise<TestSetupState> {
     "WorkingBucketPrefix",
   );
 
-  // console.log(`Steps Arn = ${smArn}`);
-  // console.log(
-  //  `Working S3 Location = ${workingBucket}/${TEST_BUCKET_WORKING_PREFIX}`,
-  //);
-  // console.log(`Source S3 Bucket = ${sourceBucket}`);
-  // console.log(`Destination S3 Bucket = ${destinationBucket}/<test id>/`);
-
   const objectsToCopyName = `objects-to-copy.jsonl`;
   const unique = randomBytes(8).toString("hex");
 
@@ -153,12 +147,11 @@ export async function testSetup(): Promise<TestSetupState> {
     uniqueTestId: unique,
     smArn,
     workingBucket,
-    workingBucketPrefixKey: workingBucketPrefix,
+    workingBucketPrefix,
 
-    // because our instructions must exist in the working folder - we need it
-    // both as a relative path (how we will refer to it _within_ the steps)
-    // and an absolute path (for use _outside_ our steps)
-    testInstructionsRelative: `${unique}/${objectsToCopyName}`,
+    // the instructions is inside a folder (relative to workingBucketPrefix)
+    testInstructionsFolder: `${unique}/`,
+    testInstructionsKey: objectsToCopyName,
     testInstructionsAbsolute: `${workingBucketPrefix}${unique}/${objectsToCopyName}`,
 
     testSrcPrefix: `${TEST_BUCKET_ONE_DAY_PREFIX}${unique}SRC/`,

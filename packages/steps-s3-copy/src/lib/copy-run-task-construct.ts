@@ -2,6 +2,7 @@ import { Construct } from "constructs";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { IntegrationPattern, Timeout } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
+import { batchArg } from "../steps-s3-copy-input";
 import {
   ContainerDefinition,
   FargatePlatformVersion,
@@ -102,8 +103,9 @@ export class CopyRunTaskConstruct extends Construct {
             },
             {
               name: "CB_BUCKET_DEFINITIONS",
-              value:
-                "{% $states.input.BatchInput.bucketDefinitions ? $string($states.input.BatchInput.bucketDefinitions) : '{}' %}",
+              value: `{% ${batchArg("bucketDefinitions")} ? $string(${batchArg(
+                "bucketDefinitions",
+              )}) : '{}' %}`,
             },
           ],
         },

@@ -1,36 +1,26 @@
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
-import { dirname } from "path/posix";
 import { createHtmlReport } from "./create-html-report";
-import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+import type { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import { buildS3Client } from "../common/s3-client-builder";
+import { assertInvokeArgumentString } from "../common/assert-invoke-arguments";
+
+interface MapResult {
+  manifestBucket: string;
+  manifestKey: string;
+}
 
 interface InvokeEvent {
-  rcloneResultsLarge: {
-    manifestBucket: string;
-    manifestKey: string;
+  invokeArguments: StepsS3CopyInvokeArguments;
+  invokeSettings: {
+    workingBucket: string;
+    workingBucketPrefix: string;
   };
-  rcloneResultsSmall: {
-    manifestBucket: string;
-    manifestKey: string;
-  };
-  rcloneResultsNeedThawSmall: {
-    manifestBucket: string;
-    manifestKey: string;
-  };
-  rcloneResultsNeedThawLarge: {
-    manifestBucket: string;
-    manifestKey: string;
-  };
-  destinationBucket: string;
-  destinationPrefixKey: string;
-  destinationEndCopyRelativeKey: string;
-  workingBucket: string;
-  sourceFilesCsvKey: string;
-  bucketDefinitions?: Record<string, BucketDefinition>;
-  includeCopyReport?: boolean;
-  retainCopyReport?: boolean;
+  rcloneResultsLarge: MapResult;
+  rcloneResultsSmall: MapResult;
+  rcloneResultsNeedThawSmall: MapResult;
+  rcloneResultsNeedThawLarge: MapResult;
 }
 
 type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED";
@@ -58,12 +48,25 @@ export async function handler(event: InvokeEvent) {
   // debug input event
   console.debug(JSON.stringify(event, null, 2));
 
+  assertInvokeArgumentString(
+    event.invokeArguments.destinationPrefix,
+    "destinationPrefix",
+  );
+  assertInvokeArgumentString(
+    event.invokeArguments.summaryCsvKey,
+    "summaryCsvKey",
+  );
+  assertInvokeArgumentString(
+    event.invokeArguments.htmlReportKey,
+    "htmlReportKey",
+  );
+
   // For the working bucket, no bucket definitions are required.
   const workingClient = await buildS3Client();
   // Need to account for bucket definitions for the destination bucket.
   const destClient = await buildS3Client(
-    event.destinationBucket,
-    event.bucketDefinitions,
+    event.invokeArguments.destinationBucket,
+    event.invokeArguments.bucketDefinitions,
   );
 
   // Each Distributed Map we run (Large, Small, NeedThawSmall, NeedThawLarge) writes a
@@ -96,7 +99,7 @@ export async function handler(event: InvokeEvent) {
   // Iterate over the manifest key produced by each map.
   for (const manifestKey of manifestKeys) {
     const getManifestCommand = new GetObjectCommand({
-      Bucket: event.workingBucket,
+      Bucket: event.invokeSettings.workingBucket,
       Key: manifestKey,
     });
 
@@ -153,7 +156,7 @@ export async function handler(event: InvokeEvent) {
   // Process each SUCCEEDED result file to extract stats.
   for (const succeededFile of succeededFiles) {
     const getSuccessCommand = new GetObjectCommand({
-      Bucket: event.workingBucket,
+      Bucket: event.invokeSettings.workingBucket,
       Key: succeededFile["Key"],
     });
 
@@ -180,7 +183,7 @@ export async function handler(event: InvokeEvent) {
       // looking
 
       const source = row["source"];
-      // The name is the basename of the source..
+      // The name is the basename of the source.
 
       // Original values
       // const errors: number = rcloneRow["errors"];
@@ -285,9 +288,9 @@ export async function handler(event: InvokeEvent) {
   });
 
   // Write the CSV ended copy to the destination S3 bucket/folder
-  const csvKey = `${event.destinationPrefixKey}${event.destinationEndCopyRelativeKey}`;
+  const csvKey = `${event.invokeArguments.destinationPrefix}${event.invokeArguments.summaryCsvKey}`;
   const putCommand = new PutObjectCommand({
-    Bucket: event.destinationBucket,
+    Bucket: event.invokeArguments.destinationBucket,
     Key: csvKey,
     Body: output,
   });
@@ -296,29 +299,38 @@ export async function handler(event: InvokeEvent) {
   // HTML ended copy report generation and storage
   // --------------------------------------------------
 
-  // Determine if we need to generate and store the HTML report(s)
-  const includeReport = event.includeCopyReport;
-  const retainReport = event.retainCopyReport;
+  // Prefix in the working bucket where the copy-instructions JSONL lives. Used as the destination
+  // for any retained CSV or HTML report.
+  const sourceFilePrefix =
+    event.invokeSettings.workingBucketPrefix +
+    event.invokeArguments.instructionsPrefix;
 
-  if (includeReport || retainReport) {
-    const htmlReportName = "ENDED_COPY_REPORT.html";
+  // Outputs
+  let htmlKey: string | undefined = undefined;
+  let workingCsvKey: string | undefined = undefined;
+  let workingHtmlKey: string | undefined = undefined;
 
+  if (
+    event.invokeArguments.htmlReport ||
+    event.invokeArguments.retainHtmlReport
+  ) {
     // Generate the HTML report
     const html = createHtmlReport({
       title: "Copy Results Report",
       records: Object.values(fileResults) as FileResult[],
-      destinationBucket: event.destinationBucket,
-      destinationFolderKey: event.destinationPrefixKey,
+      destinationBucket: event.invokeArguments.destinationBucket,
+      destinationFolderKey: event.invokeArguments.destinationPrefix,
     });
 
     // 1) Copy to the destination bucket/folder
-    if (includeReport) {
-      // TODO: define a better naming scheme for the HTML report (?)
-      const htmlKey = csvKey.replace("ENDED_COPY.csv", htmlReportName);
+    if (event.invokeArguments.htmlReport) {
+      htmlKey =
+        event.invokeArguments.destinationPrefix +
+        event.invokeArguments.htmlReportKey;
 
       await destClient.send(
         new PutObjectCommand({
-          Bucket: event.destinationBucket,
+          Bucket: event.invokeArguments.destinationBucket,
           Key: htmlKey,
           Body: html,
           ContentType: "text/html; charset=utf-8",
@@ -327,14 +339,13 @@ export async function handler(event: InvokeEvent) {
     }
 
     // 2) Extra copy to a specific S3 URI (sender retention)
-    if (retainReport) {
-      const sourceFilePrefix = dirname(event.sourceFilesCsvKey) + "/";
-      const retainReportKey = sourceFilePrefix + htmlReportName;
+    if (event.invokeArguments.retainHtmlReport) {
+      workingHtmlKey = sourceFilePrefix + event.invokeArguments.htmlReportKey;
 
       await workingClient.send(
         new PutObjectCommand({
-          Bucket: event.workingBucket,
-          Key: retainReportKey,
+          Bucket: event.invokeSettings.workingBucket,
+          Key: workingHtmlKey,
           Body: html,
           ContentType: "text/html; charset=utf-8",
         }),
@@ -343,5 +354,24 @@ export async function handler(event: InvokeEvent) {
   }
 
   await destClient.send(putCommand);
-  return output;
+
+  if (event.invokeArguments.retainSummaryCsv) {
+    workingCsvKey = sourceFilePrefix + event.invokeArguments.summaryCsvKey;
+    await workingClient.send(
+      new PutObjectCommand({
+        Bucket: event.invokeSettings.workingBucket,
+        Key: workingCsvKey,
+        Body: output,
+      }),
+    );
+  }
+
+  return {
+    destinationBucket: event.invokeArguments.destinationBucket,
+    workingBucket: event.invokeSettings.workingBucket,
+    csvKey,
+    htmlKey,
+    workingCsvKey,
+    workingHtmlKey,
+  };
 }

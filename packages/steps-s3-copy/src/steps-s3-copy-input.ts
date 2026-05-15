@@ -3,27 +3,18 @@
  * This is more for internal consistency - it is not directly
  * used to define the "schema" of the state machine.
  */
-
 export type StepsS3CopyInvokeArguments = {
   /**
-   * The region that source buckets MUST be in.
-   *
-   * If undefined, will default to the region that the orchestration is installed in.
+   * The region that source buckets MUST be in. If undefined, defaults to the region the
+   * orchestration is installed in.
    */
   readonly sourceRequiredRegion?: string;
 
   /**
-   * The region that destination bucket MUST be in.
-   *
-   * If undefined, will default to the region that the orchestration is installed in.
+   * The region that the destination bucket MUST be in. If undefined, defaults to the region
+   * the orchestration is installed in.
    */
   readonly destinationRequiredRegion?: string;
-
-  /**
-   * The relative path (relative to `workingBucketPrefixKey`) to the copy-instructions input file.
-   * This file is JSONL: one `CopyInstruction` per line.
-   */
-  readonly copyInstructionsKey: string;
 
   /**
    * The destination bucket to copy the objects.
@@ -31,34 +22,69 @@ export type StepsS3CopyInvokeArguments = {
   readonly destinationBucket: string;
 
   /**
-   * A slash terminated folder key in which to root the destination
-   * objects, or "" to mean place objects in the root of the bucket.
+   * A slash-terminated prefix in the destination bucket which copied objects are placed.
+   * Use `""` to copy into the root of the bucket.
    */
-  readonly destinationFolderKey: string;
-
-  readonly copyConcurrency: number;
-  readonly maxItemsPerBatch: number;
-
-  readonly destinationStartCopyRelativeKey: string;
-  readonly destinationEndCopyRelativeKey: string;
+  readonly destinationPrefix?: string;
 
   /**
-   * If present and true, instructs the copier to go through the motions of
-   * doing a copy (including checking for existence of all the objects) - but not
-   * actually perform the copy.
+   * A slash-terminated prefix, relative to `workingBucketPrefix` that holds the
+   * input copy instructions JSONL. Distributed map result manifests and any retained
+   * outputs are also written here. Use `""` to place at the root of `workingBucketPrefix`.
+   */
+  readonly instructionsPrefix: string;
+
+  /**
+   * The key, relative to `instructionsPrefix` of the JSONL copy instructions file. Defaults to
+   * `INSTRUCTIONS.jsonl`.
+   */
+  readonly instructionsKey?: string;
+
+  /**
+   * The key, relative to `destinationPrefix` of the start copy marker. Defaults to
+   * `STARTED_COPY.txt`.
+   */
+  readonly startMarkerKey?: string;
+
+  /**
+   * The key, relative to `destinationPrefix` of the end copy CSV summary. Defaults to
+   * `ENDED_COPY.csv`.
+   */
+  readonly summaryCsvKey?: string;
+
+  /**
+   * The key, relative to `destinationPrefix` of the end copy HTML report, written when
+   * `htmlReport` is true. Defaults to `ENDED_COPY_REPORT.html`.
+   */
+  readonly htmlReportKey?: string;
+
+  /**
+   * If true, generate and write the HTML report to `<destinationPrefix><htmlReportKey>` in the
+   * destination bucket. Defaults to false.
+   */
+  readonly htmlReport?: boolean;
+
+  /**
+   * If true, also save the HTML report in the working bucket at
+   * `<workingBucketPrefix><instructionsPrefix><htmlReportKey>`. This will work
+   * for the working bucket even if `htmlReport` is false. Defaults to false.
+   */
+  readonly retainHtmlReport?: boolean;
+
+  /**
+   * If true, also save the end copy CSV in the working bucket at
+   * `<workingBucketPrefix><instructionsPrefix><summaryCsvKey>`. Defaults to false.
+   */
+  readonly retainSummaryCsv?: boolean;
+
+  /**
+   * If true, go through the motions of doing a copy (including checking for existence of all the
+   * objects) - but do not actually perform the copy. Defaults to false.
    */
   readonly dryRun?: boolean;
 
-  /**
-   * If present and true, generate html copy report (COPY_REPORT.html)  in the destination.
-   * If omitted, defaults to false.
-   */
-  readonly includeCopyReport?: boolean;
-
-  /**
-   * If set, also save a copy report (COPY_REPORT.html) in the same bucket and prefix as the source file.
-   */
-  readonly retainCopyReport?: boolean;
+  readonly copyConcurrency?: number;
+  readonly maxItemsPerBatch?: number;
 
   /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
@@ -85,43 +111,51 @@ export type StepsS3CopyInvokeArguments = {
   };
 
   /**
-   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used to
-   * configure the credentials used to access the bucket.
-   *
-   * Settings here will override `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` if
-   * using the no-credential `CredentialProvider`.
+   * When a source or destination bucket matches a key in this map, the `BucketDefinition` is used
+   * to configure the credentials used to access the bucket. Settings here override
+   * `sourceRequiredRegion`, `destinationRequiredRegion`, or `sourceNoSignRequest` for that bucket.
    */
   readonly bucketDefinitions?: Record<string, BucketDefinition>;
 };
 
-export type CopyOutStateMachineInputKeys = keyof StepsS3CopyInvokeArguments;
+/**
+ * Settings the construct bakes into the state machine at deploy time, as opposed to
+ * `StepsS3CopyInvokeArguments` which are supplied per execution.
+ */
+export type StepsS3CopyInvokeSettings = {
+  readonly workingBucket: string;
+  readonly workingBucketPrefix: string;
+};
 
-// this odd construct just makes sure that the JSON paths we specify
-// here correspond with fields in the master "input" schema for the
-// overall Steps function
-export const COPY_INSTRUCTIONS_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "copyInstructionsKey";
+/**
+ * Builds a JSONPath reference into the `$invokeArguments` state variable.
+ */
+export const invokeArg = (key: keyof StepsS3CopyInvokeArguments): string =>
+  `$invokeArguments.${key}`;
 
-export const MAX_ITEMS_PER_BATCH_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "maxItemsPerBatch";
+/**
+ * Builds a JSONPath reference into the `$invokeSettings` state variable.
+ */
+export const invokeSetting = (key: keyof StepsS3CopyInvokeSettings): string =>
+  `$invokeSettings.${key}`;
 
-export const DESTINATION_BUCKET_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "destinationBucket";
-export const DESTINATION_FOLDER_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "destinationFolderKey";
+/**
+ * Builds a JSONata reference to a field of the raw caller `$states.input` variable.
+ */
+export const stateInput = (key: keyof StepsS3CopyInvokeArguments): string =>
+  `$states.input.${key}`;
 
-export const DESTINATION_START_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "destinationStartCopyRelativeKey";
-export const DESTINATION_END_COPY_RELATIVE_KEY_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "destinationEndCopyRelativeKey";
+/**
+ * Builds a JSONata reference to a field of the batch `$states.input.BatchInput.<key>` object.
+ */
+export const batchArg = (key: keyof StepsS3CopyInvokeArguments): string =>
+  `$states.input.BatchInput.${key}`;
 
-export const DRY_RUN_KEY_FIELD_NAME: CopyOutStateMachineInputKeys = "dryRun";
-
-export const INCLUDE_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "includeCopyReport";
-
-export const RETAIN_COPY_REPORT_FIELD_NAME: CopyOutStateMachineInputKeys =
-  "retainCopyReport";
+// Default file names used when the corresponding input override is not supplied.
+export const DEFAULT_INSTRUCTIONS_KEY = "INSTRUCTIONS.jsonl";
+export const DEFAULT_START_MARKER_KEY = "STARTED_COPY.txt";
+export const DEFAULT_SUMMARY_CSV_KEY = "ENDED_COPY.csv";
+export const DEFAULT_HTML_REPORT_KEY = "ENDED_COPY_REPORT.html";
 
 /**
  * Common fields shared by all bucket definitions.
