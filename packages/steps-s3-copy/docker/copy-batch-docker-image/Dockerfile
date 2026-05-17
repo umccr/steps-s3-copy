@@ -19,7 +19,7 @@ RUN go build copy-batch-fargate.go ecs-heartbeat.go copy-runner.go constants.go 
 # the tag removes some legacy Go 1.x support from the AWS lambda library
 RUN go build -tags lambda.norpc copy-batch-lambda.go copy-runner.go constants.go types.go utils.go
 
-ADD https://github.com/umccr/copyrite/releases/download/v0.3.2/copyrite-aarch64-unknown-linux-gnu.tar.gz .
+ADD https://github.com/umccr/copyrite/releases/download/v0.4.0/copyrite-aarch64-unknown-linux-gnu.tar.gz .
 
 RUN gzip -dc copyrite-aarch64-unknown-linux-gnu.tar.gz | tar xf -
 

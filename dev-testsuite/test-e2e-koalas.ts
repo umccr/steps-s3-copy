@@ -71,9 +71,10 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          copyInstructionsKey: state.testInstructionsRelative,
+          instructionsPrefix: state.testInstructionsFolder,
+          instructionsKey: state.testInstructionsKey,
           destinationBucket: state.workingBucket,
-          destinationFolderKey: state.testDestPrefix,
+          destinationPrefix: state.testDestPrefix,
         }),
       }),
     );

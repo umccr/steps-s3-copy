@@ -5,34 +5,31 @@ import {
 } from "@aws-sdk/client-s3";
 import { basename } from "path/posix";
 import { stringify } from "csv-stringify/sync";
-import { dirname } from "path/posix";
 import { createHtmlReport } from "./create-html-report";
-import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+import type { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import { buildS3Client } from "../common/s3-client-builder";
+import { assertInvokeArgumentString } from "../common/assert-invoke-arguments";
+
+interface MapResult {
+  manifestBucket: string;
+  manifestKey: string;
+}
 
 interface InvokeEvent {
-  rcloneResultsLarge: {
-    manifestBucket: string;
-    manifestKey: string;
+  invokeArguments: StepsS3CopyInvokeArguments;
+  invokeSettings: {
+    workingBucket: string;
+    workingBucketPrefix: string;
   };
-  rcloneResultsSmall: {
-    manifestBucket: string;
-    manifestKey: string;
-  };
-  rcloneResultsNeedThawSmall: {
-    manifestBucket: string;
-    manifestKey: string;
-  };
-  rcloneResultsNeedThawLarge: {
-    manifestBucket: string;
-    manifestKey: string;
-  };
+  rcloneResultsLarge: MapResult;
+  rcloneResultsSmall: MapResult;
+  rcloneResultsNeedThawSmall: MapResult;
+  rcloneResultsNeedThawLarge: MapResult;
   destinationBucket: string;
   destinationPrefixKey: string;
   destinationEndCopyRelativeKey: string;
   workingBucket: string;
   copyInstructionsKey: string;
-  bucketDefinitions?: Record<string, BucketDefinition>;
   includeCopyReport?: boolean;
   retainCopyReport?: boolean;
   dryRun?: boolean;
@@ -85,12 +82,25 @@ export async function handler(event: InvokeEvent) {
   // debug input event
   console.debug(JSON.stringify(event, null, 2));
 
+  assertInvokeArgumentString(
+    event.invokeArguments.destinationPrefix,
+    "destinationPrefix",
+  );
+  assertInvokeArgumentString(
+    event.invokeArguments.summaryCsvKey,
+    "summaryCsvKey",
+  );
+  assertInvokeArgumentString(
+    event.invokeArguments.htmlReportKey,
+    "htmlReportKey",
+  );
+
   // For the working bucket, no bucket definitions are required.
   const workingClient = await buildS3Client();
   // Need to account for bucket definitions for the destination bucket.
   const destClient = await buildS3Client(
-    event.destinationBucket,
-    event.bucketDefinitions,
+    event.invokeArguments.destinationBucket,
+    event.invokeArguments.bucketDefinitions,
   );
 
   // Determine if we need to generate and store the HTML report(s)
@@ -222,7 +232,9 @@ export async function handler(event: InvokeEvent) {
     }
     // 2) Extra copy to a specific S3 URI (sender retention)
     if (retainReport) {
-      const sourceFilePrefix = dirname(event.copyInstructionsKey) + "/";
+      const sourceFilePrefix =
+        event.invokeSettings.workingBucketPrefix +
+        event.invokeArguments.instructionsPrefix;
       const retainReportKey = sourceFilePrefix + htmlReportName;
 
       await workingClient.send(
@@ -391,7 +403,7 @@ async function readFileCopyResultsFromManifests(
       // looking
 
       const source = row["source"];
-      // The name is the basename of the source..
+      // The name is the basename of the source.
 
       // Original values
       // const errors: number = rcloneRow["errors"];

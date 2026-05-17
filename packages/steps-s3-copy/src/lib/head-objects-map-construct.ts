@@ -5,13 +5,13 @@ import {
   StateGraph,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { Duration } from "aws-cdk-lib";
-import { COPY_INSTRUCTIONS_KEY_FIELD_NAME } from "../steps-s3-copy-input";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { join } from "node:path";
 import { Architecture, Function, Runtime } from "aws-cdk-lib/aws-lambda";
+import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
 type Props = {
   readonly writerRole: IRole;
@@ -41,29 +41,6 @@ export class HeadObjectsMapConstruct extends Construct {
       `Map ${id} Iterator`,
     );
 
-    /*new DistributedMap(this, "HOMAP", {
-      toleratedFailurePercentage: 0,
-      itemBatcher: new ItemBatcher({
-        maxInputBytesPerBatch: 16384,
-        batchInput: {
-          "destinationFolderKey.$": JsonPath.stringAt(
-            "$invokeArguments.destinationFolderKey",
-          ),
-          maximumExpansion: 256,
-        },
-      }),
-      itemReader: new S3JsonItemReader({
-        bucketNamePath: "$invokeSettings.workingBucket",
-        key: JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
-      }),
-    }); */
-
     this.distributedMap = new S3JsonlDistributedMap(this, "HeadObjectsMap", {
       // this phase is used to detect errors so we have zero tolerance for files being missing (for instance)
       toleratedFailurePercentage: 0,
@@ -72,12 +49,12 @@ export class HeadObjectsMapConstruct extends Construct {
       // so that means we can fit 256 of them in the standard Steps result payload (256kb)
       maxItemsPerBatch: 1,
       batchInput: {
-        "destinationFolderKey.$": JsonPath.stringAt(
-          "$invokeArguments.destinationFolderKey",
+        "destinationPrefix.$": JsonPath.stringAt(
+          invokeArg("destinationPrefix"),
         ),
         maximumExpansion: 256,
         "bucketDefinitions.$": JsonPath.stringAt(
-          "$invokeArguments.bucketDefinitions",
+          invokeArg("bucketDefinitions"),
         ),
         "sourceRequiredRegion.$": JsonPath.stringAt(
           "$invokeArguments.sourceRequiredRegion",
@@ -88,25 +65,18 @@ export class HeadObjectsMapConstruct extends Construct {
         "workingBucket.$": JsonPath.stringAt("$invokeSettings.workingBucket"),
       },
       itemReader: {
-        "Bucket.$": "$invokeSettings.workingBucket",
+        "Bucket.$": invokeSetting("workingBucket"),
         "Key.$": JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
+          "{}{}{}",
+          JsonPath.stringAt(invokeSetting("workingBucketPrefix")),
+          JsonPath.stringAt(invokeArg("instructionsPrefix")),
+          JsonPath.stringAt(invokeArg("instructionsKey")),
         ),
       },
       iterator: graph,
       resultWriter: {
-        "Bucket.$": "$invokeSettings.workingBucket",
-        "Prefix.$": JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
+        "Bucket.$": invokeSetting("workingBucket"),
+        "Prefix.$": "$mapResultWriterPrefix",
       },
       assign: {
         headObjectsResults: {

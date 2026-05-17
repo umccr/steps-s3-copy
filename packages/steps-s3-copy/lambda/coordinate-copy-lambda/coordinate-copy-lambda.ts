@@ -103,6 +103,9 @@ export async function handler(event: LambdaEvent) {
   if (failed.length > 0)
     throw new Error("Copy is meant to succeed - but it had failed results");
 
+  // Each SUCCEEDED result file holds the rows from one batch of the HeadObjects map, iterate all of
+  // them to determine where objects should go.
+  const jsonlParts: string[] = [];
   for (const s of succeeded) {
     console.debug(JSON.stringify(s, null, 2));
 
@@ -113,72 +116,87 @@ export async function handler(event: LambdaEvent) {
       }),
     );
 
-    // note we bring this entirely into memory - whereas we _possibly_ could stream it in to the dataframe -
-    // is fine for the moment - we just allocate a decent amount of memory to this lambda
-    const getSuccessContent = await getSuccessResult.Body!.transformToString();
+    if (!getSuccessResult.Body) {
+      throw new Error("Success S3 object Body is undefined");
+    }
 
-    // Buffer path goes to native `readJson` which supports "lines"
-    const df = pl.readJSON(Buffer.from(getSuccessContent), {
-      // we infer the schema from the entire table
-      inferSchemaLength: null,
-      format: "lines",
-    });
-
-    const stats = await computeStats(df);
-
-    // Defining the copy sets based on the size of the objects and their storage class (cold or no)
-
-    // Small objects that do not need thawing
-    const smallDf = df
-      .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
-      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
-
-    // Small objects that require thawing
-    const smallThawDf = df
-      .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
-      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
-
-    // Large objects that do not need thawing
-    const largeDf = df
-      .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
-      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
-
-    // Large objects that require thawing
-    const largeThawDf = df
-      .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
-      .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
-
-    return {
-      dryRun: event.invokeArguments.dryRun,
-      stats: stats,
-      copySets: {
-        small: await createJsonlFromDataFrame(
-          event.headObjectsResults.manifestBucket,
-          event.headObjectsResults.manifestAbsoluteKey,
-          smallDf,
-          "small",
-        ),
-        large: await createJsonlFromDataFrame(
-          event.headObjectsResults.manifestBucket,
-          event.headObjectsResults.manifestAbsoluteKey,
-          largeDf,
-          "large",
-        ),
-        smallThaw: await createJsonlFromDataFrame(
-          event.headObjectsResults.manifestBucket,
-          event.headObjectsResults.manifestAbsoluteKey,
-          smallThawDf,
-          "smallThaw",
-        ),
-        largeThaw: await createJsonlFromDataFrame(
-          event.headObjectsResults.manifestBucket,
-          event.headObjectsResults.manifestAbsoluteKey,
-          largeThawDf,
-          "largeThaw",
-        ),
-      },
-    };
+    const content = (await getSuccessResult.Body.transformToString()).trim();
+    if (content.length > 0) jsonlParts.push(content);
   }
+
+  if (jsonlParts.length === 0) {
+    throw new Error(
+      "HeadObjects map produced no result rows, instructions JSONL may be empty",
+    );
+  }
+
+  const combinedJsonl = jsonlParts.join("\n");
+
+  // Buffer path goes to native `readJson` which supports "lines"
+  const df = pl.readJSON(Buffer.from(combinedJsonl), {
+    // we infer the schema from the entire table
+    inferSchemaLength: null,
+    format: "lines",
+  });
+
+  const stats = await computeStats(df);
+
+  // if we are doing a dry run - then we want to still collect stats etc - but at the end of the day
+  // we will pass an empty list of objects to the actual copiers
+  const emptyDf = df.filter(false);
+
+  // Defining the copy sets based on the size of the objects and their storage class (cold or no)
+
+  // Small objects that do not need thawing
+  const smallDf = df
+    .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+
+  // Small objects that require thawing
+  const smallThawDf = df
+    .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+
+  // Large objects that do not need thawing
+  const largeDf = df
+    .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+
+  // Large objects that require thawing
+  const largeThawDf = df
+    .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+
+  return {
+    dryRun: event.invokeArguments.dryRun,
+    stats: stats,
+    copySets: {
+      small: await createJsonlFromDataFrame(
+        event.headObjectsResults.manifestBucket,
+        event.headObjectsResults.manifestAbsoluteKey,
+        event.invokeArguments.dryRun ? emptyDf : smallDf,
+        "small",
+      ),
+      large: await createJsonlFromDataFrame(
+        event.headObjectsResults.manifestBucket,
+        event.headObjectsResults.manifestAbsoluteKey,
+        event.invokeArguments.dryRun ? emptyDf : largeDf,
+        "large",
+      ),
+      smallThaw: await createJsonlFromDataFrame(
+        event.headObjectsResults.manifestBucket,
+        event.headObjectsResults.manifestAbsoluteKey,
+        event.invokeArguments.dryRun ? emptyDf : smallThawDf,
+        "smallThaw",
+      ),
+      largeThaw: await createJsonlFromDataFrame(
+        event.headObjectsResults.manifestBucket,
+        event.headObjectsResults.manifestAbsoluteKey,
+        event.invokeArguments.dryRun ? emptyDf : largeThawDf,
+        "largeThaw",
+      ),
+    },
+  };
 }
 
 /**

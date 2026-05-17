@@ -2,6 +2,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   AccessDeniedError,
   DestinationPrefixKeyNoTrailingSlashError,
+  InstructionsPrefixNoTrailingSlashError,
   WrongRegionError,
 } from "./errors";
 import type {
@@ -9,16 +10,40 @@ import type {
   CanWriteLambdaResult,
 } from "../common/can-write-lambda-types";
 import { buildS3Client } from "../common/s3-client-builder";
+import { assertInvokeArgumentString } from "../common/assert-invoke-arguments";
 
 export async function handler(event: CanWriteLambdaInvokeEvent) {
   console.log("canWrite()");
   console.debug(JSON.stringify(event, null, 2));
 
-  if (event.invokeArguments.destinationFolderKey)
-    if (!event.invokeArguments.destinationFolderKey.endsWith("/"))
-      throw new DestinationPrefixKeyNoTrailingSlashError(
-        "The destination prefix sourceKey must either be an empty string or a string with a trailing slash",
-      );
+  assertInvokeArgumentString(
+    event.invokeArguments.destinationPrefix,
+    "destinationPrefix",
+  );
+  assertInvokeArgumentString(
+    event.invokeArguments.startMarkerKey,
+    "startMarkerKey",
+  );
+  assertInvokeArgumentString(
+    event.invokeArguments.instructionsPrefix,
+    "instructionsPrefix",
+  );
+
+  if (
+    event.invokeArguments.destinationPrefix &&
+    !event.invokeArguments.destinationPrefix.endsWith("/")
+  )
+    throw new DestinationPrefixKeyNoTrailingSlashError(
+      "The destination prefix must either be an empty string or a string with a trailing slash",
+    );
+
+  if (
+    event.invokeArguments.instructionsPrefix &&
+    !event.invokeArguments.instructionsPrefix.endsWith("/")
+  )
+    throw new InstructionsPrefixNoTrailingSlashError(
+      "The instructions prefix must either be an empty string or a string with a trailing slash",
+    );
 
   // we are being super specific here - more so than our normal client creation
   // the "required region" is where we are going
@@ -37,7 +62,7 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
     } else {
       const putCommand = new PutObjectCommand({
         Bucket: event.invokeArguments.destinationBucket,
-        Key: `${event.invokeArguments.destinationFolderKey}${event.invokeArguments.destinationStartCopyRelativeKey}`,
+        Key: `${event.invokeArguments.destinationPrefix}${event.invokeArguments.startMarkerKey}`,
         Body: "A file created by copy out to ensure correct permissions and to indicate that start of the copy process",
         // we need PutTagging permission to be right - or else rclone will fail when copying our sometimes
         // tagged source files

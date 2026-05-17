@@ -1,9 +1,5 @@
 import { Construct } from "constructs";
 import { JsonPath, StateGraph } from "aws-cdk-lib/aws-stepfunctions";
-import {
-  DESTINATION_BUCKET_FIELD_NAME,
-  COPY_INSTRUCTIONS_KEY_FIELD_NAME,
-} from "../steps-s3-copy-input";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { State } from "aws-cdk-lib/aws-stepfunctions";
@@ -19,6 +15,7 @@ import {
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { JitterType } from "aws-cdk-lib/aws-stepfunctions";
 import { join } from "path";
+import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
 type Props = {
   readonly writerRole: IRole;
@@ -87,8 +84,8 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
       batchInput: {
-        "thawParams.$": "$invokeArguments.thawParams",
-        "bucketDefinitions.$": "$invokeArguments.bucketDefinitions",
+        "thawParams.$": invokeArg("thawParams"),
+        "bucketDefinitions.$": invokeArg("bucketDefinitions"),
       },
       inputPath: props.inputPath,
       itemReader: {
@@ -105,23 +102,15 @@ export class SmallObjectsCopyMapConstruct extends Construct {
         ),
         "d.$": JsonPath.format(
           "s3://{}/{}",
-          JsonPath.stringAt(
-            `$invokeArguments.${DESTINATION_BUCKET_FIELD_NAME}`,
-          ),
+          JsonPath.stringAt(invokeArg("destinationBucket")),
           JsonPath.stringAt(`$$.Map.Item.Value.destinationKey`),
         ),
       },
       iterator: graph,
       // we want to write out the data to S3 as it could be larger than fits in steps payloads
       resultWriter: {
-        "Bucket.$": "$invokeSettings.workingBucket",
-        "Prefix.$": JsonPath.format(
-          "{}{}",
-          JsonPath.stringAt("$invokeSettings.workingBucketPrefixKey"),
-          JsonPath.stringAt(
-            `$invokeArguments.${COPY_INSTRUCTIONS_KEY_FIELD_NAME}`,
-          ),
-        ),
+        "Bucket.$": invokeSetting("workingBucket"),
+        "Prefix.$": "$mapResultWriterPrefix",
       },
       resultSelector: {
         type: id,

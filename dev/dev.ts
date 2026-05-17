@@ -99,7 +99,7 @@ class StepsS3CopyStack extends Stack {
       // note for dev we use a public subnet as that is most likely to always be available in a default VPC
       vpcSubnetSelection: SubnetType.PUBLIC,
       workingBucket: workingBucket.bucketName,
-      workingBucketPrefixKey: WORKING_BUCKET_PREFIX,
+      workingBucketPrefix: WORKING_BUCKET_PREFIX,
       aggressiveTimes: true,
       writerRoleName: "steps-s3-copy-role",
       allowWriteToInstalledAccount: true,

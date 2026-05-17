@@ -1,4 +1,9 @@
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { WaiterState } from "@smithy/util-waiter";
 import { makeObjectDictionaryJsonl } from "./util.mjs";
 import { testSetup, type TestSetupState } from "./setup";
@@ -11,6 +16,10 @@ import {
   REALISTIC_SOURCE_OBJECTS,
   REALISTIC_WILDCARD_PREFIX,
 } from "./lib/realistic-source-objects";
+import {
+  DEFAULT_HTML_REPORT_KEY,
+  DEFAULT_SUMMARY_CSV_KEY,
+} from "../packages/steps-s3-copy/src/steps-s3-copy-input";
 
 // we have a few large objects so this can take a few minutes
 const TEST_EXPECTED_SECONDS = 60 * 10;
@@ -74,10 +83,13 @@ test(
         stateMachineArn: state.smArn,
         name: state.uniqueTestId,
         input: JSON.stringify({
-          copyInstructionsKey: state.testInstructionsRelative,
+          instructionsPrefix: state.testInstructionsFolder,
+          instructionsKey: state.testInstructionsKey,
           destinationBucket: state.workingBucket,
-          destinationFolderKey: `${state.testDestPrefix}${DEST}`,
+          destinationPrefix: `${state.testDestPrefix}${DEST}`,
           maxItemsPerBatch: 3,
+          retainHtmlReport: true,
+          retainSummaryCsv: true,
         }),
       }),
     );
@@ -98,6 +110,35 @@ test(
       state.workingBucket,
       `${state.testDestPrefix}${DEST}`,
       sourceObjects,
+    );
+
+    const s3Client = new S3Client({});
+    const retainPrefix = state.testInstructionsFolder;
+
+    const csvObject = await s3Client.send(
+      new GetObjectCommand({
+        Bucket: state.workingBucket,
+        Key: `${state.testDestPrefix}${DEST}${DEFAULT_SUMMARY_CSV_KEY}`,
+      }),
+    );
+    const csvContent = await csvObject.Body!.transformToString();
+    assert.equal(
+      csvContent.trim().split("\n").length,
+      Object.keys(sourceObjects).length + 1,
+      "CSV row count does not match source objects length + header",
+    );
+
+    await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: state.workingBucket,
+        Key: `${retainPrefix}${DEFAULT_SUMMARY_CSV_KEY}`,
+      }),
+    );
+    await s3Client.send(
+      new HeadObjectCommand({
+        Bucket: state.workingBucket,
+        Key: `${retainPrefix}${DEFAULT_HTML_REPORT_KEY}`,
+      }),
     );
   },
   TEST_EXPECTED_SECONDS * 1000,
