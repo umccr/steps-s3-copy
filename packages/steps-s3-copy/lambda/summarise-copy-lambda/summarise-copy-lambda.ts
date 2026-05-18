@@ -209,9 +209,6 @@ export async function handler(event: InvokeEvent) {
     // Generate the HTML report
 
     // The path to the pricing data JSON file in S3 written in fetch-picing step.
-    const sourceFilePrefix =
-      event.invokeSettings.workingBucketPrefix +
-      event.invokeSettings.instructionsPrefix;
     const pricingDataKey = sourceFilePrefix + PRICING_DATA_FILENAME;
 
     const htmlReport = await createHtmlReport({
