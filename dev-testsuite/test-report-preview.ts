@@ -723,7 +723,8 @@ const htmlReport = createHtmlReport({
   destinationFolderKey: "a-very-long-prefix/",
   reportMetadata,
   dryRun,
-  workingBucket: "a-buclet",
+  workingBucket: "some-bucket",
+  pricingDataKey: "pricing-data.json",
 });
 
 const outFile = join(

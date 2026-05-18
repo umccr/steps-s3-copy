@@ -75,10 +75,14 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       payload: TaskInput.fromObject({
         invokeArguments: "{% $invokeArguments %}",
         invokeSettings: "{% $invokeSettings %}",
-        rcloneResultsSmall: "{% $states.input[type='Small'] %}",
-        rcloneResultsLarge: "{% $states.input[type='Large'] %}",
-        rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
-        rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
+        rcloneResultsSmall:
+          "{% $exists($states.input[type='Small']) ? $states.input[type='Small'] : null %}",
+        rcloneResultsLarge:
+          "{% $exists($states.input[type='Large']) ? $states.input[type='Large'] : null %}",
+        rcloneResultsNeedThawSmall:
+          "{% $exists($states.input[type='NeedThawSmall']) ? $states.input[type='NeedThawSmall'] : null %}",
+        rcloneResultsNeedThawLarge:
+          "{% $exists($states.input[type='NeedThawLarge']) ? $states.input[type='NeedThawLarge'] : null %}",
         inputCopySets: "{% $coordinateCopyResults.copySets %}",
       }),
       payloadResponseOnly: true,

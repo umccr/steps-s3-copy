@@ -118,9 +118,6 @@ test(
             intelligentTieringDeepArchiveThawDays: 1,
             intelligentTieringDeepArchiveThawSpeed: "Standard",
           },
-          htmlReport: true,
-          retainHtmlReport: true,
-          retainSummaryCsv: true,
         }),
       }),
     );

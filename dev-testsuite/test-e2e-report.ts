@@ -14,10 +14,13 @@ import {
   type TestObjectParams,
 } from "./lib/create-test-object.js";
 
-// This is a test of the whole end-to-end flow, from copy to report generation,
+// This is a test of the end-to-end flow, from copy to report generation,
 //  but with a focus on testing the report generation in the different cases considered:
 
 const TEST_EXPECTED_SECONDS = 2 * 60;
+
+const copyReportFileName = "COPY_REPORT.html";
+const dryRunReportFileName = "DRY_RUN_REPORT.html";
 
 let state: TestSetupState;
 
@@ -88,6 +91,7 @@ test(
           destinationBucket: state.workingBucket,
           destinationPrefix: state.testDestPrefix,
           htmlReport: true,
+          htmlReportKey: copyReportFileName,
           retainHtmlReport: true,
           retainSummaryCsv: true,
         }),
@@ -110,10 +114,9 @@ test(
       `Orchestration did not succeed as expected - it got ${executionResult.state} rather than ${WaiterState.SUCCESS}`,
     );
 
-    // Assert COPY_REPORT.html exists in destination and working bucket expected
-    const reportFileName = "COPY_REPORT.html";
-    const destReportKey = `${state.testDestPrefix}${reportFileName}`;
-    const retainedReportKey = `${state.uniqueTestId}/${reportFileName}`;
+    // Assert copyReportFileName exists in destination and working bucket expected
+    const destReportKey = `${state.testDestPrefix}${copyReportFileName}`;
+    const retainedReportKey = `${state.uniqueTestId}/${copyReportFileName}`;
 
     // Check destination
     await s3Client.send(
@@ -134,7 +137,7 @@ test(
   TEST_EXPECTED_SECONDS * 1000,
 );
 
-// Estimation report for a dry run copy
+// Ended copy report for a dry run copy
 test(
   "estimation report generation",
   async () => {
@@ -153,6 +156,7 @@ test(
           destinationBucket: state.workingBucket,
           destinationPrefix: state.testDestPrefix,
           htmlReport: true,
+          htmlReportKey: dryRunReportFileName,
           retainHtmlReport: true,
           retainSummaryCsv: true,
           dryRun: true,
@@ -176,10 +180,9 @@ test(
       `Orchestration did not succeed as expected - it got ${executionResult.state} rather than ${WaiterState.SUCCESS}`,
     );
 
-    // Assert ESTIMATION_REPORT.html exists in destination and working bucket expected
-    const reportFileName = "ESTIMATION_REPORT.html";
-    const destReportKey = `${state.testDestPrefix}${reportFileName}`;
-    const retainedReportKey = `${state.uniqueTestId}/${reportFileName}`;
+    // Assert dryRunReportFileName exists in destination and working bucket expected
+    const destReportKey = `${state.testDestPrefix}${dryRunReportFileName}`;
+    const retainedReportKey = `${state.uniqueTestId}/${dryRunReportFileName}`;
 
     // Check destination
     await s3Client.send(
