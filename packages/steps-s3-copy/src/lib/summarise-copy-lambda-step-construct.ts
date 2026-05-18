@@ -75,24 +75,11 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
       payload: TaskInput.fromObject({
         invokeArguments: "{% $invokeArguments %}",
         invokeSettings: "{% $invokeSettings %}",
-        destinationBucket: "{% $invokeArguments.destinationBucket %}",
-        destinationPrefixKey: "{% $invokeArguments.destinationFolderKey %}",
-        destinationEndCopyRelativeKey:
-          "{% $invokeArguments.destinationEndCopyRelativeKey %}",
-        workingBucket: "{% $invokeSettings.workingBucket %}",
-        rcloneResultsSmall:
-          "{% $exists($states.input[type='Small']) ? $states.input[type='Small'] : {} %}",
-        rcloneResultsLarge:
-          "{% $exists($states.input[type='Large']) ? $states.input[type='Large'] : {} %}",
-        rcloneResultsNeedThawSmall:
-          "{% $exists($states.input[type='NeedThawSmall']) ? $states.input[type='NeedThawSmall'] : {} %}",
-        rcloneResultsNeedThawLarge:
-          "{% $exists($states.input[type='NeedThawLarge']) ? $states.input[type='NeedThawLarge'] : {}  %}",
-        bucketDefinitions: "{% $invokeArguments.bucketDefinitions %}",
-        includeCopyReport: "{% $invokeArguments.includeCopyReport %}",
-        retainCopyReport: "{% $invokeArguments.retainCopyReport %}",
-        dryRun: "{% $invokeArguments.dryRun %}",
-        copyInstructionsKey: "{% $invokeArguments.copyInstructionsKey %}",
+        rcloneResultsSmall: "{% $states.input[type='Small'] %}",
+        rcloneResultsLarge: "{% $states.input[type='Large'] %}",
+        rcloneResultsNeedThawSmall: "{% $states.input[type='NeedThawSmall'] %}",
+        rcloneResultsNeedThawLarge: "{% $states.input[type='NeedThawLarge'] %}",
+
         inputCopySets: "{% $coordinateCopyResults.copySets %}",
       }),
       payloadResponseOnly: true,
