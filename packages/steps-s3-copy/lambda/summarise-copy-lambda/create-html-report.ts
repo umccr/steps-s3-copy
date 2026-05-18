@@ -40,6 +40,7 @@ export async function createHtmlReport(opts: {
   reportMetadata: ReportMetadata[];
   dryRun: boolean;
   workingBucket: string;
+  pricingDataKey: string;
 }): Promise<string> {
   const {
     title,
@@ -48,6 +49,7 @@ export async function createHtmlReport(opts: {
     reportMetadata = [],
     dryRun,
     workingBucket,
+    pricingDataKey,
   } = opts;
 
   // Combine all FileSummary entries into one array for the report
@@ -95,13 +97,11 @@ export async function createHtmlReport(opts: {
 
   const client = new S3Client({});
   const bucket = workingBucket;
-  const key = "pricing-data.json";
-
   // Read Pricing Data fetcheched from the API
   const pricingData: PricingData = await readPricingDataJsonFromS3(
     client,
     bucket,
-    key,
+    pricingDataKey,
   );
 
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;

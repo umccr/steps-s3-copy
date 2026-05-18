@@ -604,7 +604,7 @@ export function estimateComputeCost(
 // --------------------------------------------------------------------------------------------
 
 /**
- * Read pricing-data.json from S3 and return a strongly typed PricingData dictionary.
+ * Read JSON from S3 and return PricingData dictionary.
  */
 export async function readPricingDataJsonFromS3(
   client: S3Client,

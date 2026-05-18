@@ -9,16 +9,17 @@ import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
-import { COLD_STORAGE_CLASSES, getThawParams } from "../common/constants";
-
-import type { CostEstimate } from "../common/cost-estimation";
-
-import { readPricingDataJsonFromS3 } from "../common/cost-estimation";
-import type { PricingData } from "../common/cost-estimation";
+import {
+  COLD_STORAGE_CLASSES,
+  getThawParams,
+  PRICING_DATA_FILENAME,
+} from "../common/constants";
+import type { PricingData, CostEstimate } from "../common/cost-estimation";
 import {
   estimateColdStorageRetrievalCost,
   estimateCrossRegionCost,
   estimateComputeCost,
+  readPricingDataJsonFromS3,
 } from "../common/cost-estimation";
 
 /**
@@ -29,6 +30,8 @@ import {
 export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
     workingBucket: string;
+    workingBucketPrefix: string;
+    instructionsPrefix: string;
     destinationPrefix: string;
     maximumExpansion: number;
     bucketDefinitions?: Record<string, BucketDefinition>;
@@ -205,22 +208,21 @@ export async function handler(
     }
   }
 
-  const client = new S3Client({});
-  const anonClient = new S3Client({
-    signer: { sign: async (request) => request },
-  });
+  const s3Client = new S3Client({});
 
   // The region of the source bucket
   const sourceRegion = event.BatchInput.sourceRequiredRegion;
 
-  const bucket = event.BatchInput.workingBucket;
-  const key = "pricing-data.json";
+  // The path to the pricing data JSON file in S3 written in fetch-picing step.
+  const sourceFilePrefix =
+    event.BatchInput.workingBucketPrefix + event.BatchInput.instructionsPrefix;
+  const pricingDataKey = sourceFilePrefix + PRICING_DATA_FILENAME;
 
   // Read Pricing Data fetcheched from the API
   const pricingData: PricingData = await readPricingDataJsonFromS3(
-    client,
-    bucket,
-    key,
+    s3Client,
+    event.BatchInput.workingBucket,
+    pricingDataKey,
   );
 
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;

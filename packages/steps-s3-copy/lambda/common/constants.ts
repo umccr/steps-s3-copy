@@ -14,6 +14,9 @@ export const COLD_STORAGE_CLASSES = [
   "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
 ] as const;
 
+// The key under which pricing data is stored in S3 by the FetchPricingDataLambda
+export const PRICING_DATA_FILENAME = "pricing-data.json";
+
 // -----------------------------------------------------------------
 // PRICING CONSTANTS (BASED on tge offical AWS page COST_CHECK_URL)
 // -----------------------------------------------------------------

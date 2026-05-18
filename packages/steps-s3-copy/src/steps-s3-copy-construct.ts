@@ -33,7 +33,7 @@ import {
 import { Duration, Stack } from "aws-cdk-lib";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
-import { PricingDataLambdaStepConstruct } from "./lib/pricing-data-lambda-step-construct";
+import { PricingDataLambdaStepConstruct } from "./lib/fetch-pricing-data-lambda-step-construct";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
