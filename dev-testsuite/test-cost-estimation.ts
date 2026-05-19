@@ -6,25 +6,75 @@ import {
   fetchComputeCosts,
   estimateComputeCost,
 } from "../packages/steps-s3-copy/lambda//common/cost-estimation";
+import { writeFile, readFile } from "node:fs/promises";
 
-import { SIZE_THRESHOLD_BYTES } from "../packages/steps-s3-copy/lambda/common/constants";
-import type { CostEstimate } from "../packages/steps-s3-copy/lambda//common/cost-estimation";
+import {
+  SIZE_THRESHOLD_BYTES,
+  COLD_STORAGE_CLASSES,
+} from "../packages/steps-s3-copy/lambda/common/constants";
+import type {
+  CostEstimate,
+  ColdStorageRetrievalCosts,
+  CrossRegionCosts,
+  ComputeCosts,
+} from "../packages/steps-s3-copy/lambda//common/cost-estimation";
+
+// -----------------------------------------------------------------------------
+// Fetch cost data from API for source region Syd (ap-southeast-2) and
+// write it locally
+// -----------------------------------------------------------------------------
+const shouldFetchPricing = process.argv.includes("--fetch-pricing");
+
+if (shouldFetchPricing) {
+  const sourceRegion = "ap-southeast-1";
+
+  const coldStorageCosts = await fetchColdStorageRetrievalCosts(sourceRegion);
+  const crossRegionCosts = await fetchCrossRegionCosts(sourceRegion);
+  const computeCosts = await fetchComputeCosts(sourceRegion);
+
+  const fetchedPricingData = {
+    coldStorageCosts,
+    crossRegionCosts,
+    computeCosts,
+    fetchedAt: new Date().toISOString(),
+  };
+
+  await writeFile(
+    "./pricing-data.json",
+    JSON.stringify(
+      fetchedPricingData,
+      (_, value) =>
+        typeof value === "number" && !Number.isFinite(value)
+          ? "Infinity"
+          : value,
+      2,
+    ),
+    "utf8",
+  );
+
+  console.log("Saved pricing data to ./pricing-data.json");
+}
+
+// Read the pricing data
+
+const raw = await readFile("./pricing-data.json", "utf8");
+const pricingData = JSON.parse(raw);
 
 // -----------------------------------------------------------------------------
 // Set Mock metadata for testing
 // -----------------------------------------------------------------------------
 
-// Fetch cost data from API for source region Syd (ap-southeast-2)
-const sourceRegion = "ap-southeast-1";
-
-// const ColdStorageRetrievalCosts = await fetchColdStorageRetrievalCosts(sourceRegion);
-// const crossRegionCosts = await fetchCrossRegionCosts(sourceRegion);
-// const computeCosts = await fetchComputeCosts(sourceRegion);
-
-// console.log(computeCosts);
+type TestCase = {
+  name: string;
+  sizeBytes: number;
+  isCrossRegion: boolean;
+  storageClass: string;
+  retrievalSpeed: string;
+  restoreWindowDays: number;
+};
 
 // Test Scenarios
-const testScenarios = [
+const testCases: TestCase[] = [
   {
     name: "Small file, same region, standard",
     sizeBytes: 100 * 1024 * 1024,
@@ -164,34 +214,50 @@ const regions = [
   "sa-east-1",
 ];
 
-for (const region of regions) {
-  console.log(`\n--- ${region} ---`);
-  const computeCosts = await fetchComputeCosts(region);
-  console.log(JSON.stringify(computeCosts, null, 2));
+function calculateCostEstimate(
+  testCase: TestCase,
+  coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
+  crossRegionCosts: CrossRegionCosts,
+  computeCosts: ComputeCosts,
+): CostEstimate {
+  return {
+    crossRegionCostUSD: estimateCrossRegionCost(
+      testCase.isCrossRegion,
+      crossRegionCosts,
+      testCase.sizeBytes,
+    ),
+    coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
+      COLD_STORAGE_CLASSES.includes(
+        testCase.storageClass as (typeof COLD_STORAGE_CLASSES)[number],
+      ),
+      testCase.sizeBytes,
+      testCase.storageClass,
+      testCase.retrievalSpeed,
+      testCase.restoreWindowDays,
+      coldStorageRetrievalCosts,
+    ),
+    computeCostUSD: estimateComputeCost(testCase.sizeBytes, computeCosts),
+  };
 }
 
-// // API TESTING
-// import {
-//   PricingClient,
-//   GetProductsCommand,
-//   FilterType,
-// } from "@aws-sdk/client-pricing";
-// const client = new PricingClient({ region: "us-east-1" });
+const rows = testCases.map((testCase) => {
+  const costEstimate = calculateCostEstimate(
+    testCase,
+    pricingData.coldStorageCosts,
+    pricingData.crossRegionCosts,
+    pricingData.computeCosts,
+  );
 
-// costEstimate: {
-// crossRegionCostUSD: estimateCrossRegionCost(
-//     iscrossRegion,
-//     crossRegionCosts,
-//     size,
-// ),
+  return {
+    name: testCase.name,
+    crossRegionCostUSD: costEstimate.crossRegionCostUSD,
+    coldStorageRetrievalCostUSD: costEstimate.coldStorageRetrievalCostUSD,
+    computeCostUSD: costEstimate.computeCostUSD,
+    totalCostUSD:
+      costEstimate.crossRegionCostUSD +
+      costEstimate.coldStorageRetrievalCostUSD +
+      costEstimate.computeCostUSD,
+  };
+});
 
-// coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
-//     isColdStorage,
-//     size,
-//     storageClass,
-//     retrievalSpeed,
-//     restoreWindowDays,
-//     ColdStorageRetrievalCosts,
-// ),
-// computeCostUSD: estimateComputeCost(size, computeCosts),
-// }
+console.table(rows);

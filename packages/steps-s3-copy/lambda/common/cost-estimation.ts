@@ -13,7 +13,9 @@ import {
   SIZE_THRESHOLD_BYTES,
   FARGATE_CPU_VCPU,
   FARGATE_MEMORY_MB,
+  DEFAULT_FARGATE_OVERHEAD_SEC,
   LAMBDA_MEMORY_MB,
+  DEFAULT_LAMBDA_OVERHEAD_SEC,
 } from "./constants";
 
 // Cost estimation logic for thawing, cross-region transfer, and compute costs.
@@ -556,10 +558,15 @@ function estimateComputeCostLambda(
   memoryMb: number,
   sizeBytes: number,
   computeCosts: ComputeCosts,
+  overheadSeconds: number = DEFAULT_LAMBDA_OVERHEAD_SEC,
   assumedCopySpeedMiBps: number = DEFAULT_COPY_SPEED_MIBPS,
 ): number {
-  const seconds = defaultCopyDurationSeconds(sizeBytes, assumedCopySpeedMiBps);
-  const gbSeconds = (memoryMb / 1024) * seconds;
+  const transferSeconds = defaultCopyDurationSeconds(
+    sizeBytes,
+    assumedCopySpeedMiBps,
+  );
+  const totalSeconds = transferSeconds + overheadSeconds;
+  const gbSeconds = (memoryMb / 1024) * totalSeconds;
   return (
     gbSeconds * computeCosts.lambda.gbSecondPrice +
     computeCosts.lambda.invocationPrice
@@ -571,10 +578,15 @@ function estimateComputeCostFargate(
   memGb: number,
   sizeBytes: number,
   computeCosts: ComputeCosts,
+  overheadSeconds: number = DEFAULT_FARGATE_OVERHEAD_SEC,
   assumedCopySpeedMiBps: number = DEFAULT_COPY_SPEED_MIBPS,
 ): number {
-  const seconds = defaultCopyDurationSeconds(sizeBytes, assumedCopySpeedMiBps);
-  const billedSeconds = Math.max(seconds, FARGATE_MIN_BILLING_SECONDS);
+  const transferSeconds = defaultCopyDurationSeconds(
+    sizeBytes,
+    assumedCopySpeedMiBps,
+  );
+  const totalSeconds = transferSeconds + overheadSeconds;
+  const billedSeconds = Math.max(totalSeconds, FARGATE_MIN_BILLING_SECONDS);
   const hourFraction = billedSeconds / 3600;
   const cpuCost =
     cpuVcpu * computeCosts.fargate.vCpuPricePerHour * hourFraction;

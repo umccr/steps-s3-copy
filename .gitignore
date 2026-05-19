@@ -14,3 +14,6 @@ cdk.out/
 # Local HTML preview reports
 **/test-report-preview-copy.html
 **/test-report-preview-dryrun.html
+
+# Costing artifact
+**/pricing-data.json
