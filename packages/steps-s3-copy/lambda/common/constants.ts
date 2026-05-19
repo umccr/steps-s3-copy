@@ -75,11 +75,18 @@ export function getThawParams(
         retrievalSpeed: thawParams?.glacierDeepArchiveThawSpeed ?? "Bulk",
         restoreWindowDays: thawParams?.glacierDeepArchiveThawDays ?? 1,
       };
-    case "INTELLIGENT_TIERING":
+    case "INTELLIGENT_TIERING_ARCHIVE_ACCESS":
       return {
         retrievalSpeed:
           thawParams?.intelligentTieringArchiveThawSpeed ?? "Bulk",
         restoreWindowDays: thawParams?.intelligentTieringArchiveThawDays ?? 1,
+      };
+    case "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS":
+      return {
+        retrievalSpeed:
+          thawParams?.intelligentTieringDeepArchiveThawSpeed ?? "Bulk",
+        restoreWindowDays:
+          thawParams?.intelligentTieringDeepArchiveThawDays ?? 1,
       };
     default:
       return { retrievalSpeed: "Bulk", restoreWindowDays: 1 };
