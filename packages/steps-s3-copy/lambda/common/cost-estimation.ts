@@ -372,20 +372,39 @@ export async function fetchCrossRegionPutRequestPrice(
   return 0;
 }
 
+/**
+ * Calculates cross-region S3 egress cost with progressive AWS pricing tiers.
+ */
 export function estimateCrossRegionCost(
-  iscrossRegion: boolean,
+  isCrossRegion: boolean,
   crossRegionCosts: CrossRegionCosts,
   sizeBytes: number,
 ): number {
-  if (!iscrossRegion) return 0;
+  if (!isCrossRegion) return 0;
 
-  const totalGb = sizeBytes / 1024 / 1024 / 1024;
-  const tier = crossRegionCosts.egressPriceTiers.find(
-    (t) => totalGb >= t.beginRangeGb && totalGb < t.endRangeGb,
-  );
-  const egressCostUsd = (tier?.pricePerGbUsd ?? 0) * totalGb;
-  const putCostUsd = crossRegionCosts.putPricePerRequest; // 1 PUT request hardcoded from now
-  return egressCostUsd + putCostUsd;
+  const totalGB = bytesToGB(sizeBytes);
+
+  // Apply each tier in order, allocating as much of the transfer as possible to each tier
+  let gbRemaining = totalGB;
+  let totalEgressCost = 0;
+  for (const tier of crossRegionCosts.egressPriceTiers) {
+    const tierSize =
+      (tier.endRangeGb === Infinity ? Infinity : tier.endRangeGb) -
+      tier.beginRangeGb;
+    const gbInTier = Math.min(gbRemaining, tierSize);
+
+    if (gbInTier > 0) {
+      totalEgressCost += gbInTier * tier.pricePerGbUsd;
+      gbRemaining -= gbInTier;
+    }
+    //  Once ALL GB have been billed
+    if (gbRemaining <= 0) break;
+  }
+
+  // Simple for now PUT request cost for the copy (assumes 1 object = 1 request)
+  const putRequestCost = crossRegionCosts.putPricePerRequest;
+
+  return totalEgressCost + putRequestCost;
 }
 
 // --------------------------------------------------------------------------------------------
