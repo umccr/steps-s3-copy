@@ -11,6 +11,7 @@ import {
   DEFAULT_COPY_SPEED_MIBPS,
   FARGATE_MIN_BILLING_SECONDS,
   SIZE_THRESHOLD_BYTES,
+  MULTIPART_CHUNK_SIZE,
   FARGATE_CPU_VCPU,
   FARGATE_MEMORY_MB,
   DEFAULT_FARGATE_OVERHEAD_SEC,
@@ -379,6 +380,7 @@ export function estimateCrossRegionCost(
   isCrossRegion: boolean,
   crossRegionCosts: CrossRegionCosts,
   sizeBytes: number,
+  multipartChunkSizeBytes: number = MULTIPART_CHUNK_SIZE,
 ): number {
   if (!isCrossRegion) return 0;
 
@@ -401,8 +403,12 @@ export function estimateCrossRegionCost(
     if (gbRemaining <= 0) break;
   }
 
-  // Simple for now PUT request cost for the copy (assumes 1 object = 1 request)
-  const putRequestCost = crossRegionCosts.putPricePerRequest;
+  // Calculate the number of request
+  const numPutRequests = Math.max(
+    1,
+    Math.ceil(sizeBytes / multipartChunkSizeBytes),
+  );
+  const putRequestCost = numPutRequests * crossRegionCosts.putPricePerRequest;
 
   return totalEgressCost + putRequestCost;
 }

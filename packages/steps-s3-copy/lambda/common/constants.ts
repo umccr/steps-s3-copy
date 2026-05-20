@@ -5,6 +5,14 @@
 export const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
 
 /**
+ * Chunk size (in bytes) used for S3 multipart upload "partSize".
+ * Set to 5 MiB, which is the minimum allowed S3 multipart part size.
+ * (usefd to control both multipart upload behavior and cost estimation)
+ */
+
+export const MULTIPART_CHUNK_SIZE = 5 * 1024 * 1024;
+
+/**
  * Storage classes that require thawing/restoration before copying.
  */
 export const COLD_STORAGE_CLASSES = [

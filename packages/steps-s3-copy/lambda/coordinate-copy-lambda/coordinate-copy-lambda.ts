@@ -7,6 +7,7 @@ import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import {
   SIZE_THRESHOLD_BYTES,
+  MULTIPART_CHUNK_SIZE,
   COLD_STORAGE_CLASSES,
 } from "../common/constants";
 import { tmpNameSync } from "tmp";
@@ -284,7 +285,7 @@ async function uploadFile(filePath: string, bucket: string, key: string) {
     // (optional) concurrency configuration
     // queueSize: 4,
     // (optional) size of each part, in bytes, at least 5MB
-    partSize: 1024 * 1024 * 5,
+    partSize: MULTIPART_CHUNK_SIZE,
     // (optional) when true, do not automatically call AbortMultipartUpload when
     // a multipart upload fails to complete. You should then manually handle
     // the leftover parts.
