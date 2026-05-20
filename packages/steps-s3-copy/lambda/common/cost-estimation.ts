@@ -259,7 +259,11 @@ export function estimateColdStorageRetrievalCost(
       storageClass as keyof ColdStorageRetrievalCosts
     ] as Record<string, TierCost>
   )?.[retrievalSpeed];
-  if (!tierCosts) return 0;
+  if (!tierCosts) {
+    throw new Error(
+      `Unsupported storage class "${storageClass}" or retrieval speed "${retrievalSpeed}" in estimateColdStorageRetrievalCost`,
+    );
+  }
 
   const sizeGB = bytesToGB(sizeBytes);
 
