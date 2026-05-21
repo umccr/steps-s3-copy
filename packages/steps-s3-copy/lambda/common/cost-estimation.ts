@@ -260,9 +260,10 @@ export function estimateColdStorageRetrievalCost(
     ] as Record<string, TierCost>
   )?.[retrievalSpeed];
   if (!tierCosts) {
-    throw new Error(
-      `Unsupported storage class "${storageClass}" or retrieval speed "${retrievalSpeed}" in estimateColdStorageRetrievalCost`,
+    console.warn(
+      `[COST WARNING] Unsupported storage class "${storageClass}" or retrieval speed "${retrievalSpeed}" in estimateColdStorageRetrievalCost. Returning cost as 0.`,
     );
+    return 0;
   }
 
   const sizeGB = bytesToGB(sizeBytes);
@@ -405,6 +406,13 @@ export function estimateCrossRegionCost(
     }
     //  Once ALL GB have been billed
     if (gbRemaining <= 0) break;
+  }
+
+  // Warning for tier no covered.
+  if (gbRemaining > 0.00001) {
+    console.warn(
+      `[COST WARNING] Unmatched egress price tier: ${gbRemaining} GB not covered in estimateCrossRegionCost. Estimate may be too low.`,
+    );
   }
 
   // Calculate the number of request
@@ -657,5 +665,17 @@ export async function readPricingDataJsonFromS3(
   );
   const body = await obj.Body?.transformToString?.();
   if (!body) throw new Error("No pricing data returned from S3!");
-  return JSON.parse(body) as PricingData;
+
+  const pricingData = JSON.parse(body) as PricingData;
+
+  //Warn if last egress price tier does not end at Infinity, meaning the last cost tiering is not covered.
+  const egressPriceTiers = pricingData.crossRegionCosts?.egressPriceTiers ?? [];
+  const lastTier = egressPriceTiers[egressPriceTiers.length - 1];
+  if (lastTier?.endRangeGb !== Infinity) {
+    console.warn(
+      "[COST WARNING] Last egress price tier does NOT have endRangeGb: Infinity. Some cross-region cost estimates may be incomplete.",
+    );
+  }
+
+  return pricingData;
 }
