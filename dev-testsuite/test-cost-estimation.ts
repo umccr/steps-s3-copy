@@ -1,3 +1,18 @@
+import { writeFile, readFile } from "node:fs/promises";
+import * as fs from "fs";
+import * as path from "path";
+import {
+  SIZE_THRESHOLD_BYTES,
+  COLD_STORAGE_CLASSES,
+} from "../packages/steps-s3-copy/lambda/common/constants";
+
+import type {
+  CostEstimate,
+  ColdStorageRetrievalCosts,
+  CrossRegionCosts,
+  ComputeCosts,
+} from "../packages/steps-s3-copy/lambda//common/cost-estimation";
+
 import {
   fetchColdStorageRetrievalCosts,
   estimateColdStorageRetrievalCost,
@@ -6,26 +21,15 @@ import {
   fetchComputeCosts,
   estimateComputeCost,
 } from "../packages/steps-s3-copy/lambda//common/cost-estimation";
-import { writeFile, readFile } from "node:fs/promises";
-
-import {
-  SIZE_THRESHOLD_BYTES,
-  COLD_STORAGE_CLASSES,
-} from "../packages/steps-s3-copy/lambda/common/constants";
-import type {
-  CostEstimate,
-  ColdStorageRetrievalCosts,
-  CrossRegionCosts,
-  ComputeCosts,
-} from "../packages/steps-s3-copy/lambda//common/cost-estimation";
 
 // -----------------------------------------------------------------------------
-// Fetch cost data from API for source region Syd (ap-southeast-2) and
-// write it locally
+// If pricingFile doesn't exist, fetch cost data from API for source region Syd
+// (ap-southeast-2) and write it.
 // -----------------------------------------------------------------------------
-const shouldFetchPricing = process.argv.includes("--fetch-pricing");
+const pricingFile = path.resolve(__dirname, "pricing-data.json");
+const pricingFileExists = fs.existsSync(pricingFile);
 
-if (shouldFetchPricing) {
+if (!pricingFileExists) {
   const sourceRegion = "ap-southeast-1";
 
   const coldStorageCosts = await fetchColdStorageRetrievalCosts(sourceRegion);
@@ -40,7 +44,7 @@ if (shouldFetchPricing) {
   };
 
   await writeFile(
-    "./pricing-data.json",
+    pricingFile,
     JSON.stringify(
       fetchedPricingData,
       (_, value) =>

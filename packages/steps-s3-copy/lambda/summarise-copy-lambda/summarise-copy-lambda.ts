@@ -10,6 +10,8 @@ import type { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import { buildS3Client } from "../common/s3-client-builder";
 import { assertInvokeArgumentString } from "../common/assert-invoke-arguments";
 import { PRICING_DATA_FILENAME } from "../common/constants";
+import { readPricingDataJsonFromS3 } from "../common/cost-estimation";
+import type { PricingData } from "../common/cost-estimation";
 
 interface MapResult {
   manifestBucket: string;
@@ -208,8 +210,14 @@ export async function handler(event: InvokeEvent) {
 
     // Generate the HTML report
 
-    // The path to the pricing data JSON file in S3 written in fetch-picing step.
+    // Read Pricing Data fetcheched from the API
     const pricingDataKey = sourceFilePrefix + PRICING_DATA_FILENAME;
+
+    const pricingData: PricingData = await readPricingDataJsonFromS3(
+      workingClient,
+      event.invokeSettings.workingBucket,
+      pricingDataKey,
+    );
 
     const htmlReport = await createHtmlReport({
       title: "Copy Summary Report",
@@ -217,8 +225,7 @@ export async function handler(event: InvokeEvent) {
       destinationFolderKey: event.invokeArguments.destinationPrefix,
       reportMetadata: reportMetadata,
       dryRun: event.invokeArguments.dryRun ? true : false,
-      workingBucket: event.invokeSettings.workingBucket,
-      pricingDataKey: pricingDataKey,
+      pricingData: pricingData,
     });
 
     // 1) Copy to the destination bucket/folder

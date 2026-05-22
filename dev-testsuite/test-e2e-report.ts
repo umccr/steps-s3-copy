@@ -6,8 +6,7 @@ import { WaiterState } from "@smithy/util-waiter";
 import { beforeAll, test } from "bun:test";
 import { testSetup, type TestSetupState } from "./setup.js";
 import assert from "node:assert";
-import { assertDestinations } from "./lib/assert-destinations.mjs";
-import { KiB, MiB } from "./lib/suffixes.js";
+import { KiB } from "./lib/suffixes.js";
 import {
   createTestObject,
   type TestObject,

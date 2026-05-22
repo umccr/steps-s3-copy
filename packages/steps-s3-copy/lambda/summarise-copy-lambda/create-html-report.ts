@@ -9,7 +9,6 @@ import {
   fill_template,
 } from "./html-report-utils.ts";
 
-import { readPricingDataJsonFromS3 } from "../common/cost-estimation";
 import type { PricingData } from "../common/cost-estimation";
 import { S3Client } from "@aws-sdk/client-s3";
 
@@ -39,8 +38,7 @@ export async function createHtmlReport(opts: {
   destinationFolderKey: string;
   reportMetadata: ReportMetadata[];
   dryRun: boolean;
-  workingBucket: string;
-  pricingDataKey: string;
+  pricingData: PricingData;
 }): Promise<string> {
   const {
     title,
@@ -48,8 +46,7 @@ export async function createHtmlReport(opts: {
     destinationFolderKey,
     reportMetadata = [],
     dryRun,
-    workingBucket,
-    pricingDataKey,
+    pricingData,
   } = opts;
 
   // Combine all FileSummary entries into one array for the report
@@ -94,16 +91,6 @@ export async function createHtmlReport(opts: {
   const totalCost = totalCrossRegionCost + totalColdCost + totalComputeCost;
 
   // Create cost estimation block HTML
-
-  const client = new S3Client({});
-  const bucket = workingBucket;
-  // Read Pricing Data fetcheched from the API
-  const pricingData: PricingData = await readPricingDataJsonFromS3(
-    client,
-    bucket,
-    pricingDataKey,
-  );
-
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
   const crossRegionCosts = pricingData.crossRegionCosts;
   const computeCosts = pricingData.computeCosts;
