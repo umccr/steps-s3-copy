@@ -10,7 +10,6 @@ import {
 } from "./html-report-utils.ts";
 
 import type { PricingData } from "../common/cost-estimation";
-import { S3Client } from "@aws-sdk/client-s3";
 
 // Load the HTML template
 const REPORT_TEMPLATE = readFileSync(
