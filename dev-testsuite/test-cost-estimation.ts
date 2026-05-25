@@ -23,8 +23,8 @@ import {
 } from "../packages/steps-s3-copy/lambda//common/cost-estimation";
 
 // -----------------------------------------------------------------------------
-// If pricingFile doesn't exist, fetch cost data from API for source region Syd
-// (ap-southeast-2) and write it.
+// If pricingFile (pricing-data.json) doesn't exist, fetch cost data from API for
+//  source region Syd (ap-southeast-2) and write it.
 // -----------------------------------------------------------------------------
 const pricingFile = path.resolve(__dirname, "pricing-data.json");
 const pricingFileExists = fs.existsSync(pricingFile);
@@ -59,7 +59,9 @@ if (!pricingFileExists) {
   console.log("Saved pricing data to ./pricing-data.json");
 }
 
+// -----------------------------------------------------------------------------
 // Read the pricing data
+// -----------------------------------------------------------------------------
 
 const raw = await readFile("./pricing-data.json", "utf8");
 const pricingData = JSON.parse(raw);
@@ -77,7 +79,7 @@ type TestCase = {
   restoreWindowDays: number;
 };
 
-// Test Scenarios
+// Definitions of dofferent test cases
 const testCases: TestCase[] = [
   {
     name: "Small file, same region, standard",
@@ -201,23 +203,6 @@ const testCases: TestCase[] = [
   },
 ];
 
-const regions = [
-  "us-east-1",
-  "us-east-2",
-  "us-west-1",
-  "us-west-2",
-  "ap-southeast-1",
-  "ap-southeast-2",
-  "ap-northeast-1",
-  "ap-northeast-2",
-  "ap-south-1",
-  "eu-west-1",
-  "eu-west-2",
-  "eu-central-1",
-  "ca-central-1",
-  "sa-east-1",
-];
-
 function calculateCostEstimate(
   testCase: TestCase,
   coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
@@ -244,6 +229,7 @@ function calculateCostEstimate(
   };
 }
 
+// For each test case, calculate costs and build a summary row
 const rows = testCases.map((testCase) => {
   const costEstimate = calculateCostEstimate(
     testCase,
@@ -264,4 +250,5 @@ const rows = testCases.map((testCase) => {
   };
 });
 
+// Print the cost estimate summary as a formatted table
 console.table(rows);

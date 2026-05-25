@@ -10,7 +10,6 @@ import {
   fetchComputeCosts,
 } from "../packages/steps-s3-copy/lambda/common/cost-estimation";
 
-// Parse CLI args
 const dryRun = process.argv.includes("--dry-run");
 
 // -----------------------------------------------------------------------------
@@ -54,7 +53,7 @@ if (!pricingFileExists) {
 const raw = await readFile(pricingFile, "utf8");
 const pricingData = JSON.parse(raw);
 
-// Two sets of ReportMetadata: one for dry run, one for real copy
+// Two sets of mock ReportMetadata: one for dry run, one for real copy
 const reportMetadataDryRun: ReportMetadata[] = [
   {
     copySetsMetadata: {
@@ -755,12 +754,21 @@ const reportMetadataCopy: ReportMetadata[] = [
   },
 ];
 
-// Build  ReportMetadata array
-const multiplier = 100; // or whatever size you want
+// Multiply mock data so can test long table behaviour
+const multiplier = 10;
 
-const reportMetadata: ReportMetadata[] = [].concat(
-  ...Array(multiplier).fill(reportMetadataCopy),
-);
+// Repeat each mock set using Array fill + flat
+const repeatedDryRun = Array.from(
+  { length: multiplier },
+  () => reportMetadataDryRun,
+).flat();
+const repeatedCopy = Array.from(
+  { length: multiplier },
+  () => reportMetadataCopy,
+).flat();
+
+// Build  ReportMetadata array
+const reportMetadata: ReportMetadata[] = dryRun ? repeatedDryRun : repeatedCopy;
 
 // Generate the report
 const htmlReport = createHtmlReport({

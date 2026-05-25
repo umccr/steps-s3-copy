@@ -9,11 +9,14 @@
     "e2e-dryrun": "bun test ./test-e2e-dryrun.ts",
     "e2e-koalas": "bun test ./test-e2e-koalas.ts",
     "e2e-realistic": "bun test ./test-e2e-realistic.ts",
-    "e2e-thawing": "bun test ./test-e2e-thawing.ts",
     "e2e-report": "bun test ./test-e2e-report.ts",
+    "e2e-thawing": "bun test ./test-e2e-thawing.ts",
     "step-all": "bun test ./test-step-*.ts",
     "step-can-write": "bun test ./test-step-can-write-lambda.ts",
-    "step-head-objects": "bun test ./test-step-head-objects-lambda.ts"
+    "step-head-objects": "bun test ./test-step-head-objects-lambda.ts",
+    "report-preview": "bun test ./test-report-preview.ts",
+    "report-preview-dryrun": "bun test ./test-report-preview.ts --dry-run",
+    "cost-estimation": "bun test ./test-cost-estimation.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.1035.0",
