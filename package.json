@@ -22,8 +22,5 @@
     "name": "University of Melbourne Centre for Cancer Research",
     "organization": true
   },
-  "license": "MIT",
-  "dependencies": {
-    "@aws-sdk/client-pricing": "^3.1045.0"
-  }
+  "license": "MIT"
 }
