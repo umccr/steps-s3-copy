@@ -157,8 +157,39 @@ export function createDestinationTreeBlock(
 
 export function createFilesTableBlock(
   rows: (ReportMetadata & { rowId: string })[],
-): string {
-  return `
+): {
+  html: string;
+  copyResultsTableScript: string;
+  costEstimatesTableScript: string;
+} {
+  // -- TABLE DATA for Copy Results tab
+  const copyResultsTableData = rows.map((r) => [
+    r.copyResultMetadata.name,
+    formatBytes(r.copySetsMetadata.size),
+    r.copyResultMetadata.status === "COPIED"
+      ? "Copied"
+      : r.copyResultMetadata.status === "ALREADYCOPIED"
+        ? "Already exists"
+        : r.copyResultMetadata.status === "ESTIMATED"
+          ? "Estimated"
+          : "Error",
+    formatBytes(r.copyResultMetadata.bytesTransferred),
+    (r.copyResultMetadata.speed ?? 0).toFixed(2),
+    secondsToHMS(r.copyResultMetadata.elapsedSeconds),
+    String(r.copyResultMetadata.message ?? ""),
+    r.copyResultMetadata.destination,
+  ]);
+
+  // -- TABLE DATA for Cost tab
+  const costEstimatesTableData = rows.map((r) => [
+    r.copyResultMetadata.name,
+    formatBytes(r.copySetsMetadata.size),
+    r.copySetsMetadata.costEstimate.crossRegionCostUSD,
+    r.copySetsMetadata.costEstimate.coldStorageRetrievalCostUSD,
+    r.copySetsMetadata.costEstimate.computeCostUSD,
+  ]);
+
+  const htmlBlock = `
 <style>
   .nav-tabs .nav-link {
     color: #495057;
@@ -220,75 +251,6 @@ export function createFilesTableBlock(
             </tr>
           </thead>
           <tbody>
-            ${rows
-              .slice()
-              .sort(
-                (a, b) =>
-                  a.copyResultMetadata.destination.localeCompare(
-                    b.copyResultMetadata.destination,
-                  ) ||
-                  a.copyResultMetadata.name.localeCompare(
-                    b.copyResultMetadata.name,
-                  ),
-              )
-              .map(
-                (r) => `
-                <tr id="${r.rowId}">
-                  <td class="cell-scroll">
-                    <div class="cell-inner" title="${
-                      r.copyResultMetadata.name
-                    }">${r.copyResultMetadata.name}</div>
-                  </td>
-                  <td class="text-center">${formatBytes(
-                    r.copySetsMetadata.size,
-                  )}</td>
-                  <td class="text-center">
-                    <span class="badge ${
-                      r.copyResultMetadata.status === "COPIED"
-                        ? "text-bg-success"
-                        : r.copyResultMetadata.status === "ALREADYCOPIED"
-                          ? "text-bg-warning"
-                          : r.copyResultMetadata.status === "ESTIMATED"
-                            ? "text-bg-secondary"
-                            : "text-bg-danger"
-                    }">
-                      ${
-                        r.copyResultMetadata.status === "COPIED"
-                          ? "Copied"
-                          : r.copyResultMetadata.status === "ALREADYCOPIED"
-                            ? "Already exists"
-                            : r.copyResultMetadata.status === "ESTIMATED"
-                              ? "Estimated"
-                              : "Error"
-                      }
-                    </span>
-                  </td>
-                  <td class="text-center">${formatBytes(
-                    r.copyResultMetadata.bytesTransferred,
-                  )}</td>
-                  <td class="text-center">${(
-                    r.copyResultMetadata.speed ?? 0
-                  ).toFixed(2)}</td>
-                  <td class="text-center">${secondsToHMS(
-                    r.copyResultMetadata.elapsedSeconds,
-                  )}</td>
-                  <td class="cell-scroll">
-                    <div class="cell-inner" title="${String(
-                      r.copyResultMetadata.message ?? "",
-                    )}">
-                      ${String(r.copyResultMetadata.message ?? "")}
-                    </div>
-                  </td>
-                  <td class="cell-scroll">
-                    <div class="cell-inner" title="${
-                      r.copyResultMetadata.destination
-                    }">
-                      ${r.copyResultMetadata.destination}
-                    </div>
-                  </td>
-                </tr>`,
-              )
-              .join("")}
           </tbody>
         </table>
       </div>
@@ -314,61 +276,25 @@ export function createFilesTableBlock(
             </tr>
           </thead>
           <tbody>
-            ${rows
-              .slice()
-              .sort(
-                (a, b) =>
-                  a.copyResultMetadata.destination.localeCompare(
-                    b.copyResultMetadata.destination,
-                  ) ||
-                  a.copyResultMetadata.name.localeCompare(
-                    b.copyResultMetadata.name,
-                  ),
-              )
-              .map(
-                (r) => `
-                <tr id="cost-${r.rowId}">
-                  <td class="cell-scroll">
-                    <div class="cell-inner" title="${
-                      r.copyResultMetadata.name
-                    }">${r.copyResultMetadata.name}</div>
-                  </td>
-                  <td class="text-center">${formatBytes(
-                    r.copySetsMetadata.size,
-                  )}</td>
-                  <td class="text-center">${
-                    r.copySetsMetadata.costEstimate?.crossRegionCostUSD !==
-                    undefined
-                      ? r.copySetsMetadata.costEstimate.crossRegionCostUSD.toFixed(
-                          6,
-                        )
-                      : "-"
-                  }</td>
-                  <td class="text-center">${
-                    r.copySetsMetadata.costEstimate
-                      ?.coldStorageRetrievalCostUSD !== undefined
-                      ? r.copySetsMetadata.costEstimate.coldStorageRetrievalCostUSD.toFixed(
-                          6,
-                        )
-                      : "-"
-                  }</td>
-                  <td class="text-center">${
-                    r.copySetsMetadata.costEstimate?.computeCostUSD !==
-                    undefined
-                      ? r.copySetsMetadata.costEstimate.computeCostUSD.toFixed(
-                          6,
-                        )
-                      : "-"
-                  }</td>
-                </tr>`,
-              )
-              .join("")}
           </tbody>
         </table>
       </div>
     </div>
   </div>
 </div>`;
+  const copyResultsTableScript = `<script>
+  const copyResultsTableData = ${JSON.stringify(copyResultsTableData)};
+  </script>`;
+
+  const costEstimatesTableScript = `<script>
+    const costEstimatesTableData = ${JSON.stringify(costEstimatesTableData)};
+  </script>`;
+
+  return {
+    html: htmlBlock,
+    copyResultsTableScript: copyResultsTableScript,
+    costEstimatesTableScript: costEstimatesTableScript,
+  };
 }
 
 /**
@@ -412,7 +338,7 @@ export function createCostEstimationBlock(
 				</li>
 				<li class="pt-2 mt-2 border-top">
 					<strong class="h5">Total:</strong>
-					<span class="h5 text-primary">$${totalCost.toFixed(4)} USD</span>
+					<span class="h5 text-primary">$${totalCost.toFixed(2)} USD</span>
 				</li>
 			</ul>
 		</div>

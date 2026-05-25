@@ -349,7 +349,10 @@
           <div class="card shadow-sm">
             <div class="card-body">
               <h2 class="h5 mb-3">Per-Object Details</h2>
-              <div class="small">{{FILES_TABLE_BLOCK}}</div>
+              <div class="small">
+                {{FILES_TABLE_BLOCK}} {{COPY_RESULTS_TABLE_SCRIPT}}
+                {{COST_ESTIMATES_TABLE_SCRIPT}}
+              </div>
             </div>
           </div>
         </div>
@@ -448,7 +451,8 @@
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         const initDataTables = () => {
-          const resultsTable = $("#copy-results").DataTable({
+          const copyResultsTable = $("#copy-results").DataTable({
+            data: copyResultsTableData,
             pageLength: 10,
             lengthMenu: [10, 25, 50],
             paging: true,
@@ -463,7 +467,8 @@
             ],
           });
 
-          const costsTable = $("#costs-table").DataTable({
+          const costEstimatesTable = $("#costs-table").DataTable({
+            data: costEstimatesTableData,
             pageLength: 10,
             lengthMenu: [10, 25, 50],
             paging: true,
@@ -482,11 +487,11 @@
             const target = $(e.target).attr("data-bs-target");
 
             if (target === "#results") {
-              resultsTable.columns.adjust().draw();
+              copyResultsTable.columns.adjust().draw();
             }
 
             if (target === "#costs") {
-              costsTable.columns.adjust().draw();
+              costEstimatesTable.columns.adjust().draw();
             }
           });
         };

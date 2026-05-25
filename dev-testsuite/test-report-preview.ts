@@ -756,9 +756,11 @@ const reportMetadataCopy: ReportMetadata[] = [
 ];
 
 // Build  ReportMetadata array
-const reportMetadata: ReportMetadata[] = dryRun
-  ? reportMetadataDryRun
-  : reportMetadataCopy;
+const multiplier = 100; // or whatever size you want
+
+const reportMetadata: ReportMetadata[] = [].concat(
+  ...Array(multiplier).fill(reportMetadataCopy),
+);
 
 // Generate the report
 const htmlReport = createHtmlReport({

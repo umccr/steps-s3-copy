@@ -105,7 +105,11 @@ export async function createHtmlReport(opts: {
   );
 
   // Create files table block HTML
-  const filesTableBlock = createFilesTableBlock(rows);
+  const {
+    html: filesTableBlock,
+    copyResultsTableScript,
+    costEstimatesTableScript,
+  } = createFilesTableBlock(rows);
 
   // For dry run, we only estimate costs, so we hide the copy tree and summary sections.
   let destinationTreeBlock = "";
@@ -135,6 +139,8 @@ export async function createHtmlReport(opts: {
     SUMMARY_ERRORS: String(errors),
     DESTINATION_TREE_BLOCK: destinationTreeBlock,
     FILES_TABLE_BLOCK: filesTableBlock,
+    COPY_RESULTS_TABLE_SCRIPT: copyResultsTableScript,
+    COST_ESTIMATES_TABLE_SCRIPT: costEstimatesTableScript,
     S3_DESTINATION_PATH:
       "s3://" + destinationBucket + "/" + destinationFolderKey,
     COST_ESTIMATION_BLOCK: costEstimationBlock,
