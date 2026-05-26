@@ -371,8 +371,7 @@ export class StepsS3CopyConstruct extends Construct {
       thawLargeCopierMap.distributedMap,
     );
 
-    // Setup Choice
-    // HARCODED dryRun condition. Need to se the proper whay of reading that.
+    // Chooses summarise copy path based on dryRun input.
 
     const summariseCopyDryRun = new SummariseCopyLambdaStepConstruct(
       this,
@@ -395,7 +394,6 @@ export class StepsS3CopyConstruct extends Construct {
         copiers.next(summariseCopyRegular.invocableLambda).next(success),
       );
 
-    // Top-level chain, stop at the Choice
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
         .next(validateThawParamsStep.invocableLambda)

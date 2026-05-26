@@ -22,39 +22,43 @@ export const COLD_STORAGE_CLASSES = [
   "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
 ] as const;
 
+// -----------------------------------------------------------------
+// PRICING
+// -----------------------------------------------------------------
+
 // The key under which pricing data is stored in S3 by the FetchPricingDataLambda
 export const PRICING_DATA_FILENAME = "pricing-data.json";
 
-// -----------------------------------------------------------------
-// PRICING CONSTANTS (BASED on tge offical AWS page COST_CHECK_URL)
-// -----------------------------------------------------------------
-
 // -------------
 // Read from packages/steps-s3-copy/src/steps-s3-copy-construct.ts
-// TODO: cosider to use theses constans here defined in
-// packages/steps-s3-copy/src/steps-s3-copy-construct.ts
+// TODO: cosider to use theses constans here defined
+// in packages/steps-s3-copy/src/steps-s3-copy-construct.ts
 export const FARGATE_MIN_BILLING_SECONDS = 60;
-
 export const FARGATE_MEMORY_MB = 512;
 export const FARGATE_CPU_VCPU = 0.25;
-
 export const DEFAULT_FARGATE_OVERHEAD_SEC = 8;
 
 // Read from packages/steps-s3-copy/src/lib/small-copy-map-construct.ts
-// This value is used for estimating Lambda compute costs for small object copy operations.
 // TODO: cosider to use theses constans here defined
 // in packages/steps-s3-copy/src/lib/small-copy-map-construct.ts
-
 export const LAMBDA_MEMORY_MB = 128;
-
 // Typical assumed copy speed for compute cost estimation (MiB/s)
 export const DEFAULT_COPY_SPEED_MIBPS = 40;
-
 export const DEFAULT_LAMBDA_OVERHEAD_SEC = 20;
 
-// -------------
+/**
+ * Estimate copy duration (seconds) from size and speed.
+ */
+export function defaultCopyDurationSeconds(
+  sizeBytes: number,
+  speedMiBps: number = DEFAULT_COPY_SPEED_MIBPS,
+): number {
+  return sizeBytes / (speedMiBps * 1024 * 1024);
+}
+
+// -----------------------------------------------------------------
 // UTILITIES
-// -------------
+// -----------------------------------------------------------------
 export function bytesToGB(bytes: number): number {
   return bytes / 1024 ** 3;
 }
@@ -99,14 +103,4 @@ export function getThawParams(
     default:
       return { retrievalSpeed: "Bulk", restoreWindowDays: 1 };
   }
-}
-
-/**
- * Estimate copy duration (seconds) from size and speed.
- */
-export function defaultCopyDurationSeconds(
-  sizeBytes: number,
-  speedMiBps: number = DEFAULT_COPY_SPEED_MIBPS,
-): number {
-  return sizeBytes / (speedMiBps * 1024 * 1024);
 }
