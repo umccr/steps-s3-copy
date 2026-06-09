@@ -93,6 +93,7 @@ export async function createHtmlReport(opts: {
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
   const crossRegionCosts = pricingData.crossRegionCosts;
   const computeCosts = pricingData.computeCosts;
+  const fetchedAt = pricingData.fetchedAt;
 
   const costEstimationBlock = createCostEstimationBlock(
     totalCrossRegionCost,
@@ -102,6 +103,7 @@ export async function createHtmlReport(opts: {
     coldStorageRetrievalCosts,
     crossRegionCosts,
     computeCosts,
+    fetchedAt,
   );
 
   // Create files table block HTML

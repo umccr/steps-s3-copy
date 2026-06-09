@@ -308,7 +308,16 @@ export function createCostEstimationBlock(
   coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
   crossRegionCosts: CrossRegionCosts,
   computeCosts: ComputeCosts,
+  pricingDataFetchedAt: string,
 ): string {
+  const formattedPricingDataFetchedAt = new Date(
+    pricingDataFetchedAt,
+  ).toLocaleString("en-AU", {
+    dateStyle: "long",
+    timeStyle: "medium",
+    timeZone: "UTC",
+  });
+
   return `
 	<div class="row align-items-start">
 		<!-- Left: Cost values and pie chart -->
@@ -466,8 +475,9 @@ export function createCostEstimationBlock(
 
 
         <p class="small text-muted fst-italic mb-0 mt-3">
-					Based on official <a href="${COST_CHECK_URL}" target="_blank" rel="noopener">AWS pricing</a> (ap-southeast-2).
-				</p>
+          Based on official <a href="${COST_CHECK_URL}" target="_blank" rel="noopener">AWS Price List API pricing data</a> for ap-southeast-2.<br />
+          Pricing data last updated: ${formattedPricingDataFetchedAt} (UTC)
+        </p>
 
 			</div>
 		</div>
