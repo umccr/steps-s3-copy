@@ -56,6 +56,19 @@ export class HeadObjectsMapConstruct extends Construct {
         "bucketDefinitions.$": JsonPath.stringAt(
           invokeArg("bucketDefinitions"),
         ),
+        "sourceRequiredRegion.$": JsonPath.stringAt(
+          "$invokeArguments.sourceRequiredRegion",
+        ),
+        "destinationRequiredRegion.$": JsonPath.stringAt(
+          "$invokeArguments.destinationRequiredRegion",
+        ),
+        "workingBucket.$": JsonPath.stringAt("$invokeSettings.workingBucket"),
+        "workingBucketPrefix.$": JsonPath.stringAt(
+          "$invokeSettings.workingBucketPrefix",
+        ),
+        "instructionsPrefix.$": JsonPath.stringAt(
+          "$invokeArguments.instructionsPrefix",
+        ),
       },
       itemReader: {
         "Bucket.$": invokeSetting("workingBucket"),

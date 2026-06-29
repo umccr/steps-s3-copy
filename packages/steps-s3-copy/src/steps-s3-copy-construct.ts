@@ -18,10 +18,9 @@ import {
   Succeed,
   Wait,
   WaitTime,
+  Choice,
+  Condition,
 } from "aws-cdk-lib/aws-stepfunctions";
-import { Duration, Stack } from "aws-cdk-lib";
-import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
-import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import {
   DEFAULT_HTML_REPORT_KEY,
   DEFAULT_INSTRUCTIONS_KEY,
@@ -31,11 +30,16 @@ import {
   StepsS3CopyInvokeSettings,
   stateInput,
 } from "./steps-s3-copy-input";
+import { Duration, Stack } from "aws-cdk-lib";
+import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
+import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
+import { PricingDataLambdaStepConstruct } from "./lib/fetch-pricing-data-lambda-step-construct";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
+import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
 import {
   AssetImage,
   AwsLogDriverMode,
@@ -48,7 +52,6 @@ import {
 import { join } from "path";
 import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
 
 export { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
 export { StepsS3CopyInvokeSettings } from "./steps-s3-copy-input";
@@ -246,6 +249,12 @@ export class StepsS3CopyConstruct extends Construct {
       },
     );
 
+    const pricingDataLambdaStep = new PricingDataLambdaStepConstruct(
+      this,
+      "FetchPricingData",
+      { writerRole: this._workingRole },
+    );
+
     const validateThawParamsStep = new ValidateThawParamsLambdaStepConstruct(
       this,
       "ValidateThawParams",
@@ -353,14 +362,6 @@ export class StepsS3CopyConstruct extends Construct {
       containerDefinition: containerDefinition,
     });
 
-    const summariseCopyLambdaStep = new SummariseCopyLambdaStepConstruct(
-      this,
-      "SummariseCopy",
-      {
-        writerRole: this._workingRole,
-      },
-    );
-
     // we construct a set of independent copiers that handle different types of objects
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
@@ -370,15 +371,37 @@ export class StepsS3CopyConstruct extends Construct {
       thawLargeCopierMap.distributedMap,
     );
 
+    // Chooses summarise copy path based on dryRun input.
+
+    const summariseCopyDryRun = new SummariseCopyLambdaStepConstruct(
+      this,
+      "SummariseCopyDryRun",
+      { writerRole: this._workingRole },
+    );
+
+    const summariseCopyRegular = new SummariseCopyLambdaStepConstruct(
+      this,
+      "SummariseCopyRegular",
+      { writerRole: this._workingRole },
+    );
+
+    const dryRunChoice = new Choice(this, "Is DryRun?")
+      .when(
+        Condition.booleanEquals("$.dryRun", true),
+        summariseCopyDryRun.invocableLambda.next(success),
+      )
+      .otherwise(
+        copiers.next(summariseCopyRegular.invocableLambda).next(success),
+      );
+
     const definition = ChainDefinitionBody.fromChainable(
       assignInputsAndApplyDefaults
         .next(validateThawParamsStep.invocableLambda)
         .next(canWriteStep)
+        .next(pricingDataLambdaStep.invocableLambda)
         .next(this._headObjectsMap.distributedMap)
         .next(coordinateCopyLambdaStep.invocableLambda)
-        .next(copiers)
-        .next(summariseCopyLambdaStep.invocableLambda)
-        .next(success),
+        .next(dryRunChoice),
     );
 
     // NOTE: we use a technique here to allow optional input parameters to the state machine
@@ -536,6 +559,21 @@ export class StepsS3CopyConstruct extends Construct {
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ["secretsmanager:GetSecretValue"],
+        resources: ["*"],
+      }),
+    );
+
+    // Allow Pricing API access for cost estimation
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: [
+          "pricing:DescribeServices",
+          "pricing:GetAttributeValues",
+          "pricing:GetProducts",
+          "pricing:ListPriceLists",
+          "pricing:GetPriceListFileUrl",
+        ],
         resources: ["*"],
       }),
     );

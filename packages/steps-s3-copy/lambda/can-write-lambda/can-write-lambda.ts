@@ -83,7 +83,10 @@ export async function handler(event: CanWriteLambdaInvokeEvent) {
     throw e;
   }
 
-  const result: CanWriteLambdaResult = {};
+  const result: CanWriteLambdaResult = {
+    invokeArguments: event.invokeArguments,
+    invokeSettings: event.invokeSettings,
+  };
 
   return result;
 }

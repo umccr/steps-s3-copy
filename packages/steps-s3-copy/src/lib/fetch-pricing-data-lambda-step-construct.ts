@@ -11,12 +11,7 @@ type Props = {
   readonly writerRole: IRole;
 };
 
-/**
- * A construct for a Steps function that tests whether an S3
- * bucket exists, is in the correct region, and is writeable
- * by us. Throws an exception if any of these conditions is not met.
- */
-export class CanWriteLambdaStepConstruct extends Construct {
+export class PricingDataLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
   public readonly lambda: Function;
   public readonly stateName: string;
@@ -24,25 +19,28 @@ export class CanWriteLambdaStepConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    const packageRoot = join(__dirname, "..", "..");
-    const lambdaFolder = join(packageRoot, "lambda", "can-write-lambda");
+    const lambdaFolder = join(
+      __dirname,
+      "..",
+      "..",
+      "lambda",
+      "fetch-pricing-data-lambda",
+    );
 
-    this.stateName = `Can Write To Destination Bucket?`;
+    this.stateName = "Fetch Pricing Data";
 
-    this.lambda = new NodejsFunction(this, "CanWriteFunction", {
+    this.lambda = new NodejsFunction(this, "FetchPricingDataFunction", {
       role: props.writerRole,
-      entry: join(lambdaFolder, "can-write-lambda.ts"),
+      entry: join(lambdaFolder, "fetch-pricing-data-lambda.ts"),
       runtime: Runtime.NODEJS_22_X,
       handler: "handler",
-      bundling: {
-        minify: false,
-      },
-      // this seems like plenty of seconds to do a few API calls to S3
-      timeout: Duration.seconds(30),
+      bundling: { minify: false },
+      timeout: Duration.seconds(60),
     });
 
     this.invocableLambda = new LambdaInvoke(this, this.stateName, {
       lambdaFunction: this.lambda,
+      timeout: Duration.seconds(60),
       queryLanguage: QueryLanguage.JSONATA,
       payload: TaskInput.fromObject({
         invokeArguments: "{% $invokeArguments %}",

@@ -45,6 +45,9 @@ export class CoordinateCopyLambdaStepConstruct extends Construct {
         entry: join(lambdaFolder, "coordinate-copy-lambda.ts"),
         runtime: Runtime.NODEJS_22_X,
         architecture: Architecture.ARM_64,
+        // Set projectRoot to lambda/ directory to enable bundling of shared modules from lambda/common/
+        // for example allowing all lambdas to import the constant defined in ../common/constants
+        projectRoot: join(__dirname, "..", "..", "..", ".."),
         // possibly this function needs to load some larger (GiB?) manifest files so we give it plenty
         // of time, though I expect it till not need this most of the time
         timeout: Duration.minutes(5),

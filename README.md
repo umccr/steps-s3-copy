@@ -478,3 +478,28 @@ Note that `aggressiveTimes` is enabled for **development and testing only**, whe
 expected to complete quickly and faster feedback is desirable. However, if `aggressiveTimes: true` and
 a caller selects a slow retrieval tier (e.g. `Bulk`) via `thawParams`, retries may be exhausted
 and the workflow can fail while the restore is still in progress.
+
+## Cost estimation
+
+The workflow assigns each object a `costEstimate` during the `HeadObjects` step. These estimates are then included in the copy report both, per object and in total.
+
+Each estimate has three components:
+
+- **`crossRegionCostUSD`**: estimated cross-region transfer cost
+- **`coldStorageRetrievalCostUSD`**: estimated restore/retrieval cost for cold or archival objects
+- **`computeCostUSD`**: estimated compute cost for processing and copying the object
+
+### How are costs estimated?
+
+Costs are estimated using pricing data fetched from the [AWS Price List API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/price-changes.html) earlier in the workflow and are based on object size, storage class, and copy characteristics.
+
+- **Cross-region transfer**
+  Applied when the source and destination are in different AWS regions. This includes transfer charges and destination write request costs. (In-region S3 copies are treated as having no transfer cost.)
+
+- **Cold storage retrieval**
+  Applied when an object is in a cold or archival storage class and must be restored before copy. The estimate depends on the storage class, object size, and thaw speed.
+
+- **Compute**
+  Includes the AWS compute used by the workflow to process and execute the copy, primarily Lambda and Fargate.
+
+The HTML copy report includes a cost breakdown summary and per-object estimated cost details. Cost estimates are approximate and intended for planning/reporting rather than exact billing prediction.

@@ -11,5 +11,9 @@ cdk.out/
 /.fleet/
 
 
-# Local HTML preview for summarise-copy report
-**/dev_copy_report.html
+# Local HTML preview reports
+**/test-report-preview-copy.html
+**/test-report-preview-dryrun.html
+
+# Costing artifact
+**/pricing-data.json

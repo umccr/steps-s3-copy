@@ -2,12 +2,25 @@ import {
   HeadObjectCommand,
   NotFound,
   paginateListObjectsV2,
+  S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
 import { join, relative, basename } from "node:path/posix";
 import * as assert from "node:assert/strict";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
+import {
+  COLD_STORAGE_CLASSES,
+  getThawParams,
+  PRICING_DATA_FILENAME,
+} from "../common/constants";
+import type { PricingData, CostEstimate } from "../common/cost-estimation";
+import {
+  estimateColdStorageRetrievalCost,
+  estimateCrossRegionCost,
+  estimateComputeCost,
+  readPricingDataJsonFromS3,
+} from "../common/cost-estimation";
 
 /**
  * The way this lambda will be invoked. We expect to be part of a Distributed Map -
@@ -16,9 +29,24 @@ import { createS3ClientCache } from "../common/s3-client-builder";
  */
 export type HeadObjectsLambdaInvokeEvent = {
   BatchInput: {
+    workingBucket: string;
+    workingBucketPrefix: string;
+    instructionsPrefix: string;
     destinationPrefix: string;
     maximumExpansion: number;
     bucketDefinitions?: Record<string, BucketDefinition>;
+    sourceRequiredRegion: string;
+    destinationRequiredRegion: string;
+    thawParams?: {
+      glacierFlexibleRetrievalThawDays?: number;
+      glacierFlexibleRetrievalThawSpeed?: string;
+      glacierDeepArchiveThawDays?: number;
+      glacierDeepArchiveThawSpeed?: string;
+      intelligentTieringArchiveThawDays?: number;
+      intelligentTieringArchiveThawSpeed?: string;
+      intelligentTieringDeepArchiveThawDays?: number;
+      intelligentTieringDeepArchiveThawSpeed?: string;
+    };
   };
   Items: HeadObjectsLambdaItem[];
 };
@@ -77,6 +105,9 @@ export type HeadObjectsLambdaResultItem = Omit<
 
   // last modified date rendered as ISO string
   lastModifiedISOString: string;
+
+  // the cost estimate for copying this object
+  costEstimate: CostEstimate;
 };
 
 /**
@@ -177,7 +208,27 @@ export async function handler(
     }
   }
 
-  // we build an array of details of objects that we find either from ListObjects
+  const s3Client = new S3Client({});
+
+  // The region of the source bucket
+  const sourceRegion = event.BatchInput.sourceRequiredRegion;
+
+  // The path to the pricing data JSON file in S3 written in fetch-picing step.
+  const sourceFilePrefix =
+    event.BatchInput.workingBucketPrefix + event.BatchInput.instructionsPrefix;
+  const pricingDataKey = sourceFilePrefix + PRICING_DATA_FILENAME;
+
+  // Read Pricing Data fetcheched from the API
+  const pricingData: PricingData = await readPricingDataJsonFromS3(
+    s3Client,
+    event.BatchInput.workingBucket,
+    pricingDataKey,
+  );
+
+  const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
+  const crossRegionCosts = pricingData.crossRegionCosts;
+  const computeCosts = pricingData.computeCosts;
+
   // *or* by calling HeadObject
   const resultObjects: HeadObjectsLambdaResultItem[] = [];
 
@@ -222,7 +273,7 @@ export async function handler(
           assert.ok(item.Key);
           assert.ok(item.ETag);
           assert.ok(item.LastModified);
-          assert.equal(typeof item.Size, "number");
+          assert.ok(typeof item.Size === "number");
 
           // we skip directory markers in S3
           // note: we do this _before_ incrementing expansionCount - so if it
@@ -238,6 +289,20 @@ export async function handler(
               o.sourceKey,
               event.BatchInput.maximumExpansion,
             );
+
+          // size and storageClass variables foir use downstream
+          // in both the result object and cost estimation
+          const size = item.Size;
+          const storageClass = item.StorageClass ?? "STANDARD";
+          const destinationRegion = event.BatchInput.destinationRequiredRegion;
+          const iscrossRegion = sourceRegion !== destinationRegion;
+          const isColdStorage = COLD_STORAGE_CLASSES.map((s) =>
+            s.toUpperCase(),
+          ).includes(storageClass.toUpperCase());
+          const { retrievalSpeed, restoreWindowDays } = getThawParams(
+            storageClass,
+            event.BatchInput.thawParams,
+          );
 
           // we have the benefit that ListObjects actually returns the details we
           // need - so these do not need a further HEAD command
@@ -256,6 +321,25 @@ export async function handler(
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
             sums: undefined,
+
+            // Cost estimation for wildcard expanded items
+            costEstimate: {
+              crossRegionCostUSD: estimateCrossRegionCost(
+                iscrossRegion,
+                crossRegionCosts,
+                size,
+              ),
+
+              coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
+                isColdStorage,
+                size,
+                storageClass,
+                retrievalSpeed,
+                restoreWindowDays,
+                coldStorageRetrievalCosts,
+              ),
+              computeCostUSD: estimateComputeCost(size, computeCosts),
+            },
           });
         }
       }
@@ -281,7 +365,22 @@ export async function handler(
 
       assert.ok(headResult.ETag);
       assert.ok(headResult.LastModified);
-      assert.equal(typeof headResult.ContentLength, "number");
+      assert.ok(typeof headResult.ContentLength === "number");
+
+      // size and storageClass variables foir use downstream
+      // in both the result object and cost estimation
+      const size = headResult.ContentLength;
+      const storageClass = headResult.StorageClass ?? "STANDARD";
+
+      const destinationRegion = event.BatchInput.destinationRequiredRegion;
+      const iscrossRegion = sourceRegion !== destinationRegion;
+      const isColdStorage = COLD_STORAGE_CLASSES.map((s) =>
+        s.toUpperCase(),
+      ).includes(storageClass.toUpperCase());
+      const { retrievalSpeed, restoreWindowDays } = getThawParams(
+        storageClass,
+        event.BatchInput.thawParams,
+      );
 
       resultObjects.push({
         sourceBucket: o.sourceBucket,
@@ -296,9 +395,27 @@ export async function handler(
         size: headResult.ContentLength!,
         // as per spec - storage class is always returned by head object EXCEPT for standard
         // for our downstream processing - we mind as well rectify this so it is always present
-        storageClass: headResult.StorageClass ?? "STANDARD",
+        storageClass: storageClass,
         lastModifiedISOString: headResult.LastModified.toISOString(),
         sums: o.sums,
+
+        // Cost estimation for non-wildcard items
+        costEstimate: {
+          crossRegionCostUSD: estimateCrossRegionCost(
+            iscrossRegion,
+            crossRegionCosts,
+            size,
+          ),
+          coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
+            isColdStorage,
+            size,
+            storageClass,
+            retrievalSpeed,
+            restoreWindowDays,
+            coldStorageRetrievalCosts,
+          ),
+          computeCostUSD: estimateComputeCost(size, computeCosts),
+        },
       });
     } catch (e: any) {
       // this is an error we kind of might expect - we turn it into our own exception type
@@ -322,10 +439,6 @@ export async function handler(
   );
 
   return resultObjects;
-}
-
-function isNotEmptyString(o: any): o is string {
-  return typeof o !== "undefined" && o !== null;
 }
 
 /**

@@ -5,6 +5,11 @@ import { createReadStream, rmSync } from "node:fs";
 import { chdir } from "node:process";
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
+import {
+  SIZE_THRESHOLD_BYTES,
+  MULTIPART_CHUNK_SIZE,
+  COLD_STORAGE_CLASSES,
+} from "../common/constants";
 import { tmpNameSync } from "tmp";
 import * as path from "node:path/posix";
 import { buildS3Client } from "../common/s3-client-builder";
@@ -25,18 +30,6 @@ interface LambdaEvent {
     manifestAbsoluteKey: string;
   };
 }
-
-// we should pass this in from above
-// set to 5 MiB as that is the definitional minimum size of a multipart part
-const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
-
-// These are the storage classes requiring thaw before copying
-const COLD_STORAGE_CLASSES = [
-  "GLACIER",
-  "DEEP_ARCHIVE",
-  "INTELLIGENT_TIERING_ARCHIVE_ACCESS",
-  "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
-];
 
 /**
  * A handler that processes the list/head of all the objects that we are
@@ -176,30 +169,31 @@ export async function handler(event: LambdaEvent) {
     .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
 
   return {
+    dryRun: event.invokeArguments.dryRun,
     stats: stats,
     copySets: {
       small: await createJsonlFromDataFrame(
         event.headObjectsResults.manifestBucket,
         event.headObjectsResults.manifestAbsoluteKey,
-        event.invokeArguments.dryRun ? emptyDf : smallDf,
+        smallDf,
         "small",
       ),
       large: await createJsonlFromDataFrame(
         event.headObjectsResults.manifestBucket,
         event.headObjectsResults.manifestAbsoluteKey,
-        event.invokeArguments.dryRun ? emptyDf : largeDf,
+        largeDf,
         "large",
       ),
       smallThaw: await createJsonlFromDataFrame(
         event.headObjectsResults.manifestBucket,
         event.headObjectsResults.manifestAbsoluteKey,
-        event.invokeArguments.dryRun ? emptyDf : smallThawDf,
+        smallThawDf,
         "smallThaw",
       ),
       largeThaw: await createJsonlFromDataFrame(
         event.headObjectsResults.manifestBucket,
         event.headObjectsResults.manifestAbsoluteKey,
-        event.invokeArguments.dryRun ? emptyDf : largeThawDf,
+        largeThawDf,
         "largeThaw",
       ),
     },
@@ -247,9 +241,26 @@ async function createJsonlFromDataFrame(
  * @param df
  */
 async function computeStats(df: pl.DataFrame) {
+  // Extract cost estimate fields from the dataframe and compute their sums
+  const costEstimates = df.getColumn("costEstimate");
+  const totalS3CrossRegionReadWriteCostUSD = costEstimates.struct
+    .field("crossRegionCostUSD")
+    .sum();
+  const totalColdStorageRetrievalCostUSD = costEstimates.struct
+    .field("coldStorageRetrievalCostUSD")
+    .sum();
+  const totalComputeCostUSD = costEstimates.struct
+    .field("computeCostUSD")
+    .sum();
+
   return {
     objectToCopyCount: df.getColumn("sourceKey").len(),
     objectToCopySizeInBytes: df.getColumn("size").sum(),
+    totalCostEstimateUSD: {
+      totalS3CrossRegionReadWriteCostUSD: totalS3CrossRegionReadWriteCostUSD,
+      totalColdStorageRetrievalCostUSD: totalColdStorageRetrievalCostUSD,
+      totalComputeCostUSD: totalComputeCostUSD,
+    },
   };
 }
 
@@ -274,7 +285,7 @@ async function uploadFile(filePath: string, bucket: string, key: string) {
     // (optional) concurrency configuration
     // queueSize: 4,
     // (optional) size of each part, in bytes, at least 5MB
-    partSize: 1024 * 1024 * 5,
+    partSize: MULTIPART_CHUNK_SIZE,
     // (optional) when true, do not automatically call AbortMultipartUpload when
     // a multipart upload fails to complete. You should then manually handle
     // the leftover parts.
