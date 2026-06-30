@@ -251,8 +251,9 @@ export async function handler(
           "cannot specify both a wildcard folder and also includes a sums field as checksums will not apply to all the expanded files",
         );
 
-      // source key without the trailing "/*"
-      const sourceKeyPrefix = o.sourceKey.substring(0, o.sourceKey.length - 2);
+      // source key without the trailing "*", must retain the "/" so that prefixes represent
+      // the folder itself.
+      const sourceKeyPrefix = o.sourceKey.substring(0, o.sourceKey.length - 1);
 
       let expansionCount = 0;
 
@@ -311,7 +312,7 @@ export async function handler(
             sourceKey: item.Key,
             destinationKey: computeDestinationKey(
               item.Key,
-              sourceKeyPrefix + "/",
+              sourceKeyPrefix,
               event.BatchInput.destinationPrefix,
               o.destinationRelativeFolderKey,
             ),

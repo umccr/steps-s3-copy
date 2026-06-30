@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, test, expect } from "bun:test";
 import { equal, ok } from "node:assert/strict";
 import { SFNClient, TestStateCommand } from "@aws-sdk/client-sfn";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   testSetup,
   type TestSetupState,
@@ -8,11 +9,17 @@ import {
   type UnitTestSetupState,
 } from "./setup.js";
 import { type HeadObjectsLambdaInvokeEvent } from "../packages/steps-s3-copy/lambda/head-objects-lambda/head-objects-lambda";
+import { PRICING_DATA_FILENAME } from "../packages/steps-s3-copy/lambda/common/constants";
+import type { PricingData } from "../packages/steps-s3-copy/lambda/common/cost-estimation";
 import { createTestObject } from "./lib/create-test-object";
 
 const sfnClient = new SFNClient({});
+const s3Client = new S3Client({});
 
 const DESTINATION_PREFIX = "abc/";
+
+// the region we pretend the source and destination buckets live in.
+const TEST_REGION = "ap-southeast-2";
 
 const FOLDER_AA = "aa/";
 const FOLDER_BB = "bb/";
@@ -27,15 +34,50 @@ const FILE4 = "file4.fastq";
 const FILE5 = "file5.fastq";
 const FILE6 = "file6.fastq";
 
+// a file that that shared the same prefix of `FOLDER_BB` without being in that folder.
+const FILE_BB_SIBLING = "bb-sibling.fastq";
+
 const PATH1 = `${FILE1}`;
 const PATH2 = `${FOLDER_AA}${FILE2}`;
 const PATH3 = `${FOLDER_AA}${FILE3}`;
 const PATH4 = `${FOLDER_BB}${FILE4}`;
 const PATH5 = `${FOLDER_BB}${FILE5}`;
 const PATH6 = `${FOLDER_BB}${FOLDER_CCC}${FILE6}`;
+const PATH_BB_SIBLING = `${FILE_BB_SIBLING}`;
+
+// A static pricing data fixture, which the tests here are required to seed in order
+// to proceed. The data isn't actually used for tests in this file.
+const PRICING_DATA = {
+  coldStorageCosts: {
+    tempStoragePerGBPerMonth: 0,
+    DEEP_ARCHIVE: {
+      Bulk: { perGB: 0, perRequest: 0 },
+      Standard: { perGB: 0, perRequest: 0 },
+    },
+  },
+  computeCosts: {
+    lambda: { gbSecondPrice: 0, invocationPrice: 0 },
+    fargate: { vCpuPricePerHour: 0, memoryGbPricePerHour: 0 },
+  },
+} as PricingData;
 
 let state: TestSetupState;
 let unitState: UnitTestSetupState;
+
+/**
+ * Builds the BatchInput for a head objects lambda invocation.
+ */
+function batchInput(): HeadObjectsLambdaInvokeEvent["BatchInput"] {
+  return {
+    destinationPrefix: DESTINATION_PREFIX,
+    maximumExpansion: 5,
+    workingBucket: state.workingBucket,
+    workingBucketPrefix: state.workingBucketPrefix,
+    instructionsPrefix: state.testInstructionsFolder,
+    sourceRequiredRegion: TEST_REGION,
+    destinationRequiredRegion: TEST_REGION,
+  };
+}
 
 // we have some throttling issues with the SFN steps test invokes - so just slow down the testing a bit
 // seems to fix that
@@ -96,6 +138,14 @@ beforeAll(async () => {
     undefined,
     "STANDARD",
   );
+  await createTestObject(
+    state.workingBucket,
+    `${state.uniqueTestId}/${PATH_BB_SIBLING}`,
+    7,
+    1,
+    undefined,
+    "STANDARD",
+  );
 
   // create files to test limits of our expansion
   for (let i = 0; i < 10; i++) {
@@ -108,14 +158,25 @@ beforeAll(async () => {
       "STANDARD",
     );
   }
+
+  // seed the pricing data that the head objects lambda reads.
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: state.workingBucket,
+      Key: `${state.workingBucketPrefix}${state.testInstructionsFolder}${PRICING_DATA_FILENAME}`,
+      Body: JSON.stringify(PRICING_DATA, (_, value) =>
+        typeof value === "number" && !Number.isFinite(value)
+          ? "Infinity"
+          : value,
+      ),
+      ContentType: "application/json",
+    }),
+  );
 });
 
 test.serial("basic functionality", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationPrefix: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
+    BatchInput: batchInput(),
     Items: [
       {
         sourceBucket: state.workingBucket,
@@ -165,10 +226,7 @@ test.serial(
   "sourceRoot places objects retaining original folder structure",
   async () => {
     const input: HeadObjectsLambdaInvokeEvent = {
-      BatchInput: {
-        destinationPrefix: DESTINATION_PREFIX,
-        maximumExpansion: 5,
-      },
+      BatchInput: batchInput(),
       Items: [
         {
           sourceBucket: state.workingBucket,
@@ -225,10 +283,7 @@ test.serial(
     const DEST2 = "yyy/";
 
     const input: HeadObjectsLambdaInvokeEvent = {
-      BatchInput: {
-        destinationPrefix: DESTINATION_PREFIX,
-        maximumExpansion: 5,
-      },
+      BatchInput: batchInput(),
       Items: [
         {
           sourceBucket: state.workingBucket,
@@ -286,10 +341,7 @@ test.serial(
 
 test.serial("wildcard expansion with destination prefix", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationPrefix: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
+    BatchInput: batchInput(),
     Items: [
       {
         sourceBucket: state.workingBucket,
@@ -346,12 +398,42 @@ test.serial("wildcard expansion with destination prefix", async () => {
   equal(outputArray[3].destinationKey, `${DESTINATION_PREFIX}${FILE5}`);
 });
 
+test.serial(
+  "wildcard expansion does not include shared prefix objects",
+  async () => {
+    const input: HeadObjectsLambdaInvokeEvent = {
+      BatchInput: batchInput(),
+      Items: [
+        {
+          sourceBucket: state.workingBucket,
+          sourceKey: `${state.uniqueTestId}/${FOLDER_BB}*`,
+        },
+      ],
+    };
+
+    const testStateResult = await sfnClient.send(
+      new TestStateCommand({
+        definition: unitState.smHeadObjectsLambdaAslStateString,
+        roleArn: unitState.smRoleArn,
+        input: JSON.stringify(input),
+        variables: "{}",
+      }),
+    );
+
+    equal(testStateResult.status, "SUCCEEDED");
+    ok(testStateResult.output);
+
+    const outputArray = JSON.parse(testStateResult.output);
+    equal(outputArray.length, 3);
+
+    const sourceKeys = outputArray.map((o: any) => o.sourceKey);
+    ok(!sourceKeys.includes(`${state.uniqueTestId}/${PATH_BB_SIBLING}`));
+  },
+);
+
 test.serial("sums data is passed through", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationPrefix: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
+    BatchInput: batchInput(),
     Items: [
       {
         sourceBucket: state.workingBucket,
@@ -384,10 +466,7 @@ test.serial("sums data is passed through", async () => {
 
 test.serial("missing object will fail", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationPrefix: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
+    BatchInput: batchInput(),
     Items: [
       {
         sourceBucket: state.workingBucket,
@@ -411,10 +490,7 @@ test.serial("missing object will fail", async () => {
 
 test("wildcard expansion will fail if too many", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationPrefix: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
+    BatchInput: batchInput(),
     Items: [
       {
         sourceBucket: state.workingBucket,
@@ -438,10 +514,7 @@ test("wildcard expansion will fail if too many", async () => {
 
 test.serial("wildcard expansion will fail if none", async () => {
   const input: HeadObjectsLambdaInvokeEvent = {
-    BatchInput: {
-      destinationPrefix: DESTINATION_PREFIX,
-      maximumExpansion: 5,
-    },
+    BatchInput: batchInput(),
     Items: [
       {
         sourceBucket: state.workingBucket,
