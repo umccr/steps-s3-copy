@@ -11,6 +11,12 @@ const copyBinaryEnvName = "CB_COPY_BINARY"
 const taskTokenEnvName = "CB_TASK_TOKEN"
 const taskTokenHeartbeatSecondsIntervalEnvName = "CB_TASK_TOKEN_HEARTBEAT_SECONDS_INTERVAL"
 
+// Set to true to continue when an error occurs during copying.
+const continueOnErrorEnvName = "CB_CONTINUE_ON_ERROR"
+
+// The error name reported to Steps
+const copyErrorName = "CopyError"
+
 // Our parent ECS task (when a SPOT instance) can be sent a TERM signal - we then have a hard
 // limit of 120 seconds before the process is hard killed.
 // This value here is the number of seconds to wait after receiving the TERM in the hope that our

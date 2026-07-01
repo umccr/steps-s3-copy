@@ -151,6 +151,9 @@ func main() {
 
 	log.Printf("Results are %v", resultsString)
 
+	continueOnError := parseContinueOnError()
+	errorCount := countCopyErrors(toCopyResults)
+
 	// the normal mechanism by which we will send back results to our caller is
 	// Steps SendTask - which sends back JSON
 	if taskTokenOk {
@@ -161,23 +164,29 @@ func main() {
 		// Type: String
 		// Length Constraints: Maximum length of 262144.
 
-		// if we got any errors - we want to signal that up to the steps
-		//if resultErrorCount > 0 {
-		//    sfnSvc.SendTaskFailure(context.TODO(), &sfn.SendTaskFailureInput{
-		//        Output:    aws.String(resultsString),
-		//        TaskToken: aws.String(taskToken),
-		//    })
-		//} else {
-		successResult, successErr := sfnSvc.SendTaskSuccess(context.TODO(), &sfn.SendTaskSuccessInput{
-			Output:    aws.String(resultsString),
-			TaskToken: aws.String(taskToken),
-		})
-		if successErr != nil {
-			log.Fatalf("heartbeat: success signal failure %v\n", successErr)
+		// by default, the first copy error fails the whole batch.
+		if errorCount > 0 && !continueOnError {
+			failureResult, failureErr := sfnSvc.SendTaskFailure(context.TODO(), &sfn.SendTaskFailureInput{
+				Error:     aws.String(copyErrorName),
+				Cause:     aws.String(copyErrorSummary(toCopyResults)),
+				TaskToken: aws.String(taskToken),
+			})
+			if failureErr != nil {
+				log.Fatalf("heartbeat: signal failure %v\n", failureErr)
+			} else {
+				log.Printf("heartbeat: send failure %v\n", failureResult)
+			}
 		} else {
-			log.Printf("heartbeat: send success %v\n", successResult)
+			successResult, successErr := sfnSvc.SendTaskSuccess(context.TODO(), &sfn.SendTaskSuccessInput{
+				Output:    aws.String(resultsString),
+				TaskToken: aws.String(taskToken),
+			})
+			if successErr != nil {
+				log.Fatalf("heartbeat: signal failure %v\n", successErr)
+			} else {
+				log.Printf("heartbeat: send success %v\n", successResult)
+			}
 		}
-		//}
 
 		// we can signal we no longer want heartbeats as we are about to finish up
 		if heartbeatWorker != nil {
@@ -187,4 +196,19 @@ func main() {
 	}
 
 	os.Exit(0) // int(resultErrorCount))
+}
+
+// parseContinueOnError reads the CB_CONTINUE_ON_ERROR environment variable amd determines
+// whether to continue on an error.
+func parseContinueOnError() bool {
+	value, ok := os.LookupEnv(continueOnErrorEnvName)
+	if !ok {
+		return false
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		log.Printf("could not parse %s value %q as a boolean: %v", continueOnErrorEnvName, value, err)
+		return false
+	}
+	return parsed
 }
