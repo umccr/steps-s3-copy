@@ -77,25 +77,33 @@ func copyErrorSummary(results []*CopyResult) string {
 	}
 }
 
+// copyriteStats is the copyrite JSON stats block that copy-batch consumes.
+type copyriteStats struct {
+	ElapsedSeconds     float64         `json:"elapsed_seconds"`
+	BytesTransferred   uint64          `json:"bytes_transferred"`
+	CopyMode           string          `json:"copy_mode"`
+	Source             string          `json:"source"`
+	Destination        string          `json:"destination"`
+	UnrecoverableError json.RawMessage `json:"unrecoverable_error"`
+}
+
 // copyriteError extracts the failure reason from stderr that copyrite produces when it
 // exits with an error.
-func copyriteError(stderr string) string {
-	trimmed := strings.TrimSpace(stderr)
-	if trimmed == "" {
-		return "copy failed but copyrite produced no error output"
+func copyriteError(stdout string, stats copyriteStats, statsErr error, stderr string) string {
+	if statsErr == nil {
+		if len(stats.UnrecoverableError) > 0 {
+			return string(stats.UnrecoverableError)
+		}
+		if trimmed := strings.TrimSpace(stdout); trimmed != "" {
+			return trimmed
+		}
 	}
 
-	// Rust's default error reporting prefixes the serialised stats with "Error: ".
-	jsonPart := strings.TrimSpace(strings.TrimPrefix(trimmed, "Error:"))
-
-	var stats struct {
-		UnrecoverableError json.RawMessage `json:"unrecoverable_error"`
-	}
-	if err := json.Unmarshal([]byte(jsonPart), &stats); err == nil && len(stats.UnrecoverableError) > 0 {
-		return string(stats.UnrecoverableError)
+	if trimmed := strings.TrimSpace(stderr); trimmed != "" {
+		return trimmed
 	}
 
-	return trimmed
+	return "copy failed but copyrite produced no error output"
 }
 
 // bucketNameFromS3Uri extracts the bucket name from an "s3://bucket/key" URI.
@@ -232,13 +240,16 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 		stdoutString := stdoutStringBuilder.String()
 
 		log.Printf("copy %d: Run() stdout -> %s", i, stdoutString)
-.
+
+		var stats copyriteStats
+		statsErr := json.Unmarshal([]byte(strings.TrimSpace(stdoutString)), &stats)
+
 		if runErr != nil {
 			// on failure copyrite serialises a stats block carrying the "unrecoverable_error" to
 			// stderr.
 			result := &CopyResult{
 				Errors:      1,
-				LastError:   copyriteError(stderrString),
+				LastError:   copyriteError(stdoutString, stats, statsErr, stderrString),
 				Source:      copyArg.Source,
 				Destination: copyArg.Destination,
 			}
@@ -254,16 +265,10 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 			continue
 		}
 
-		var logLineJson map[string]interface{}
-
-		decoder := json.NewDecoder(strings.NewReader(stdoutString))
-		decoder.UseNumber()
-		decoderErr := decoder.Decode(&logLineJson)
-
-		if decoderErr != nil {
+		if statsErr != nil {
 			// copyrite reported success but we could not parse its stats. This should still be considered
 			// a success, as the file would have been properly copied.
-			log.Printf("copy %d: succeeded but stats block could not be parsed: %v", i, decoderErr)
+			log.Printf("copy %d: succeeded but stats block could not be parsed: %v", i, statsErr)
 			(*toCopyResults)[i] = &CopyResult{
 				Errors:      0,
 				Source:      copyArg.Source,
@@ -272,17 +277,13 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 			continue
 		}
 
-		// reparsing the stats block by hand is probably not the best way - revisit
-		elapsedTime, elapsedTimeErr := logLineJson["elapsed_seconds"].(json.Number).Float64()
-		bytesTransferred, bytesTransferredErr := logLineJson["bytes_transferred"].(json.Number).Int64()
-
 		(*toCopyResults)[i] = &CopyResult{
 			Errors:           0,
-			ElapsedSeconds:   If(elapsedTimeErr == nil, elapsedTime, 0),
-			BytesTransferred: If(bytesTransferredErr == nil, uint64(bytesTransferred), 0),
-			CopyMode:         logLineJson["copy_mode"].(string),
-			Source:           logLineJson["source"].(string),
-			Destination:      logLineJson["destination"].(string)}
+			ElapsedSeconds:   stats.ElapsedSeconds,
+			BytesTransferred: stats.BytesTransferred,
+			CopyMode:         stats.CopyMode,
+			Source:           stats.Source,
+			Destination:      stats.Destination}
 	}
 
 	for i, val := range *toCopyResults {

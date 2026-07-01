@@ -24,7 +24,11 @@ import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { ThawObjectsLambdaStepConstruct } from "./thaw-lambda-step-construct";
-import { CopyErrorName, invokeArg, invokeSetting } from "../steps-s3-copy-input";
+import {
+  CopyErrorName,
+  invokeArg,
+  invokeSetting,
+} from "../steps-s3-copy-input";
 
 type Props = {
   readonly cluster: ICluster;
