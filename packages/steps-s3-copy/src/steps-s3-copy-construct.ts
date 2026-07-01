@@ -195,6 +195,8 @@ export class StepsS3CopyConstruct extends Construct {
       retainSummaryCsv: `{% [ ${stateInput("retainSummaryCsv")}, false ][0] %}`,
 
       dryRun: `{% [ ${stateInput("dryRun")}, false ][0] %}`,
+      // default to failing on the first error.
+      continueOnError: `{% [ ${stateInput("continueOnError")}, false ][0] %}`,
       copyConcurrency: `{% [ $number(${stateInput(
         "copyConcurrency",
       )}), 80 ][0] %}`,

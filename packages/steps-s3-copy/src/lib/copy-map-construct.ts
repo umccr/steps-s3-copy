@@ -24,7 +24,7 @@ import { Duration } from "aws-cdk-lib";
 import { IRole } from "aws-cdk-lib/aws-iam";
 import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { ThawObjectsLambdaStepConstruct } from "./thaw-lambda-step-construct";
-import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
+import { CopyErrorName, invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
 type Props = {
   readonly cluster: ICluster;
@@ -114,6 +114,12 @@ export class CopyMapConstruct extends Construct {
       containerDefinition: props.containerDefinition,
     }).ecsRunTask;
 
+    // If the copy batch task returns an error, then this should not be retried.
+    copyRunTask.addRetry({
+      errors: [CopyErrorName],
+      maxAttempts: 0,
+    });
+
     // our task is an idempotent copy operation, so we can retry if we happen to get killed
     // (possible given we might be using Spot fargate)
     copyRunTask.addRetry({
@@ -178,6 +184,7 @@ export class CopyMapConstruct extends Construct {
       batchInput: {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),
+        "continueOnError.$": invokeArg("continueOnError"),
       },
       inputPath: props.inputPath,
       itemReader: {
