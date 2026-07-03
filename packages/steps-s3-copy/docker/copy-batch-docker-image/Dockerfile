@@ -1,6 +1,8 @@
+ARG TARGETARCH
+ARG COPYRITE_VERSION=v0.5.1
+
 FROM public.ecr.aws/docker/library/golang:1.24.1-alpine AS builder
 
-# copyrite rebuilt 2026-04-10 with glibc 2.35 compatibility
 # git is needed for go mod download to work
 RUN apk add --no-cache git
 
@@ -14,15 +16,22 @@ RUN go mod download
 # compile two binaries
 ADD *.go ./
 
-RUN go build copy-batch-fargate.go ecs-heartbeat.go copy-runner.go constants.go types.go utils.go
+RUN go build copy-batch-fargate.go ecs-heartbeat.go copy-runner.go constants.go types.go
 
 # the tag removes some legacy Go 1.x support from the AWS lambda library
-RUN go build -tags lambda.norpc copy-batch-lambda.go copy-runner.go constants.go types.go utils.go
+RUN go build -tags lambda.norpc copy-batch-lambda.go copy-runner.go constants.go types.go
 
-ADD https://github.com/umccr/copyrite/releases/download/v0.5.0/copyrite-aarch64-unknown-linux-gnu.tar.gz .
+# Bundle the copyrite release matching the target architecture.
+FROM builder AS copyrite-amd64
+ARG COPYRITE_VERSION
+ADD https://github.com/umccr/copyrite/releases/download/${COPYRITE_VERSION}/copyrite-x86_64-unknown-linux-gnu.tar.gz copyrite.tar.gz
 
-RUN gzip -dc copyrite-aarch64-unknown-linux-gnu.tar.gz | tar xf -
+FROM builder AS copyrite-arm64
+ARG COPYRITE_VERSION
+ADD https://github.com/umccr/copyrite/releases/download/${COPYRITE_VERSION}/copyrite-aarch64-unknown-linux-gnu.tar.gz copyrite.tar.gz
 
+FROM copyrite-${TARGETARCH} AS copyrite
+RUN gzip -dc copyrite.tar.gz | tar xf -
 
 FROM amazon/aws-cli:latest AS fargate
 
@@ -30,7 +39,7 @@ WORKDIR /work
 
 # RUN install_packages bash
 COPY --from=builder /build/copy-batch-fargate ./
-COPY --from=builder /build/copyrite ./
+COPY --from=copyrite /build/copyrite ./
 
 #ENV CB_COPY_BINARY="/opt/bitnami/aws-cli/venv/bin/aws"
 #ENV CB_COPY_BINARY="/usr/bin/cp"
@@ -46,7 +55,7 @@ FROM amazon/aws-cli:latest AS lambda
 WORKDIR /work
 
 COPY --from=builder /build/copy-batch-lambda ./
-COPY --from=builder /build/copyrite ./
+COPY --from=copyrite /build/copyrite ./
 
 ENV CB_COPY_BINARY="/work/copyrite"
 

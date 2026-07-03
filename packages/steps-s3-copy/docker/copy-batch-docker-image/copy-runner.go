@@ -106,6 +106,47 @@ func copyriteError(stdout string, stats copyriteStats, statsErr error, stderr st
 	return "copy failed but copyrite produced no error output"
 }
 
+// copyOutcome is the result of executing copyrite for a single copy
+type copyOutcome struct {
+	stdout      string
+	stderr      string
+	failed      bool
+	systemError string
+}
+
+// toResult turns a copyOutcome into a CopyResult.
+func (o copyOutcome) toResult(copyArg CopyArg) *CopyResult {
+	var stats copyriteStats
+	statsErr := json.Unmarshal([]byte(strings.TrimSpace(o.stdout)), &stats)
+
+	if o.failed {
+		return &CopyResult{
+			Errors:      1,
+			LastError:   copyriteError(o.stdout, stats, statsErr, o.stderr),
+			SystemError: o.systemError,
+			Source:      copyArg.Source,
+			Destination: copyArg.Destination,
+		}
+	}
+
+	if statsErr != nil {
+		return &CopyResult{
+			Errors:      0,
+			Source:      copyArg.Source,
+			Destination: copyArg.Destination,
+		}
+	}
+
+	return &CopyResult{
+		Errors:           0,
+		ElapsedSeconds:   stats.ElapsedSeconds,
+		BytesTransferred: stats.BytesTransferred,
+		CopyMode:         stats.CopyMode,
+		Source:           stats.Source,
+		Destination:      stats.Destination,
+	}
+}
+
 // bucketNameFromS3Uri extracts the bucket name from an "s3://bucket/key" URI.
 func bucketNameFromS3Uri(uri string) string {
 	trimmed := strings.TrimPrefix(uri, "s3://")
@@ -241,49 +282,21 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 
 		log.Printf("copy %d: Run() stdout -> %s", i, stdoutString)
 
-		var stats copyriteStats
-		statsErr := json.Unmarshal([]byte(strings.TrimSpace(stdoutString)), &stats)
-
+		outcome := copyOutcome{
+			stdout: stdoutString,
+			stderr: stderrString,
+			failed: runErr != nil,
+		}
 		if runErr != nil {
-			// on failure copyrite serialises a stats block carrying the "unrecoverable_error" to
-			// stderr.
-			result := &CopyResult{
-				Errors:      1,
-				LastError:   copyriteError(stdoutString, stats, statsErr, stderrString),
-				Source:      copyArg.Source,
-				Destination: copyArg.Destination,
-			}
-
 			var runExitErr *exec.ExitError
 			if errors.As(runErr, &runExitErr) {
-				result.SystemError = fmt.Sprintf("exit code %d", runExitErr.ExitCode())
+				outcome.systemError = fmt.Sprintf("exit code %d", runExitErr.ExitCode())
 			} else {
-				result.SystemError = runErr.Error()
+				outcome.systemError = runErr.Error()
 			}
-
-			(*toCopyResults)[i] = result
-			continue
 		}
 
-		if statsErr != nil {
-			// copyrite reported success but we could not parse its stats. This should still be considered
-			// a success, as the file would have been properly copied.
-			log.Printf("copy %d: succeeded but stats block could not be parsed: %v", i, statsErr)
-			(*toCopyResults)[i] = &CopyResult{
-				Errors:      0,
-				Source:      copyArg.Source,
-				Destination: copyArg.Destination,
-			}
-			continue
-		}
-
-		(*toCopyResults)[i] = &CopyResult{
-			Errors:           0,
-			ElapsedSeconds:   stats.ElapsedSeconds,
-			BytesTransferred: stats.BytesTransferred,
-			CopyMode:         stats.CopyMode,
-			Source:           stats.Source,
-			Destination:      stats.Destination}
+		(*toCopyResults)[i] = outcome.toResult(copyArg)
 	}
 
 	for i, val := range *toCopyResults {
