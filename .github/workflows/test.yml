@@ -11,6 +11,9 @@ on:
       - "packages/steps-s3-copy/docker/copy-batch-docker-image/**"
       - ".github/workflows/test.yml"
 
+permissions:
+  contents: read
+
 jobs:
   copy-batch-tests:
     runs-on: ubuntu-latest

@@ -62,10 +62,15 @@ func copyErrorSummary(results []*CopyResult) string {
 	for {
 		encoded, err := json.Marshal(report)
 		if err != nil {
-			// A struct of strings should not fail, so fallback to default to keep a valid JSON.
-			message, _ := json.Marshal(report.Message)
-			return fmt.Sprintf(`{"message":%s,"failedCount":%d,"totalCount":%d,"truncated":true,"errors":[]}`,
-				message, report.FailedCount, report.TotalCount)
+			// A struct of strings should not fail.
+			fallback, _ := json.Marshal(CopyErrorReport{
+				Message:     report.Message,
+				FailedCount: report.FailedCount,
+				TotalCount:  report.TotalCount,
+				Truncated:   true,
+				Errors:      []CopyErrorDetail{},
+			})
+			return string(fallback)
 		}
 
 		if len(encoded) <= maxSummaryLength || len(report.Errors) == 0 {
