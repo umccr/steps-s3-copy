@@ -2,9 +2,14 @@ name: Test
 
 on:
   push:
+    branches: [main]
     paths:
       - "packages/steps-s3-copy/docker/copy-batch-docker-image/**"
-      - "test.yml"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "packages/steps-s3-copy/docker/copy-batch-docker-image/**"
+      - ".github/workflows/test.yml"
 
 jobs:
   copy-batch-tests:

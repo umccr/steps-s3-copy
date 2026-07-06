@@ -46,7 +46,7 @@ func TestCopyBatchIntegration(t *testing.T) {
 		logs, container := runCopyBatch(t, ctx, nil, copyArgJSON(src, dst))
 		t.Logf("copy-batch logs:\n%s", logs)
 
-		assert.Contains(t, logs, `"errors": 1`)
+		assert.Contains(t, logs, `"errors": true`)
 		assert.Contains(t, logs, `"lastError"`)
 		assert.False(t, fileExistsInContainer(t, ctx, container, dst))
 	})

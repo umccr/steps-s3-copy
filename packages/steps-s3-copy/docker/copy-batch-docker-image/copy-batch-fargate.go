@@ -111,7 +111,7 @@ func main() {
 
 		if copyArgErr != nil {
 			toCopyResults[i] = &CopyResult{
-				Errors:    1,
+				Errors:    true,
 				LastError: fmt.Sprintf("command line argument of '%s' could not be unmarshalled into a CopyArg structure with unmarshal error %v", copyArgJsonString, copyArgErr),
 			}
 			continue
@@ -119,7 +119,7 @@ func main() {
 
 		if copyArg.Source == "" {
 			toCopyResults[i] = &CopyResult{
-				Errors:    1,
+				Errors:    true,
 				LastError: fmt.Sprintf("command line argument of '%s' did not have a valid 's' (source) field", copyArgJsonString),
 			}
 			continue
@@ -127,7 +127,7 @@ func main() {
 
 		if copyArg.Destination == "" {
 			toCopyResults[i] = &CopyResult{
-				Errors:    1,
+				Errors:    true,
 				LastError: fmt.Sprintf("command line argument of '%s' did not have a valid 'd' (destination) field", copyArgJsonString),
 			}
 			continue
@@ -165,7 +165,7 @@ func main() {
 		// Length Constraints: Maximum length of 262144.
 
 		// by default, the first copy error fails the whole batch.
-		if errorCount > 0 && !continueOnError {
+		if shouldFailTask(errorCount, continueOnError) {
 			failureResult, failureErr := sfnSvc.SendTaskFailure(context.TODO(), &sfn.SendTaskFailureInput{
 				Error:     aws.String(copyErrorName),
 				Cause:     aws.String(copyErrorSummary(toCopyResults)),
@@ -211,4 +211,10 @@ func parseContinueOnError() bool {
 		return false
 	}
 	return parsed
+}
+
+// shouldFailTask reports whether the batch should signal SendTaskFailure
+// rather than SendTaskSuccess.
+func shouldFailTask(errorCount int, continueOnError bool) bool {
+	return errorCount > 0 && !continueOnError
 }

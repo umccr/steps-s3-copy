@@ -17,7 +17,7 @@ import (
 func countCopyErrors(results []*CopyResult) int {
 	count := 0
 	for _, r := range results {
-		if r != nil && r.Errors > 0 {
+		if r != nil && r.Errors {
 			count++
 		}
 	}
@@ -41,7 +41,7 @@ func copyErrorSummary(results []*CopyResult) string {
 	}
 
 	for _, r := range results {
-		if r == nil || r.Errors == 0 {
+		if r == nil || !r.Errors {
 			continue
 		}
 
@@ -92,7 +92,7 @@ type copyriteStats struct {
 func copyriteError(stdout string, stats copyriteStats, statsErr error, stderr string) string {
 	if statsErr == nil {
 		if len(stats.UnrecoverableError) > 0 {
-			return string(stats.UnrecoverableError)
+			return unwrapCopyriteError(stats.UnrecoverableError)
 		}
 		if trimmed := strings.TrimSpace(stdout); trimmed != "" {
 			return trimmed
@@ -104,6 +104,42 @@ func copyriteError(stdout string, stats copyriteStats, statsErr error, stderr st
 	}
 
 	return "copy failed but copyrite produced no error output"
+}
+
+// unwrapCopyriteError turns the copyrite unrecoverable_error JSON into a readable
+// message.
+func unwrapCopyriteError(raw json.RawMessage) string {
+	fallback := strings.TrimSpace(string(raw))
+
+	var wrapper map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &wrapper); err != nil || len(wrapper) != 1 {
+		return fallback
+	}
+
+	for variant, value := range wrapper {
+		// most variants wrap a plain string message
+		var message string
+		if err := json.Unmarshal(value, &message); err == nil {
+			return message
+		}
+
+		// AWS errors wrap an object with a code, call and message
+		var apiErr struct {
+			Code    string `json:"code"`
+			Call    string `json:"call"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(value, &apiErr); err == nil && apiErr.Message != "" {
+			if apiErr.Code != "" && apiErr.Call != "" {
+				return fmt.Sprintf("%s for %s: %s", apiErr.Code, apiErr.Call, apiErr.Message)
+			}
+			return apiErr.Message
+		}
+
+		return fmt.Sprintf("%s: %s", variant, strings.TrimSpace(string(value)))
+	}
+
+	return fallback
 }
 
 // copyOutcome is the result of executing copyrite for a single copy
@@ -121,7 +157,7 @@ func (o copyOutcome) toResult(copyArg CopyArg) *CopyResult {
 
 	if o.failed {
 		return &CopyResult{
-			Errors:      1,
+			Errors:      true,
 			LastError:   copyriteError(o.stdout, stats, statsErr, o.stderr),
 			SystemError: o.systemError,
 			Source:      copyArg.Source,
@@ -131,14 +167,12 @@ func (o copyOutcome) toResult(copyArg CopyArg) *CopyResult {
 
 	if statsErr != nil {
 		return &CopyResult{
-			Errors:      0,
 			Source:      copyArg.Source,
 			Destination: copyArg.Destination,
 		}
 	}
 
 	return &CopyResult{
-		Errors:           0,
 		ElapsedSeconds:   stats.ElapsedSeconds,
 		BytesTransferred: stats.BytesTransferred,
 		CopyMode:         stats.CopyMode,
@@ -211,7 +245,7 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 		if interrupted {
 			// create a fake "compatible" stats block
 			(*toCopyResults)[i] = &CopyResult{
-				Errors:      1,
+				Errors:      true,
 				LastError:   "skipped due to previous SIGTERM received",
 				Source:      copyArg.Source,
 				Destination: copyArg.Destination}

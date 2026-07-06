@@ -49,7 +49,7 @@ type CopyArg struct {
 }
 
 type CopyResult struct {
-	Errors           int8    `json:"errors,omitempty"`
+	Errors           bool    `json:"errors,omitempty"`
 	LastError        string  `json:"lastError,omitempty"`
 	SystemError      string  `json:"systemError,omitempty"`
 	Source           string  `json:"source,omitempty"`
