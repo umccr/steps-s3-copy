@@ -107,6 +107,10 @@ export class CopyRunTaskConstruct extends Construct {
                 "bucketDefinitions",
               )}) : '{}' %}`,
             },
+            {
+              name: "CB_CONTINUE_ON_ERROR",
+              value: `{% ${batchArg("continueOnError")} ? 'true' : 'false' %}`,
+            },
           ],
         },
       ],

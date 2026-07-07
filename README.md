@@ -215,6 +215,13 @@ export type StepsS3CopyInvokeArguments = {
    */
   readonly dryRun?: boolean;
 
+  /**
+   * Controls how per-object copy errors are handled. By default, a copy fails on the first object
+   * that errors, and the whole run is aborted. Set this to true to continue on a best effort basis,
+   * where previously failed objects do not stop the state machine.
+   */
+  readonly continueOnError?: boolean;
+
   readonly copyConcurrency?: number;
   readonly maxItemsPerBatch?: number;
 

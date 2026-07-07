@@ -36,6 +36,11 @@ func handler(ctx context.Context, event StepsDistributedMapBatch) (any, error) {
 	// passing in -1 to signify we don't want SIGTERM handling
 	copyRunner(copyBinary, -1, event.BatchInput.BucketDefinitions, &toCopy, &toCopyResults)
 
+	// by default, any copy error fails the whole batch.
+	if !event.BatchInput.ContinueOnError && countCopyErrors(toCopyResults) > 0 {
+		return nil, &CopyError{Message: copyErrorSummary(toCopyResults)}
+	}
+
 	return toCopyResults, nil
 }
 

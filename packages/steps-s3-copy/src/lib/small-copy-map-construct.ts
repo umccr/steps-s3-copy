@@ -86,6 +86,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
       batchInput: {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),
+        "continueOnError.$": invokeArg("continueOnError"),
       },
       inputPath: props.inputPath,
       itemReader: {

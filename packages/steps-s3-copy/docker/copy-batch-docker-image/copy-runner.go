@@ -13,6 +13,179 @@ import (
 	"time"
 )
 
+// countCopyErrors returns how many copy results recorded at least one error.
+func countCopyErrors(results []*CopyResult) int {
+	count := 0
+	for _, r := range results {
+		if r != nil && r.Errors {
+			count++
+		}
+	}
+	return count
+}
+
+// copyErrorSummary builds a JSON report of the copy errors. This will truncate if the sized
+// is too large.
+func copyErrorSummary(results []*CopyResult) string {
+	// Steps allows up to 32768 characters for a cause, so keep it well under to avoid errors:
+	// https://docs.aws.amazon.com/step-functions/latest/apireference/API_SendTaskFailure.html#API_SendTaskFailure_RequestSyntax
+	const maxSummaryLength = 10000
+
+	failedCount := countCopyErrors(results)
+
+	report := CopyErrorReport{
+		Message:     fmt.Sprintf("%d of %d copies failed", failedCount, len(results)),
+		FailedCount: failedCount,
+		TotalCount:  len(results),
+		Errors:      make([]CopyErrorDetail, 0, failedCount),
+	}
+
+	for _, r := range results {
+		if r == nil || !r.Errors {
+			continue
+		}
+
+		message := r.LastError
+		if message == "" {
+			message = r.SystemError
+		}
+		if message == "" {
+			message = "unknown error"
+		}
+
+		report.Errors = append(report.Errors, CopyErrorDetail{
+			Source: r.Source,
+			Error:  message,
+		})
+	}
+
+	for {
+		encoded, err := json.Marshal(report)
+		if err != nil {
+			// A struct of strings should not fail.
+			fallback, _ := json.Marshal(CopyErrorReport{
+				Message:     report.Message,
+				FailedCount: report.FailedCount,
+				TotalCount:  report.TotalCount,
+				Truncated:   true,
+				Errors:      []CopyErrorDetail{},
+			})
+			return string(fallback)
+		}
+
+		if len(encoded) <= maxSummaryLength || len(report.Errors) == 0 {
+			return string(encoded)
+		}
+
+		report.Errors = report.Errors[:len(report.Errors)-1]
+		report.Truncated = true
+	}
+}
+
+// copyriteStats is the copyrite JSON stats block that copy-batch consumes.
+type copyriteStats struct {
+	ElapsedSeconds     float64         `json:"elapsed_seconds"`
+	BytesTransferred   uint64          `json:"bytes_transferred"`
+	CopyMode           string          `json:"copy_mode"`
+	Source             string          `json:"source"`
+	Destination        string          `json:"destination"`
+	UnrecoverableError json.RawMessage `json:"unrecoverable_error"`
+}
+
+// copyriteError extracts the failure reason from stderr that copyrite produces when it
+// exits with an error.
+func copyriteError(stdout string, stats copyriteStats, statsErr error, stderr string) string {
+	if statsErr == nil {
+		if len(stats.UnrecoverableError) > 0 {
+			return unwrapCopyriteError(stats.UnrecoverableError)
+		}
+		if trimmed := strings.TrimSpace(stdout); trimmed != "" {
+			return trimmed
+		}
+	}
+
+	if trimmed := strings.TrimSpace(stderr); trimmed != "" {
+		return trimmed
+	}
+
+	return "copy failed but copyrite produced no error output"
+}
+
+// unwrapCopyriteError turns the copyrite unrecoverable_error JSON into a readable
+// message.
+func unwrapCopyriteError(raw json.RawMessage) string {
+	fallback := strings.TrimSpace(string(raw))
+
+	var wrapper map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &wrapper); err != nil || len(wrapper) != 1 {
+		return fallback
+	}
+
+	for variant, value := range wrapper {
+		// most variants wrap a plain string message
+		var message string
+		if err := json.Unmarshal(value, &message); err == nil {
+			return message
+		}
+
+		// AWS errors wrap an object with a code, call and message
+		var apiErr struct {
+			Code    string `json:"code"`
+			Call    string `json:"call"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(value, &apiErr); err == nil && apiErr.Message != "" {
+			if apiErr.Code != "" && apiErr.Call != "" {
+				return fmt.Sprintf("%s for %s: %s", apiErr.Code, apiErr.Call, apiErr.Message)
+			}
+			return apiErr.Message
+		}
+
+		return fmt.Sprintf("%s: %s", variant, strings.TrimSpace(string(value)))
+	}
+
+	return fallback
+}
+
+// copyOutcome is the result of executing copyrite for a single copy
+type copyOutcome struct {
+	stdout      string
+	stderr      string
+	failed      bool
+	systemError string
+}
+
+// toResult turns a copyOutcome into a CopyResult.
+func (o copyOutcome) toResult(copyArg CopyArg) *CopyResult {
+	var stats copyriteStats
+	statsErr := json.Unmarshal([]byte(strings.TrimSpace(o.stdout)), &stats)
+
+	if o.failed {
+		return &CopyResult{
+			Errors:      true,
+			LastError:   copyriteError(o.stdout, stats, statsErr, o.stderr),
+			SystemError: o.systemError,
+			Source:      copyArg.Source,
+			Destination: copyArg.Destination,
+		}
+	}
+
+	if statsErr != nil {
+		return &CopyResult{
+			Source:      copyArg.Source,
+			Destination: copyArg.Destination,
+		}
+	}
+
+	return &CopyResult{
+		ElapsedSeconds:   stats.ElapsedSeconds,
+		BytesTransferred: stats.BytesTransferred,
+		CopyMode:         stats.CopyMode,
+		Source:           stats.Source,
+		Destination:      stats.Destination,
+	}
+}
+
 // bucketNameFromS3Uri extracts the bucket name from an "s3://bucket/key" URI.
 func bucketNameFromS3Uri(uri string) string {
 	trimmed := strings.TrimPrefix(uri, "s3://")
@@ -77,7 +250,7 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 		if interrupted {
 			// create a fake "compatible" stats block
 			(*toCopyResults)[i] = &CopyResult{
-				Errors:      1,
+				Errors:      true,
 				LastError:   "skipped due to previous SIGTERM received",
 				Source:      copyArg.Source,
 				Destination: copyArg.Destination}
@@ -148,80 +321,21 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 
 		log.Printf("copy %d: Run() stdout -> %s", i, stdoutString)
 
-		// the stdout of the copier should be a JSON representing stats of the copy
-		var logLineJson map[string]interface{}
-
-		decoder := json.NewDecoder(strings.NewReader(stdoutString))
-		decoder.UseNumber()
-		decoderErr := decoder.Decode(&logLineJson)
-
-		if decoderErr == nil {
-
-			if runErr != nil {
-				var runExitErr *exec.ExitError
-				if errors.As(runErr, &runExitErr) {
-					(*toCopyResults)[i] = &CopyResult{
-						Errors:      1,
-						LastError:   strings.TrimSpace(stderrString),
-						SystemError: fmt.Sprintf("%v", runExitErr.ExitCode()),
-						Source:      copyArg.Source,
-						Destination: copyArg.Destination}
-				}
-			} else {
-				// reparsing the stats block by hand is probably not the best way - revisit
-				elapsedTime, elapsedTimeErr := logLineJson["elapsed_seconds"].(json.Number).Float64()
-				bytesTransferred, bytesTransferredErr := logLineJson["bytes_transferred"].(json.Number).Int64()
-
-				(*toCopyResults)[i] = &CopyResult{
-					Errors:           0,
-					ElapsedSeconds:   If(elapsedTimeErr == nil, elapsedTime, 0),
-					BytesTransferred: If(bytesTransferredErr == nil, uint64(bytesTransferred), 0),
-					CopyMode:         logLineJson["copy_mode"].(string),
-					Source:           logLineJson["source"].(string),
-					Destination:      logLineJson["destination"].(string)}
-
-				continue
-			}
+		outcome := copyOutcome{
+			stdout: stdoutString,
+			stderr: stderrString,
+			failed: runErr != nil,
 		}
-
-		// if we get here then
-		// we couldn't parse the output as JSON so it is probably our bug!
-		// as`no valid stats block was output by the copier we need to make our own "compatible" one
-
-		// keep in mind we *only* get here if copier itself didn't provide JSON stats
-		// try to use the runtime error codes to gain some insight!
 		if runErr != nil {
 			var runExitErr *exec.ExitError
 			if errors.As(runErr, &runExitErr) {
-				switch runExitErr.ExitCode() {
-				/*case 143:
-				results[i] = CopyResult{
-					errors: 1,
-					lastError: "interrupted by SIGTERM",
-					source: copyArg.Source,
-					destination: copyArg.Destination}
-				resultErrorCount++
-				continue */
-				default:
-					(*toCopyResults)[i] = &CopyResult{
-						Errors:      1,
-						LastError:   fmt.Sprintf("exit of copy with code %v but no JSON statistics block generated", runExitErr.ExitCode()),
-						SystemError: fmt.Sprintf("%#v", runExitErr),
-						Source:      copyArg.Source,
-						Destination: copyArg.Destination}
-					continue
-				}
-
+				outcome.systemError = fmt.Sprintf("exit code %d", runExitErr.ExitCode())
+			} else {
+				outcome.systemError = runErr.Error()
 			}
 		}
 
-		// if we have fallen through all the way to here without any details, then we put in
-		// something generic - but we want to make sure every copy operation has a "result" block
-		(*toCopyResults)[i] = &CopyResult{
-			Errors:      1,
-			LastError:   "exit of copy tool but no JSON statistics block generated or reason detected",
-			Source:      copyArg.Source,
-			Destination: copyArg.Destination}
+		(*toCopyResults)[i] = outcome.toResult(copyArg)
 	}
 
 	for i, val := range *toCopyResults {

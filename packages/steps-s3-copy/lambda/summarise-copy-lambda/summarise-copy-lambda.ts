@@ -437,8 +437,8 @@ async function readFileCopyResultsFromManifests(
 
       // Debbuged
 
-      // Is there were any errors during the transfer ?
-      const errors: number = row["errors"] ?? 0;
+      // Were there any errors during the transfer ?
+      const errors: boolean = row["errors"] ?? false;
 
       const name = basename(source);
 
@@ -455,7 +455,7 @@ async function readFileCopyResultsFromManifests(
       const retryError = row["retryError"]; // Not being passed
 
       // if we have been signalled an error - we need to report that
-      if (errors > 0) {
+      if (errors) {
         fileCopyResults[name] = {
           name: name,
           status: "ERROR",
