@@ -30,7 +30,7 @@ import {
   StepsS3CopyInvokeSettings,
   stateInput,
 } from "./steps-s3-copy-input";
-import { Duration, Stack } from "aws-cdk-lib";
+import { Aws, Duration, Stack } from "aws-cdk-lib";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
 import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-construct";
 import { PricingDataLambdaStepConstruct } from "./lib/fetch-pricing-data-lambda-step-construct";
@@ -562,6 +562,22 @@ export class StepsS3CopyConstruct extends Construct {
         effect: Effect.ALLOW,
         actions: ["secretsmanager:GetSecretValue"],
         resources: ["*"],
+      }),
+    );
+
+    // we want to allow cross-account secret usage - which means we also need to give perms for
+    // secret manager to make KMS decrypt calls
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        sid: "AllowCrossAccountDecryptViaSecretsManager",
+        effect: Effect.ALLOW,
+        actions: ["kms:Decrypt"],
+        resources: ["*"],
+        conditions: {
+          StringEquals: {
+            "kms:ViaService": `secretsmanager.${Aws.REGION}.amazonaws.com`,
+          },
+        },
       }),
     );
 
