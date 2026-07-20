@@ -1,5 +1,5 @@
 ARG TARGETARCH
-ARG COPYRITE_VERSION=v0.6.0
+ARG COPYRITE_VERSION=v0.7.0
 
 FROM public.ecr.aws/docker/library/golang:1.24.1-alpine AS builder
 
@@ -33,7 +33,7 @@ ADD https://github.com/umccr/copyrite/releases/download/${COPYRITE_VERSION}/copy
 FROM copyrite-${TARGETARCH} AS copyrite
 RUN gzip -dc copyrite.tar.gz | tar xf -
 
-FROM amazon/aws-cli:latest AS fargate
+FROM amazon/aws-cli:2.36.2 AS fargate
 
 WORKDIR /work
 
@@ -50,7 +50,7 @@ ENV CB_COPY_BINARY="/work/copyrite"
 # (we used to install tini and execute it ourselves but no longer do that)
 ENTRYPOINT ["/work/copy-batch-fargate"]
 
-FROM amazon/aws-cli:latest AS lambda
+FROM amazon/aws-cli:2.36.2 AS lambda
 
 WORKDIR /work
 
@@ -62,7 +62,7 @@ ENV CB_COPY_BINARY="/work/copyrite"
 ENTRYPOINT ["/work/copy-batch-lambda"]
 
 
-FROM amazon/aws-cli:latest AS wontbuild
+FROM amazon/aws-cli:2.36.2 AS wontbuild
 
 # we very explicitly don't want a "default" build - we ALWAYS want to specify a target (fargate or lambda)
 # so this line will make any build without a --target fail
