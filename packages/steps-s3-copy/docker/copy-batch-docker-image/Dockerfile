@@ -1,5 +1,5 @@
 ARG TARGETARCH
-ARG COPYRITE_VERSION=v0.7.0
+ARG COPYRITE_VERSION=0.8.0
 
 FROM public.ecr.aws/docker/library/golang:1.24.1-alpine AS builder
 
@@ -24,11 +24,11 @@ RUN go build -tags lambda.norpc copy-batch-lambda.go copy-runner.go constants.go
 # Bundle the copyrite release matching the target architecture.
 FROM builder AS copyrite-amd64
 ARG COPYRITE_VERSION
-ADD https://github.com/umccr/copyrite/releases/download/${COPYRITE_VERSION}/copyrite-x86_64-unknown-linux-gnu.tar.gz copyrite.tar.gz
+ADD https://github.com/umccr/copyrite/releases/download/v${COPYRITE_VERSION}/copyrite-${COPYRITE_VERSION}-x86_64-unknown-linux-gnu.tar.gz copyrite.tar.gz
 
 FROM builder AS copyrite-arm64
 ARG COPYRITE_VERSION
-ADD https://github.com/umccr/copyrite/releases/download/${COPYRITE_VERSION}/copyrite-aarch64-unknown-linux-gnu.tar.gz copyrite.tar.gz
+ADD https://github.com/umccr/copyrite/releases/download/v${COPYRITE_VERSION}/copyrite-${COPYRITE_VERSION}-aarch64-unknown-linux-gnu.tar.gz copyrite.tar.gz
 
 FROM copyrite-${TARGETARCH} AS copyrite
 RUN gzip -dc copyrite.tar.gz | tar xf -
