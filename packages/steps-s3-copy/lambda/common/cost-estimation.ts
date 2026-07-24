@@ -38,20 +38,21 @@ export interface PricingData {
   computeCosts: ComputeCosts;
   fetchedAt: string;
 }
-// Throttling for AWS Pricing API requests (max 5 requests per second)
+// Rate limiter — queues Pricing API calls to max 5 per second to prevent burst rejections.
 const pricingThrottle = pThrottle({
   limit: 5,
   interval: 1000,
 });
 
-// Retry logic constants for AWS Pricing API requests:
-//  (max 5 retries, exponential backoff with jitter)
+// Retry constants — up to 5 retries, exponential backoff (200ms base, 5s cap).
 const PRICING_MAX_RETRIES = 5;
 const PRICING_RETRY_BASE_DELAY_MS = 200;
 const PRICING_RETRY_MAX_DELAY_MS = 5000;
 
+// Pauses execution between retry attempts.
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Returns true only for throttling/rate-limit errors worth retrying.
 function isRetryablePricingError(error: unknown): boolean {
   const maybeError = error as {
     name?: string;
@@ -81,6 +82,7 @@ function isRetryablePricingError(error: unknown): boolean {
   return /throttl|rate exceeded/i.test(maybeError.message ?? "");
 }
 
+// Exponential delay (200 * 2^attempt, capped at 5s) with jitter to avoid thundering herd.
 function getBackoffDelayWithJitterMs(attempt: number): number {
   const exponentialDelay = Math.min(
     PRICING_RETRY_MAX_DELAY_MS,
@@ -90,6 +92,7 @@ function getBackoffDelayWithJitterMs(attempt: number): number {
   return Math.floor(Math.random() * exponentialDelay);
 }
 
+// Wraps GetProducts with the throttle gate (max 5/sec).
 const throttledGetProducts = pricingThrottle(
   async (
     client: PricingClient,
@@ -98,6 +101,7 @@ const throttledGetProducts = pricingThrottle(
     client.send(new GetProductsCommand(input)),
 );
 
+// Calls throttledGetProducts and retries on throttling errors with exponential backoff.
 async function throttledGetProductsWithRetry(
   client: PricingClient,
   input: GetProductsCommandInput,
