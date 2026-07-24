@@ -2,8 +2,11 @@ import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   PricingClient,
   GetProductsCommand,
+  GetProductsCommandInput,
+  GetProductsCommandOutput,
   FilterType,
 } from "@aws-sdk/client-pricing";
+import pThrottle from "p-throttle";
 
 import {
   bytesToGB,
@@ -35,6 +38,91 @@ export interface PricingData {
   computeCosts: ComputeCosts;
   fetchedAt: string;
 }
+// Throttling for AWS Pricing API requests (max 5 requests per second)
+const pricingThrottle = pThrottle({
+  limit: 5,
+  interval: 1000,
+});
+
+// Retry logic constants for AWS Pricing API requests:
+//  (max 5 retries, exponential backoff with jitter)
+const PRICING_MAX_RETRIES = 5;
+const PRICING_RETRY_BASE_DELAY_MS = 200;
+const PRICING_RETRY_MAX_DELAY_MS = 5000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isRetryablePricingError(error: unknown): boolean {
+  const maybeError = error as {
+    name?: string;
+    message?: string;
+    code?: string;
+    Code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+
+  const errorName = maybeError.name ?? maybeError.code ?? maybeError.Code;
+  const statusCode = maybeError.$metadata?.httpStatusCode;
+
+  if (statusCode === 429) {
+    return true;
+  }
+
+  if (
+    errorName === "Throttling" ||
+    errorName === "ThrottlingException" ||
+    errorName === "TooManyRequestsException" ||
+    errorName === "RequestLimitExceeded" ||
+    errorName === "ProvisionedThroughputExceededException"
+  ) {
+    return true;
+  }
+
+  return /throttl|rate exceeded/i.test(maybeError.message ?? "");
+}
+
+function getBackoffDelayWithJitterMs(attempt: number): number {
+  const exponentialDelay = Math.min(
+    PRICING_RETRY_MAX_DELAY_MS,
+    PRICING_RETRY_BASE_DELAY_MS * 2 ** attempt,
+  );
+
+  return Math.floor(Math.random() * exponentialDelay);
+}
+
+const throttledGetProducts = pricingThrottle(
+  async (
+    client: PricingClient,
+    input: GetProductsCommandInput,
+  ): Promise<GetProductsCommandOutput> =>
+    client.send(new GetProductsCommand(input)),
+);
+
+async function throttledGetProductsWithRetry(
+  client: PricingClient,
+  input: GetProductsCommandInput,
+): Promise<GetProductsCommandOutput> {
+  for (let attempt = 0; attempt <= PRICING_MAX_RETRIES; attempt++) {
+    try {
+      return await throttledGetProducts(client, input);
+    } catch (error) {
+      const isLastAttempt = attempt === PRICING_MAX_RETRIES;
+      if (!isRetryablePricingError(error) || isLastAttempt) {
+        throw error;
+      }
+
+      const delayMs = getBackoffDelayWithJitterMs(attempt);
+      console.warn(
+        `[Pricing Retry] GetProducts throttled (attempt ${attempt + 1}/${
+          PRICING_MAX_RETRIES + 1
+        }). Retrying in ${delayMs} ms.`,
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw new Error("Unexpected retry flow in throttledGetProductsWithRetry");
+}
 
 // --------------------------------------------------------------------------------------------
 // Thawing cost estimation (returns 0 for non-cold storage classes)
@@ -61,16 +149,12 @@ export async function fetchColdStorageRetrievalCosts(
 ): Promise<ColdStorageRetrievalCosts> {
   const client = new PricingClient({ region: "us-east-1" });
 
-  const sleep = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
-
   const fetchAllPrices = async (
     allFilters: { Field: string; Value: string }[][],
   ) => {
     const results: number[] = [];
     for (const filters of allFilters) {
       results.push(await fetchPrice(filters));
-      await sleep(200);
     }
     return results;
   };
@@ -90,7 +174,7 @@ export async function fetchColdStorageRetrievalCosts(
       ],
       MaxResults: 1,
     });
-    const response = await client.send(command);
+    const response = await throttledGetProductsWithRetry(client, command.input);
     if (!response.PriceList?.length) return 0;
     const priceItem = JSON.parse(response.PriceList[0] as string);
     const priceDimensions = Object.values(
@@ -306,7 +390,7 @@ export async function fetchCrossRegionEgressPrice(
   fromRegion: string,
 ): Promise<EgressPriceTier[]> {
   const client = new PricingClient({ region: "us-east-1" });
-  const command = new GetProductsCommand({
+  const response = await throttledGetProductsWithRetry(client, {
     ServiceCode: "AWSDataTransfer",
     Filters: [
       {
@@ -322,8 +406,6 @@ export async function fetchCrossRegionEgressPrice(
     ],
     MaxResults: 1,
   });
-
-  const response = await client.send(command);
   if (!response.PriceList?.length) return [];
 
   const priceItem = JSON.parse(response.PriceList[0] as string);
@@ -353,7 +435,7 @@ export async function fetchCrossRegionPutRequestPrice(
   fromRegion: string,
 ): Promise<number> {
   const client = new PricingClient({ region: "us-east-1" });
-  const command = new GetProductsCommand({
+  const response = await throttledGetProductsWithRetry(client, {
     ServiceCode: "AmazonS3",
     Filters: [
       { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: fromRegion },
@@ -361,8 +443,6 @@ export async function fetchCrossRegionPutRequestPrice(
     ],
     MaxResults: 1,
   });
-
-  const response = await client.send(command);
   if (!response.PriceList?.length) return 0;
 
   const priceItem = JSON.parse(response.PriceList[0] as string);
@@ -484,34 +564,30 @@ async function fetchLambdaComputePrice(
   const client = new PricingClient({ region: "us-east-1" });
 
   const [durationResponse, invocationResponse] = await Promise.all([
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AWSLambda",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "group",
-            Value: "AWS-Lambda-Duration",
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AWSLambda",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "group",
-            Value: "AWS-Lambda-Requests",
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
+    throttledGetProductsWithRetry(client, {
+      ServiceCode: "AWSLambda",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "group",
+          Value: "AWS-Lambda-Duration",
+        },
+      ],
+      MaxResults: 1,
+    }),
+    throttledGetProductsWithRetry(client, {
+      ServiceCode: "AWSLambda",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "group",
+          Value: "AWS-Lambda-Requests",
+        },
+      ],
+      MaxResults: 1,
+    }),
   ]);
 
   const durationItem = JSON.parse(durationResponse.PriceList![0] as string);
@@ -549,34 +625,30 @@ async function fetchFargateComputePrice(
   }
 
   const [vcpuResponse, memResponse] = await Promise.all([
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AmazonECS",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "usagetype",
-            Value: `${regionPrefix}-Fargate-vCPU-Hours:perCPU`,
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AmazonECS",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "usagetype",
-            Value: `${regionPrefix}-Fargate-GB-Hours`,
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
+    throttledGetProductsWithRetry(client, {
+      ServiceCode: "AmazonECS",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "usagetype",
+          Value: `${regionPrefix}-Fargate-vCPU-Hours:perCPU`,
+        },
+      ],
+      MaxResults: 1,
+    }),
+    throttledGetProductsWithRetry(client, {
+      ServiceCode: "AmazonECS",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "usagetype",
+          Value: `${regionPrefix}-Fargate-GB-Hours`,
+        },
+      ],
+      MaxResults: 1,
+    }),
   ]);
 
   const vcpuItem = JSON.parse(vcpuResponse.PriceList![0] as string);
