@@ -92,7 +92,7 @@ The cost estimation models can be tested directly using a set of copy scenarios 
 bun test-cost-estimation
 ```
 
-To avoid hitting AWS Pricing rate limits, we applies a small client-side throttle and retry/backoff when fetching pricing data (see `packages/steps-s3-copy/lambda/common/cost-estimation.ts`):
+To avoid hitting AWS Pricing rate limits, we apply a small client-side throttle and retry/backoff when fetching pricing data (see `packages/steps-s3-copy/lambda/common/cost-estimation.ts`):
 
 ```ts
 const pricingThrottle = pThrottle({ limit: 5, interval: 1000 });
