@@ -25,18 +25,18 @@ const isNonEmpty = (v: any) => {
   return true;
 };
 
+const COLORS = { green: "\x1b[32m", red: "\x1b[31m", reset: "\x1b[0m" };
+const okSym = (v: boolean) =>
+  v ? `${COLORS.green}✔${COLORS.reset}` : `${COLORS.red}✖${COLORS.reset}`;
+
 results.forEach(([cold, cross, compute], idx) => {
-  const cold_ok = isNonEmpty(cold);
-  const cross_ok = isNonEmpty(cross);
-  const compute_ok = isNonEmpty(compute.lambda);
-  // Some colors for the console output to make it easier to see which runs succeeded and which failed.
-  const COLORS = { green: "\x1b[32m", red: "\x1b[31m", reset: "\x1b[0m" };
-  const okSym = (v: boolean) =>
-    v ? `${COLORS.green}✔${COLORS.reset}` : `${COLORS.red}✖${COLORS.reset}`;
+  const coldOk = isNonEmpty(cold);
+  const crossOk = isNonEmpty(cross);
+  const computeOk = isNonEmpty(compute.lambda);
 
   console.log(
-    `run ${idx + 1}: cold=${okSym(cold_ok)} cross=${okSym(
-      cross_ok,
-    )} compute=${okSym(compute_ok)}`,
+    `run ${idx + 1}: cold=${okSym(coldOk)} cross=${okSym(
+      crossOk,
+    )} compute=${okSym(computeOk)}`,
   );
 });
