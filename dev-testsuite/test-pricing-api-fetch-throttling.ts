@@ -5,7 +5,7 @@ import {
 } from "../packages/steps-s3-copy/lambda/common/cost-estimation";
 
 // number of simulated lambdas to run
-const REPEATS = 5;
+const REPEATS = 100;
 
 // Launch all `REPEATS` runs at the same time and wait for them to finish.
 const tasks = Array.from({ length: REPEATS }, () =>

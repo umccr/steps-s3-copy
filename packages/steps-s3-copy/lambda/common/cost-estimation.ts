@@ -6,6 +6,7 @@ import {
   GetProductsCommandOutput,
   FilterType,
 } from "@aws-sdk/client-pricing";
+
 import pThrottle from "p-throttle";
 
 import {
@@ -44,55 +45,23 @@ const pricingThrottle = pThrottle({
   interval: 1000,
 });
 
-// Retry constants — up to 5 retries, exponential backoff (200ms base, 5s cap).
-const PRICING_MAX_RETRIES = 5;
-const PRICING_RETRY_BASE_DELAY_MS = 200;
-const PRICING_RETRY_MAX_DELAY_MS = 5000;
+// Retry constants:  total SDK attempts (1initial + 5 retries).
+const PRICING_MAX_ATTEMPTS = 6;
 
-// Pauses execution between retry attempts.
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// Retry/backoff is handled by the AWS SDK. We configure the SDK clients
+// below using `maxAttempts` + `retryMode` to control retry behaviour.
 
-// Returns true only for throttling/rate-limit errors worth retrying.
-function isRetryablePricingError(error: unknown): boolean {
-  const maybeError = error as {
-    name?: string;
-    message?: string;
-    code?: string;
-    Code?: string;
-    $metadata?: { httpStatusCode?: number };
-  };
-
-  const errorName = maybeError.name ?? maybeError.code ?? maybeError.Code;
-  const statusCode = maybeError.$metadata?.httpStatusCode;
-
-  if (statusCode === 429) {
-    return true;
-  }
-
-  if (
-    errorName === "Throttling" ||
-    errorName === "ThrottlingException" ||
-    errorName === "TooManyRequestsException" ||
-    errorName === "RequestLimitExceeded" ||
-    errorName === "ProvisionedThroughputExceededException"
-  ) {
-    return true;
-  }
-
-  return /throttl|rate exceeded/i.test(maybeError.message ?? "");
-}
-
-// Exponential delay (200 * 2^attempt, capped at 5s) with jitter to avoid thundering herd.
-function getBackoffDelayWithJitterMs(attempt: number): number {
-  const exponentialDelay = Math.min(
-    PRICING_RETRY_MAX_DELAY_MS,
-    PRICING_RETRY_BASE_DELAY_MS * 2 ** attempt,
-  );
-
-  return Math.floor(Math.random() * exponentialDelay);
+// Helper to create a configured PricingClient
+function createPricingClient(): PricingClient {
+  return new PricingClient({
+    region: "us-east-1",
+    maxAttempts: PRICING_MAX_ATTEMPTS,
+    retryMode: "standard",
+  });
 }
 
 // Wraps GetProducts with the throttle gate (max 5/sec).
+// `hrottledGetProducts already applies the throttle and the SDK handles retries.
 const throttledGetProducts = pricingThrottle(
   async (
     client: PricingClient,
@@ -100,33 +69,6 @@ const throttledGetProducts = pricingThrottle(
   ): Promise<GetProductsCommandOutput> =>
     client.send(new GetProductsCommand(input)),
 );
-
-// Calls throttledGetProducts and retries on throttling errors with exponential backoff.
-async function throttledGetProductsWithRetry(
-  client: PricingClient,
-  input: GetProductsCommandInput,
-): Promise<GetProductsCommandOutput> {
-  for (let attempt = 0; attempt <= PRICING_MAX_RETRIES; attempt++) {
-    try {
-      return await throttledGetProducts(client, input);
-    } catch (error) {
-      const isLastAttempt = attempt === PRICING_MAX_RETRIES;
-      if (!isRetryablePricingError(error) || isLastAttempt) {
-        throw error;
-      }
-
-      const delayMs = getBackoffDelayWithJitterMs(attempt);
-      console.warn(
-        `[Pricing Retry] GetProducts throttled (attempt ${attempt + 1}/${
-          PRICING_MAX_RETRIES + 1
-        }). Retrying in ${delayMs} ms.`,
-      );
-      await sleep(delayMs);
-    }
-  }
-
-  throw new Error("Unexpected retry flow in throttledGetProductsWithRetry");
-}
 
 // --------------------------------------------------------------------------------------------
 // Thawing cost estimation (returns 0 for non-cold storage classes)
@@ -151,7 +93,7 @@ export type ColdStorageRetrievalCosts = {
 export async function fetchColdStorageRetrievalCosts(
   region: string,
 ): Promise<ColdStorageRetrievalCosts> {
-  const client = new PricingClient({ region: "us-east-1" });
+  const client = createPricingClient();
 
   const fetchAllPrices = async (
     allFilters: { Field: string; Value: string }[][],
@@ -178,7 +120,7 @@ export async function fetchColdStorageRetrievalCosts(
       ],
       MaxResults: 1,
     });
-    const response = await throttledGetProductsWithRetry(client, command.input);
+    const response = await throttledGetProducts(client, command.input);
     if (!response.PriceList?.length) return 0;
     const priceItem = JSON.parse(response.PriceList[0] as string);
     const priceDimensions = Object.values(
@@ -393,8 +335,8 @@ interface EgressPriceTier {
 export async function fetchCrossRegionEgressPrice(
   fromRegion: string,
 ): Promise<EgressPriceTier[]> {
-  const client = new PricingClient({ region: "us-east-1" });
-  const response = await throttledGetProductsWithRetry(client, {
+  const client = createPricingClient();
+  const response = await throttledGetProducts(client, {
     ServiceCode: "AWSDataTransfer",
     Filters: [
       {
@@ -438,8 +380,8 @@ export async function fetchCrossRegionEgressPrice(
 export async function fetchCrossRegionPutRequestPrice(
   fromRegion: string,
 ): Promise<number> {
-  const client = new PricingClient({ region: "us-east-1" });
-  const response = await throttledGetProductsWithRetry(client, {
+  const client = createPricingClient();
+  const response = await throttledGetProducts(client, {
     ServiceCode: "AmazonS3",
     Filters: [
       { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: fromRegion },
@@ -565,10 +507,10 @@ const regionPrefixMap: Record<string, string> = {
 async function fetchLambdaComputePrice(
   region: string,
 ): Promise<Pick<ComputeCosts, "lambda">> {
-  const client = new PricingClient({ region: "us-east-1" });
+  const client = createPricingClient();
 
   const [durationResponse, invocationResponse] = await Promise.all([
-    throttledGetProductsWithRetry(client, {
+    throttledGetProducts(client, {
       ServiceCode: "AWSLambda",
       Filters: [
         { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
@@ -580,7 +522,7 @@ async function fetchLambdaComputePrice(
       ],
       MaxResults: 1,
     }),
-    throttledGetProductsWithRetry(client, {
+    throttledGetProducts(client, {
       ServiceCode: "AWSLambda",
       Filters: [
         { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
@@ -620,7 +562,7 @@ async function fetchLambdaComputePrice(
 async function fetchFargateComputePrice(
   region: string,
 ): Promise<Pick<ComputeCosts, "fargate">> {
-  const client = new PricingClient({ region: "us-east-1" });
+  const client = createPricingClient();
 
   const regionPrefix = regionPrefixMap[region];
 
@@ -629,7 +571,7 @@ async function fetchFargateComputePrice(
   }
 
   const [vcpuResponse, memResponse] = await Promise.all([
-    throttledGetProductsWithRetry(client, {
+    throttledGetProducts(client, {
       ServiceCode: "AmazonECS",
       Filters: [
         { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
@@ -641,7 +583,7 @@ async function fetchFargateComputePrice(
       ],
       MaxResults: 1,
     }),
-    throttledGetProductsWithRetry(client, {
+    throttledGetProducts(client, {
       ServiceCode: "AmazonECS",
       Filters: [
         { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
