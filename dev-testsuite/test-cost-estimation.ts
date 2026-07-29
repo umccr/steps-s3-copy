@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   SIZE_THRESHOLD_BYTES,
-  COLD_STORAGE_CLASSES,
+  checkColdStorage,
 } from "../packages/steps-s3-copy/lambda/common/constants";
 
 import type {
@@ -75,6 +75,7 @@ type TestCase = {
   sizeBytes: number;
   isCrossRegion: boolean;
   storageClass: string;
+  archiveStatus?: string;
   retrievalSpeed: string;
   restoreWindowDays: number;
 };
@@ -174,6 +175,7 @@ const testCases: TestCase[] = [
     sizeBytes: 5 * 1024 * 1024 * 1024,
     isCrossRegion: true,
     storageClass: "INTELLIGENT_TIERING",
+    archiveStatus: "ARCHIVE_ACCESS",
     retrievalSpeed: "Expedited",
     restoreWindowDays: 7,
   },
@@ -182,6 +184,7 @@ const testCases: TestCase[] = [
     sizeBytes: 5 * 1024 * 1024 * 1024,
     isCrossRegion: true,
     storageClass: "INTELLIGENT_TIERING",
+    archiveStatus: "DEEP_ARCHIVE_ACCESS",
     retrievalSpeed: "Bulk",
     restoreWindowDays: 7,
   },
@@ -216,11 +219,10 @@ function calculateCostEstimate(
       testCase.sizeBytes,
     ),
     coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
-      COLD_STORAGE_CLASSES.includes(
-        testCase.storageClass as (typeof COLD_STORAGE_CLASSES)[number],
-      ),
+      checkColdStorage(testCase.storageClass, testCase.archiveStatus),
       testCase.sizeBytes,
       testCase.storageClass,
+      testCase.archiveStatus,
       testCase.retrievalSpeed,
       testCase.restoreWindowDays,
       coldStorageRetrievalCosts,
