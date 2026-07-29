@@ -97,6 +97,9 @@ export type HeadObjectsLambdaResultItem = Omit<
   // storage class of object currently
   storageClass: string;
 
+  // whether the object is in cold storage and requires thawing before copy
+  isColdStorage: boolean;
+
   // size in bytes
   size: number;
 
@@ -328,6 +331,7 @@ export async function handler(
             etag: item.ETag,
             size: size,
             storageClass: storageClass,
+            isColdStorage: isColdStorage,
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
             sums: undefined,
@@ -406,6 +410,7 @@ export async function handler(
         // as per spec - storage class is always returned by head object EXCEPT for standard
         // for our downstream processing - we mind as well rectify this so it is always present
         storageClass: storageClass,
+        isColdStorage: isColdStorage,
         lastModifiedISOString: headResult.LastModified.toISOString(),
         sums: o.sums,
 

@@ -146,22 +146,22 @@ export async function handler(event: LambdaEvent) {
   // Small objects that do not need thawing
   const smallDf = df
     .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+    .filter(pl.col("isColdStorage").not());
 
   // Small objects that require thawing
   const smallThawDf = df
     .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+    .filter(pl.col("isColdStorage"));
 
   // Large objects that do not need thawing
   const largeDf = df
     .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+    .filter(pl.col("isColdStorage").not());
 
   // Large objects that require thawing
   const largeThawDf = df
     .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+    .filter(pl.col("isColdStorage"));
 
   return {
     dryRun: event.invokeArguments.dryRun,
