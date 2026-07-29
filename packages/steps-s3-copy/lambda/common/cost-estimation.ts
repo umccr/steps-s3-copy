@@ -248,20 +248,31 @@ export function estimateColdStorageRetrievalCost(
   isColdStorage: boolean,
   sizeBytes: number,
   storageClass: string,
+  archiveStatus: string | undefined,
   retrievalSpeed: string,
   restoreWindowDays: number,
   coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
 ): number {
   if (!isColdStorage) return 0;
 
+  // Resolve the pricing key: GLACIER and DEEP_ARCHIVE map directly,
+  // but INTELLIGENT_TIERING needs the archiveStatus to pick the right pricing tier
+  let pricingKey = storageClass;
+  if (storageClass === "INTELLIGENT_TIERING") {
+    if (archiveStatus === "ARCHIVE_ACCESS")
+      pricingKey = "INTELLIGENT_TIERING_ARCHIVE_ACCESS";
+    if (archiveStatus === "DEEP_ARCHIVE_ACCESS")
+      pricingKey = "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS";
+  }
+
   const tierCosts = (
     coldStorageRetrievalCosts[
-      storageClass as keyof ColdStorageRetrievalCosts
+      pricingKey as keyof ColdStorageRetrievalCosts
     ] as Record<string, TierCost>
   )?.[retrievalSpeed];
   if (!tierCosts) {
     console.warn(
-      `[COST WARNING] Unsupported storage class "${storageClass}" or retrieval speed "${retrievalSpeed}" in estimateColdStorageRetrievalCost. Returning cost as 0.`,
+      `[COST WARNING] Unsupported storage class "${pricingKey}" or retrieval speed "${retrievalSpeed}" in estimateColdStorageRetrievalCost. Returning cost as 0.`,
     );
     return 0;
   }
