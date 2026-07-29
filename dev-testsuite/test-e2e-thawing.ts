@@ -60,6 +60,19 @@ test(
         storageClass:
           "GLACIER_IR" /* Glacier IR should behave like normal S3, but we want to ensure that it works */,
       },
+      //
+      // INTELLIGENT_TIERING objects that are NOT in an archive tier should be copied
+      // directly without thawing — confirming they are not incorrectly classified as cold
+      //
+      [`intelligent-tiering-single-part.bin`]: {
+        sizeInBytes: 256 * KiB,
+        storageClass: "INTELLIGENT_TIERING",
+      },
+      [`intelligent-tiering-multi-part.bin`]: {
+        sizeInBytes: 6 * MiB,
+        partSizeInBytes: 5 * MiB,
+        storageClass: "INTELLIGENT_TIERING",
+      },
     };
 
     console.info("Creating test objects");
