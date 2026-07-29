@@ -73,6 +73,7 @@ export function bytesToGB(bytes: number): number {
 
 export function getThawParams(
   storageClass: string,
+  archiveStatus?: string,
   thawParams?: {
     glacierFlexibleRetrievalThawDays?: number;
     glacierFlexibleRetrievalThawSpeed?: string;
@@ -95,19 +96,22 @@ export function getThawParams(
         retrievalSpeed: thawParams?.glacierDeepArchiveThawSpeed ?? "Bulk",
         restoreWindowDays: thawParams?.glacierDeepArchiveThawDays ?? 1,
       };
-    case "INTELLIGENT_TIERING_ARCHIVE_ACCESS":
-      return {
-        retrievalSpeed:
-          thawParams?.intelligentTieringArchiveThawSpeed ?? "Bulk",
-        restoreWindowDays: thawParams?.intelligentTieringArchiveThawDays ?? 1,
-      };
-    case "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS":
-      return {
-        retrievalSpeed:
-          thawParams?.intelligentTieringDeepArchiveThawSpeed ?? "Bulk",
-        restoreWindowDays:
-          thawParams?.intelligentTieringDeepArchiveThawDays ?? 1,
-      };
+    case "INTELLIGENT_TIERING":
+      if (archiveStatus === "ARCHIVE_ACCESS") {
+        return {
+          retrievalSpeed:
+            thawParams?.intelligentTieringArchiveThawSpeed ?? "Bulk",
+          restoreWindowDays: thawParams?.intelligentTieringArchiveThawDays ?? 1,
+        };
+      }
+      if (archiveStatus === "DEEP_ARCHIVE_ACCESS") {
+        return {
+          retrievalSpeed:
+            thawParams?.intelligentTieringDeepArchiveThawSpeed ?? "Bulk",
+          restoreWindowDays:
+            thawParams?.intelligentTieringDeepArchiveThawDays ?? 1,
+        };
+      }
     default:
       return { retrievalSpeed: "Bulk", restoreWindowDays: 1 };
   }

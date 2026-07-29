@@ -314,6 +314,7 @@ export async function handler(
 
           const { retrievalSpeed, restoreWindowDays } = getThawParams(
             storageClass,
+            archiveStatus,
             event.BatchInput.thawParams,
           );
 
@@ -393,6 +394,7 @@ export async function handler(
 
       const { retrievalSpeed, restoreWindowDays } = getThawParams(
         storageClass,
+        archiveStatus,
         event.BatchInput.thawParams,
       );
 
