@@ -7,6 +7,7 @@ import {
 import { IsThawingError } from "./errors";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
+import { checkColdStorage } from "../common/constants";
 
 interface ThawParams {
   glacierFlexibleRetrievalThawDays?: number;
@@ -77,16 +78,17 @@ export async function handler(event: ThawObjectsEvent) {
 
       // now deal with the objects we have detected that are in storage classes needing restoring but where it
       // hasn't started yet
-      if (
-        headResult.StorageClass == "GLACIER" ||
-        headResult.StorageClass == "DEEP_ARCHIVE" ||
-        headResult.StorageClass == "INTELLIGENT_TIERING"
-      ) {
+
+      const storageClass = headResult.StorageClass ?? "STANDARD";
+      const archiveStatus = headResult.ArchiveStatus;
+      const isColdStorage = checkColdStorage(storageClass, archiveStatus);
+
+      if (isColdStorage) {
         // Default to 1 day and Bulk tier unless overridden in thawParams
         let days: number = 1;
         let tier: Tier = "Bulk";
 
-        if (headResult.StorageClass == "GLACIER") {
+        if (storageClass == "GLACIER") {
           days =
             event.BatchInput.thawParams.glacierFlexibleRetrievalThawDays ??
             days;
@@ -94,13 +96,13 @@ export async function handler(event: ThawObjectsEvent) {
             event.BatchInput.thawParams.glacierFlexibleRetrievalThawSpeed ??
             tier;
         }
-        if (headResult.StorageClass == "DEEP_ARCHIVE") {
+        if (storageClass == "DEEP_ARCHIVE") {
           days = event.BatchInput.thawParams.glacierDeepArchiveThawDays ?? days;
           tier =
             event.BatchInput.thawParams.glacierDeepArchiveThawSpeed ?? tier;
         }
-        if (headResult.StorageClass == "INTELLIGENT_TIERING") {
-          if (headResult.ArchiveStatus == "ARCHIVE_ACCESS") {
+        if (storageClass == "INTELLIGENT_TIERING") {
+          if (archiveStatus == "ARCHIVE_ACCESS") {
             days =
               event.BatchInput.thawParams.intelligentTieringArchiveThawDays ??
               days;
@@ -108,7 +110,7 @@ export async function handler(event: ThawObjectsEvent) {
               event.BatchInput.thawParams.intelligentTieringArchiveThawSpeed ??
               tier;
           }
-          if (headResult.ArchiveStatus == "DEEP_ARCHIVE_ACCESS") {
+          if (archiveStatus == "DEEP_ARCHIVE_ACCESS") {
             days =
               event.BatchInput.thawParams
                 .intelligentTieringDeepArchiveThawDays ?? days;
