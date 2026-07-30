@@ -10,7 +10,7 @@ import * as assert from "node:assert/strict";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
 import {
-  COLD_STORAGE_CLASSES,
+  checkColdStorage,
   getThawParams,
   PRICING_DATA_FILENAME,
 } from "../common/constants";
@@ -96,6 +96,9 @@ export type HeadObjectsLambdaResultItem = Omit<
 
   // storage class of object currently
   storageClass: string;
+
+  // whether the object is in cold storage and requires thawing before copy
+  isColdStorage: boolean;
 
   // size in bytes
   size: number;
@@ -295,13 +298,23 @@ export async function handler(
           // in both the result object and cost estimation
           const size = item.Size;
           const storageClass = item.StorageClass ?? "STANDARD";
+
+          // ListObjects doesn't return ArchiveStatus — need a HeadObject call
+          // for INTELLIGENT_TIERING objects to determine if they're in an archive tier
+          let archiveStatus: string | undefined;
+          if (storageClass === "INTELLIGENT_TIERING") {
+            const headResult = await client.send(
+              new HeadObjectCommand({ Bucket: o.sourceBucket, Key: item.Key }),
+            );
+            archiveStatus = headResult.ArchiveStatus;
+          }
+          const isColdStorage = checkColdStorage(storageClass, archiveStatus);
           const destinationRegion = event.BatchInput.destinationRequiredRegion;
           const iscrossRegion = sourceRegion !== destinationRegion;
-          const isColdStorage = COLD_STORAGE_CLASSES.map((s) =>
-            s.toUpperCase(),
-          ).includes(storageClass.toUpperCase());
+
           const { retrievalSpeed, restoreWindowDays } = getThawParams(
             storageClass,
+            archiveStatus,
             event.BatchInput.thawParams,
           );
 
@@ -317,8 +330,9 @@ export async function handler(
               o.destinationRelativeFolderKey,
             ),
             etag: item.ETag,
-            size: item.Size!,
-            storageClass: item.StorageClass ?? "STANDARD",
+            size: size,
+            storageClass: storageClass,
+            isColdStorage: isColdStorage,
             lastModifiedISOString: item?.LastModified.toISOString(),
             // for the moment by definition anything we wildcard expand does not have any asserted checksums
             sums: undefined,
@@ -335,6 +349,7 @@ export async function handler(
                 isColdStorage,
                 size,
                 storageClass,
+                archiveStatus,
                 retrievalSpeed,
                 restoreWindowDays,
                 coldStorageRetrievalCosts,
@@ -372,14 +387,15 @@ export async function handler(
       // in both the result object and cost estimation
       const size = headResult.ContentLength;
       const storageClass = headResult.StorageClass ?? "STANDARD";
+      const archiveStatus = headResult.ArchiveStatus;
+      const isColdStorage = checkColdStorage(storageClass, archiveStatus);
 
       const destinationRegion = event.BatchInput.destinationRequiredRegion;
       const iscrossRegion = sourceRegion !== destinationRegion;
-      const isColdStorage = COLD_STORAGE_CLASSES.map((s) =>
-        s.toUpperCase(),
-      ).includes(storageClass.toUpperCase());
+
       const { retrievalSpeed, restoreWindowDays } = getThawParams(
         storageClass,
+        archiveStatus,
         event.BatchInput.thawParams,
       );
 
@@ -397,6 +413,7 @@ export async function handler(
         // as per spec - storage class is always returned by head object EXCEPT for standard
         // for our downstream processing - we mind as well rectify this so it is always present
         storageClass: storageClass,
+        isColdStorage: isColdStorage,
         lastModifiedISOString: headResult.LastModified.toISOString(),
         sums: o.sums,
 
@@ -411,6 +428,7 @@ export async function handler(
             isColdStorage,
             size,
             storageClass,
+            archiveStatus,
             retrievalSpeed,
             restoreWindowDays,
             coldStorageRetrievalCosts,

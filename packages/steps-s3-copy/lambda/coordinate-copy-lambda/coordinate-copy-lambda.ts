@@ -8,7 +8,6 @@ import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import {
   SIZE_THRESHOLD_BYTES,
   MULTIPART_CHUNK_SIZE,
-  COLD_STORAGE_CLASSES,
 } from "../common/constants";
 import { tmpNameSync } from "tmp";
 import * as path from "node:path/posix";
@@ -142,31 +141,27 @@ export async function handler(event: LambdaEvent) {
 
   const stats = await computeStats(df);
 
-  // if we are doing a dry run - then we want to still collect stats etc - but at the end of the day
-  // we will pass an empty list of objects to the actual copiers
-  const emptyDf = df.filter(false);
-
   // Defining the copy sets based on the size of the objects and their storage class (cold or no)
 
   // Small objects that do not need thawing
   const smallDf = df
     .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+    .filter(pl.col("isColdStorage").not());
 
   // Small objects that require thawing
   const smallThawDf = df
     .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+    .filter(pl.col("isColdStorage"));
 
   // Large objects that do not need thawing
   const largeDf = df
     .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES).not());
+    .filter(pl.col("isColdStorage").not());
 
   // Large objects that require thawing
   const largeThawDf = df
     .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
-    .filter(pl.col("storageClass").isIn(COLD_STORAGE_CLASSES));
+    .filter(pl.col("isColdStorage"));
 
   return {
     dryRun: event.invokeArguments.dryRun,

@@ -13,14 +13,22 @@ export const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
 export const MULTIPART_CHUNK_SIZE = 5 * 1024 * 1024;
 
 /**
- * Storage classes that require thawing/restoration before copying.
+ * Determines whether an S3 object is in cold storage (i.e. requires restoration
+ * before it can be copied).
+ *
+ * GLACIER and DEEP_ARCHIVE are always cold. INTELLIGENT_TIERING is only cold
+ * when the object has been moved to an archive tier, indicated by the
+ * ArchiveStatus header returned by HeadObject.
  */
-export const COLD_STORAGE_CLASSES = [
-  "GLACIER",
-  "DEEP_ARCHIVE",
-  "INTELLIGENT_TIERING_ARCHIVE_ACCESS",
-  "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS",
-] as const;
+export function checkColdStorage(
+  storageClass: string,
+  archiveStatus?: string,
+): boolean {
+  if (storageClass === "GLACIER" || storageClass === "DEEP_ARCHIVE")
+    return true;
+  if (storageClass === "INTELLIGENT_TIERING" && archiveStatus) return true;
+  return false;
+}
 
 // -----------------------------------------------------------------
 // PRICING
@@ -65,6 +73,7 @@ export function bytesToGB(bytes: number): number {
 
 export function getThawParams(
   storageClass: string,
+  archiveStatus?: string,
   thawParams?: {
     glacierFlexibleRetrievalThawDays?: number;
     glacierFlexibleRetrievalThawSpeed?: string;
@@ -87,19 +96,22 @@ export function getThawParams(
         retrievalSpeed: thawParams?.glacierDeepArchiveThawSpeed ?? "Bulk",
         restoreWindowDays: thawParams?.glacierDeepArchiveThawDays ?? 1,
       };
-    case "INTELLIGENT_TIERING_ARCHIVE_ACCESS":
-      return {
-        retrievalSpeed:
-          thawParams?.intelligentTieringArchiveThawSpeed ?? "Bulk",
-        restoreWindowDays: thawParams?.intelligentTieringArchiveThawDays ?? 1,
-      };
-    case "INTELLIGENT_TIERING_DEEP_ARCHIVE_ACCESS":
-      return {
-        retrievalSpeed:
-          thawParams?.intelligentTieringDeepArchiveThawSpeed ?? "Bulk",
-        restoreWindowDays:
-          thawParams?.intelligentTieringDeepArchiveThawDays ?? 1,
-      };
+    case "INTELLIGENT_TIERING":
+      if (archiveStatus === "ARCHIVE_ACCESS") {
+        return {
+          retrievalSpeed:
+            thawParams?.intelligentTieringArchiveThawSpeed ?? "Bulk",
+          restoreWindowDays: thawParams?.intelligentTieringArchiveThawDays ?? 1,
+        };
+      }
+      if (archiveStatus === "DEEP_ARCHIVE_ACCESS") {
+        return {
+          retrievalSpeed:
+            thawParams?.intelligentTieringDeepArchiveThawSpeed ?? "Bulk",
+          restoreWindowDays:
+            thawParams?.intelligentTieringDeepArchiveThawDays ?? 1,
+        };
+      }
     default:
       return { retrievalSpeed: "Bulk", restoreWindowDays: 1 };
   }
