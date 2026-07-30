@@ -2,8 +2,12 @@ import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   PricingClient,
   GetProductsCommand,
+  GetProductsCommandInput,
+  GetProductsCommandOutput,
   FilterType,
 } from "@aws-sdk/client-pricing";
+
+import pThrottle from "p-throttle";
 
 import {
   bytesToGB,
@@ -35,6 +39,36 @@ export interface PricingData {
   computeCosts: ComputeCosts;
   fetchedAt: string;
 }
+// Rate limiter — queues Pricing API calls to max 5 per second to prevent burst rejections.
+const pricingThrottle = pThrottle({
+  limit: 5,
+  interval: 1000,
+});
+
+// Retry constants:  total SDK attempts (1initial + 5 retries).
+const PRICING_MAX_ATTEMPTS = 6;
+
+// Retry/backoff is handled by the AWS SDK. We configure the SDK clients
+// below using `maxAttempts` + `retryMode` to control retry behaviour.
+
+// Helper to create a configured PricingClient
+function createPricingClient(): PricingClient {
+  return new PricingClient({
+    region: "us-east-1",
+    maxAttempts: PRICING_MAX_ATTEMPTS,
+    retryMode: "standard",
+  });
+}
+
+// Wraps GetProducts with the throttle gate (max 5/sec).
+// `hrottledGetProducts already applies the throttle and the SDK handles retries.
+const throttledGetProducts = pricingThrottle(
+  async (
+    client: PricingClient,
+    input: GetProductsCommandInput,
+  ): Promise<GetProductsCommandOutput> =>
+    client.send(new GetProductsCommand(input)),
+);
 
 // --------------------------------------------------------------------------------------------
 // Thawing cost estimation (returns 0 for non-cold storage classes)
@@ -59,10 +93,7 @@ export type ColdStorageRetrievalCosts = {
 export async function fetchColdStorageRetrievalCosts(
   region: string,
 ): Promise<ColdStorageRetrievalCosts> {
-  const client = new PricingClient({ region: "us-east-1" });
-
-  const sleep = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
+  const client = createPricingClient();
 
   const fetchAllPrices = async (
     allFilters: { Field: string; Value: string }[][],
@@ -70,7 +101,6 @@ export async function fetchColdStorageRetrievalCosts(
     const results: number[] = [];
     for (const filters of allFilters) {
       results.push(await fetchPrice(filters));
-      await sleep(200);
     }
     return results;
   };
@@ -90,7 +120,7 @@ export async function fetchColdStorageRetrievalCosts(
       ],
       MaxResults: 1,
     });
-    const response = await client.send(command);
+    const response = await throttledGetProducts(client, command.input);
     if (!response.PriceList?.length) return 0;
     const priceItem = JSON.parse(response.PriceList[0] as string);
     const priceDimensions = Object.values(
@@ -305,8 +335,8 @@ interface EgressPriceTier {
 export async function fetchCrossRegionEgressPrice(
   fromRegion: string,
 ): Promise<EgressPriceTier[]> {
-  const client = new PricingClient({ region: "us-east-1" });
-  const command = new GetProductsCommand({
+  const client = createPricingClient();
+  const response = await throttledGetProducts(client, {
     ServiceCode: "AWSDataTransfer",
     Filters: [
       {
@@ -322,8 +352,6 @@ export async function fetchCrossRegionEgressPrice(
     ],
     MaxResults: 1,
   });
-
-  const response = await client.send(command);
   if (!response.PriceList?.length) return [];
 
   const priceItem = JSON.parse(response.PriceList[0] as string);
@@ -352,8 +380,8 @@ export async function fetchCrossRegionEgressPrice(
 export async function fetchCrossRegionPutRequestPrice(
   fromRegion: string,
 ): Promise<number> {
-  const client = new PricingClient({ region: "us-east-1" });
-  const command = new GetProductsCommand({
+  const client = createPricingClient();
+  const response = await throttledGetProducts(client, {
     ServiceCode: "AmazonS3",
     Filters: [
       { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: fromRegion },
@@ -361,8 +389,6 @@ export async function fetchCrossRegionPutRequestPrice(
     ],
     MaxResults: 1,
   });
-
-  const response = await client.send(command);
   if (!response.PriceList?.length) return 0;
 
   const priceItem = JSON.parse(response.PriceList[0] as string);
@@ -481,37 +507,33 @@ const regionPrefixMap: Record<string, string> = {
 async function fetchLambdaComputePrice(
   region: string,
 ): Promise<Pick<ComputeCosts, "lambda">> {
-  const client = new PricingClient({ region: "us-east-1" });
+  const client = createPricingClient();
 
   const [durationResponse, invocationResponse] = await Promise.all([
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AWSLambda",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "group",
-            Value: "AWS-Lambda-Duration",
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AWSLambda",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "group",
-            Value: "AWS-Lambda-Requests",
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
+    throttledGetProducts(client, {
+      ServiceCode: "AWSLambda",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "group",
+          Value: "AWS-Lambda-Duration",
+        },
+      ],
+      MaxResults: 1,
+    }),
+    throttledGetProducts(client, {
+      ServiceCode: "AWSLambda",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "group",
+          Value: "AWS-Lambda-Requests",
+        },
+      ],
+      MaxResults: 1,
+    }),
   ]);
 
   const durationItem = JSON.parse(durationResponse.PriceList![0] as string);
@@ -540,7 +562,7 @@ async function fetchLambdaComputePrice(
 async function fetchFargateComputePrice(
   region: string,
 ): Promise<Pick<ComputeCosts, "fargate">> {
-  const client = new PricingClient({ region: "us-east-1" });
+  const client = createPricingClient();
 
   const regionPrefix = regionPrefixMap[region];
 
@@ -549,34 +571,30 @@ async function fetchFargateComputePrice(
   }
 
   const [vcpuResponse, memResponse] = await Promise.all([
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AmazonECS",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "usagetype",
-            Value: `${regionPrefix}-Fargate-vCPU-Hours:perCPU`,
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
-    client.send(
-      new GetProductsCommand({
-        ServiceCode: "AmazonECS",
-        Filters: [
-          { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
-          {
-            Type: FilterType.TERM_MATCH,
-            Field: "usagetype",
-            Value: `${regionPrefix}-Fargate-GB-Hours`,
-          },
-        ],
-        MaxResults: 1,
-      }),
-    ),
+    throttledGetProducts(client, {
+      ServiceCode: "AmazonECS",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "usagetype",
+          Value: `${regionPrefix}-Fargate-vCPU-Hours:perCPU`,
+        },
+      ],
+      MaxResults: 1,
+    }),
+    throttledGetProducts(client, {
+      ServiceCode: "AmazonECS",
+      Filters: [
+        { Type: FilterType.TERM_MATCH, Field: "regionCode", Value: region },
+        {
+          Type: FilterType.TERM_MATCH,
+          Field: "usagetype",
+          Value: `${regionPrefix}-Fargate-GB-Hours`,
+        },
+      ],
+      MaxResults: 1,
+    }),
   ]);
 
   const vcpuItem = JSON.parse(vcpuResponse.PriceList![0] as string);

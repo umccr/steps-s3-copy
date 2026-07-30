@@ -91,3 +91,19 @@ The cost estimation models can be tested directly using a set of copy scenarios 
 ```bash
 bun test-cost-estimation
 ```
+
+To avoid hitting AWS Pricing rate limits, we apply a small client-side throttle and retry/backoff when fetching pricing data (see `packages/steps-s3-copy/lambda/common/cost-estimation.ts`):
+
+```ts
+const pricingThrottle = pThrottle({ limit: 5, interval: 1000 });
+
+const PRICING_MAX_RETRIES = 5;
+const PRICING_RETRY_BASE_DELAY_MS = 200;
+const PRICING_RETRY_MAX_DELAY_MS = 5000;
+```
+
+The `pricing-api-fetch-throttling` script repeatedly runs the pricing fetches to exercise that throttle and the retry logic. The number of runs is controlled by the `REPEATS` variable inside the script. Per-run summaries print to stdout; retry and error diagnostics are written to stderr so you can inspect throttling activity separately.
+
+```bash
+bun pricing-api-fetch-throttling
+```

@@ -16,7 +16,8 @@
     "step-head-objects": "bun test ./test-step-head-objects-lambda.ts",
     "report-preview": "bun test ./test-report-preview.ts",
     "report-preview-dryrun": "bun test ./test-report-preview.ts --dry-run",
-    "cost-estimation": "bun test ./test-cost-estimation.ts"
+    "cost-estimation": "bun test ./test-cost-estimation.ts",
+    "pricing-api-fetch-throttling": "bun test ./test-pricing-api-fetch-throttling.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.1035.0",
