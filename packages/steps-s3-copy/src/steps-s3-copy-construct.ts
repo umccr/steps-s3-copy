@@ -315,21 +315,16 @@ export class StepsS3CopyConstruct extends Construct {
       // - this let steps batch them up itself
       // to the max that can fit in its payload limit
       // this means that each invoke will for instance be copying 10-20 small items
-      //maxItemsPerBatch: 16,
-      //cluster: cluster,
-      //clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
       maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.copySets.small",
-      //taskDefinition: taskDefinition,
-      //containerDefinition: containerDefinition,
     });
 
     const largeCopierMap = new CopyMapConstruct(this, "Large", {
       // for larger items - designate a single copy at a time - gaining concurrency
       // via the distributed map itself
       maxItemsPerBatch: 1,
-      maxConcurrency: 2000,
+      maxConcurrency: 96,
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -355,7 +350,7 @@ export class StepsS3CopyConstruct extends Construct {
       addThawStep: true,
       aggressiveTimes: props.aggressiveTimes,
       maxItemsPerBatch: 1,
-      maxConcurrency: 2000,
+      maxConcurrency: 96,
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -576,6 +571,27 @@ export class StepsS3CopyConstruct extends Construct {
         conditions: {
           StringEquals: {
             "kms:ViaService": `secretsmanager.${Aws.REGION}.amazonaws.com`,
+          },
+        },
+      }),
+    );
+
+    // allow KMS operations needed when reading (GetObject) from and writing (PutObject) to
+    // S3 buckets using SSE-KMS encryption
+    writerRole.addToPolicy(
+      new PolicyStatement({
+        sid: "AllowKmsForS3SseKms",
+        effect: Effect.ALLOW,
+        actions: [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:Encrypt",
+          "kms:DescribeKey",
+        ],
+        resources: ["*"],
+        conditions: {
+          StringEquals: {
+            "kms:ViaService": `s3.${Aws.REGION}.amazonaws.com`,
           },
         },
       }),

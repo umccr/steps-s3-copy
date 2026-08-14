@@ -14,6 +14,7 @@
     "package": "cd packages/steps-s3-copy && bun run package",
     "clean": "git clean -fXd",
     "dev-deploy": "bun run build && cd dev && bunx cdk deploy",
+    "dev-deploy-unimelb": "bun run build && cd dev && bunx cdk deploy -c vpcName=UomPrimaryVpc",
     "dev-destroy": "bun run build && cd dev && bunx cdk destroy",
     "dev-synth": "bun run build && cd dev && bunx cdk synth"
   },

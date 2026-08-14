@@ -1,5 +1,5 @@
 ARG TARGETARCH
-ARG COPYRITE_VERSION=0.8.0
+ARG COPYRITE_VERSION=0.9.2
 
 FROM public.ecr.aws/docker/library/golang:1.24.1-alpine AS builder
 

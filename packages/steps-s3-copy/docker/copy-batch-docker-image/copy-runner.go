@@ -257,7 +257,7 @@ func copyRunner(copyBinary string, copyInterruptWait time.Duration, bucketDefini
 			continue
 		}
 
-		var cliArgs = []string{"copy", "--concurrency", "1"}
+		var cliArgs = []string{"copy", "--concurrency", "1", "--tag-mode", "best-effort", "--stalled-stream-protection", "disable-all"}
 		if bucketDefinitions != nil {
 			srcBucket := bucketNameFromS3Uri(copyArg.Source)
 			dstBucket := bucketNameFromS3Uri(copyArg.Destination)

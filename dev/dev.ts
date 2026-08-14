@@ -27,9 +27,12 @@ class StepsS3CopyStack extends Stack {
   constructor(scope?: Construct, id?: string, props?: StackProps) {
     super(scope, id, props);
 
-    // use the basic UMCCR vpc
+    // VPC name can be specified via context: -c vpcName=my-vpc
+    // Falls back to "main-vpc" if not provided.
+    const vpcName = this.node.tryGetContext("vpcName") ?? "main-vpc";
+
     const vpc = Vpc.fromLookup(this, "VPC", {
-      vpcName: "main-vpc",
+      vpcName: vpcName,
     });
 
     // we constantly create temporary files here as part of the test suite
