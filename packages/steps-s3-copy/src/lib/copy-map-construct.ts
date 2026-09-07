@@ -1,17 +1,18 @@
 import { Construct } from "constructs";
 import {
-  DistributedMap,
-  ItemBatcher,
   JitterType,
   JsonPath,
-  OutputType,
-  ResultWriterV2,
-  S3JsonLItemReader,
   StateGraph,
-  Transformation,
   Wait,
   WaitTime,
-  WriterConfig,
+  // NOTE: the following imports are only used by the commented-out "BetterMap"
+  // DistributedMap,
+  // ItemBatcher,
+  // OutputType,
+  // ResultWriterV2,
+  // S3JsonLItemReader,
+  // Transformation,
+  // WriterConfig,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { CopyRunTaskConstruct } from "./copy-run-task-construct";
 import { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -156,6 +157,8 @@ export class CopyMapConstruct extends Construct {
     // NOTE
     // NOT USED YET - WE WANT TO MOVE TO THIS ASAP - BUT CURRENTLY THE resultWriterV2
     // DOES NOT ALLOW JSONATA IN THE BUCKET
+    //
+    /*
     new DistributedMap(this, id + "BetterMap", {
       toleratedFailurePercentage: 0,
       itemReader: new S3JsonLItemReader({
@@ -180,6 +183,7 @@ export class CopyMapConstruct extends Construct {
         }),
       }),
     });
+    */
 
     this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,

@@ -197,12 +197,6 @@ export class StepsS3CopyConstruct extends Construct {
       dryRun: `{% [ ${stateInput("dryRun")}, false ][0] %}`,
       // default to failing on the first error.
       continueOnError: `{% [ ${stateInput("continueOnError")}, false ][0] %}`,
-      copyConcurrency: `{% [ $number(${stateInput(
-        "copyConcurrency",
-      )}), 80 ][0] %}`,
-      maxItemsPerBatch: `{% [ $number(${stateInput(
-        "maxItemsPerBatch",
-      )}), 8 ][0] %}`,
 
       // if thawParams is not passed in, we use an empty object
       thawParams: `{% $exists(${stateInput("thawParams")}) ? ${stateInput(
