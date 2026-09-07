@@ -198,6 +198,16 @@ export class StepsS3CopyConstruct extends Construct {
       // default to failing on the first error.
       continueOnError: `{% [ ${stateInput("continueOnError")}, false ][0] %}`,
 
+      // Defaults: smallCopyConcurrency uncapped, smallCopyBatchSize 128, largeCopyConcurrency 2000.
+      performance: `{% (
+        $p := [ ${stateInput("performance")}, {} ][0];
+        {
+          "smallCopyConcurrency": $p.smallCopyConcurrency,
+          "smallCopyBatchSize": [ $p.smallCopyBatchSize, 128 ][0],
+          "largeCopyConcurrency": [ $p.largeCopyConcurrency, 2000 ][0]
+        }
+      ) %}`,
+
       // if thawParams is not passed in, we use an empty object
       thawParams: `{% $exists(${stateInput("thawParams")}) ? ${stateInput(
         "thawParams",
