@@ -198,11 +198,14 @@ export class StepsS3CopyConstruct extends Construct {
       // default to failing on the first error.
       continueOnError: `{% [ ${stateInput("continueOnError")}, false ][0] %}`,
 
-      // Defaults: smallCopyConcurrency uncapped, smallCopyBatchSize 128, largeCopyConcurrency 2000.
+      // Defaults (chosen to preserve historical behaviour): headConcurrency and
+      // smallCopyConcurrency 10000 (the Distributed Map max, i.e. effectively uncapped),
+      // smallCopyBatchSize 128, largeCopyConcurrency 2000.
       performance: `{% (
         $p := [ ${stateInput("performance")}, {} ][0];
         {
-          "smallCopyConcurrency": $p.smallCopyConcurrency,
+          "headConcurrency": [ $p.headConcurrency, 10000 ][0],
+          "smallCopyConcurrency": [ $p.smallCopyConcurrency, 10000 ][0],
           "smallCopyBatchSize": [ $p.smallCopyBatchSize, 128 ][0],
           "largeCopyConcurrency": [ $p.largeCopyConcurrency, 2000 ][0]
         }
@@ -315,12 +318,12 @@ export class StepsS3CopyConstruct extends Construct {
     );
 
     const smallCopierMap = new SmallObjectsCopyMapConstruct(this, "Small", {
-      // for small items we use a value that is much bigger than what will work
-      // - this let steps batch them up itself
+      // batch size and concurrency come from the per-execution performance invoke argument.
+      // for small items we default to a batch size much bigger than what will work
+      // - this lets steps batch them up itself
       // to the max that can fit in its payload limit
       // this means that each invoke will for instance be copying 10-20 small items
       writerRole: this._workingRole,
-      maxItemsPerBatch: 128,
       inputPath: "$coordinateCopyResults.copySets.small",
     });
 
@@ -346,7 +349,6 @@ export class StepsS3CopyConstruct extends Construct {
         aggressiveTimes: props.aggressiveTimes,
         writerRole: this._workingRole,
         inputPath: "$coordinateCopyResults.copySets.smallThaw",
-        maxItemsPerBatch: 128,
       },
     );
 

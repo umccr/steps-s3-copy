@@ -1,9 +1,11 @@
 /**
  * Per-execution performance tuning for the copy stages.
  *
- * The copy pipeline splits objects into two stages by size, each backed by its own
- * Step Functions Distributed Map:
+ * Before copying, a "head" stage reads every source object to gather its size and storage class.
+ * The copy itself then splits objects into two stages by size, each backed by its own Step
+ * Functions Distributed Map:
  *
+ * - the "head" stage reads (HEADs) every source object. It touches the source system only.
  * - the "small" stage copies objects using a Lambda. Many small objects are batched into
  *   a single Lambda invocation to amortise start-up overhead, and parallelism comes from
  *   running many invocations at once.
@@ -11,10 +13,21 @@
  *   comes entirely from running many tasks at once, so there is deliberately no batch-size
  *   control for this stage (it is always one object per task).
  *
+ * Only the concurrency and small-copy batch size are exposed here. The head and large stages
+ * always use a batch size of 1 by design (the head stage to keep its result payload small, the
+ * large stage to avoid serialising big copies within a single task), so those batch sizes are not
+ * configurable.
+ *
  * All fields are optional. Anything left undefined falls back to a default that preserves the
  * historical behaviour (tuned for AWS S3 as the destination).
  */
 export type Performance = {
+  /**
+   * The maximum number of source objects to HEAD concurrently in the head stage. Lower this to
+   * reduce read load on a source system that cannot sustain high concurrency.
+   */
+  readonly headConcurrency?: number;
+
   /**
    * The maximum number of small-object copy Lambdas to run concurrently.
    */
@@ -183,6 +196,12 @@ export type StepsS3CopyInvokeSettings = {
  */
 export const invokeArg = (key: keyof StepsS3CopyInvokeArguments): string =>
   `$invokeArguments.${key}`;
+
+/**
+ * Builds a JSONPath reference into a field of the normalised `$invokeArguments.performance` object.
+ */
+export const performanceArg = (key: keyof Performance): string =>
+  `$invokeArguments.performance.${key}`;
 
 /**
  * Builds a JSONPath reference into the `$invokeSettings` state variable.
