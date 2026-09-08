@@ -193,15 +193,21 @@ export type StepsS3CopyInvokeSettings = {
 
 /**
  * Builds a JSONPath reference into the `$invokeArguments` state variable.
+ *
+ * Nested groups are available as namespaced helpers, e.g.
+ * `invokeArg.performance("largeCopyConcurrency")` -> `$invokeArguments.performance.largeCopyConcurrency`.
  */
-export const invokeArg = (key: keyof StepsS3CopyInvokeArguments): string =>
-  `$invokeArguments.${key}`;
-
-/**
- * Builds a JSONPath reference into a field of the normalised `$invokeArguments.performance` object.
- */
-export const performanceArg = (key: keyof Performance): string =>
-  `$invokeArguments.performance.${key}`;
+export const invokeArg = Object.assign(
+  (key: keyof StepsS3CopyInvokeArguments): string => `$invokeArguments.${key}`,
+  {
+    /**
+     * Builds a JSONPath reference into a field of the normalised
+     * `$invokeArguments.performance` object.
+     */
+    performance: (key: keyof Performance): string =>
+      `$invokeArguments.performance.${key}`,
+  },
+);
 
 /**
  * Builds a JSONPath reference into the `$invokeSettings` state variable.

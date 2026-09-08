@@ -29,7 +29,6 @@ import {
   CopyErrorName,
   invokeArg,
   invokeSetting,
-  performanceArg,
 } from "../steps-s3-copy-input";
 
 type Props = {
@@ -197,7 +196,7 @@ export class CopyMapConstruct extends Construct {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),
         "continueOnError.$": invokeArg("continueOnError"),
-        "largeCopyConcurrency.$": performanceArg("largeCopyConcurrency"),
+        "largeCopyConcurrency.$": invokeArg.performance("largeCopyConcurrency"),
       },
       inputPath: props.inputPath,
       itemReader: {

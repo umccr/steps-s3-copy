@@ -11,11 +11,7 @@ import { S3JsonlDistributedMap } from "./s3-jsonl-distributed-map";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { join } from "node:path";
 import { Architecture, Function, Runtime } from "aws-cdk-lib/aws-lambda";
-import {
-  invokeArg,
-  invokeSetting,
-  performanceArg,
-} from "../steps-s3-copy-input";
+import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
 type Props = {
   readonly writerRole: IRole;
@@ -50,7 +46,7 @@ export class HeadObjectsMapConstruct extends Construct {
       toleratedFailurePercentage: 0,
       // per-execution concurrency limit for HEADing source objects (defaults to effectively
       // uncapped). Lower it via performance.headConcurrency to be gentle on the source system.
-      maxConcurrencyPath: performanceArg("headConcurrency"),
+      maxConcurrencyPath: invokeArg.performance("headConcurrency"),
       // batch size is intentionally fixed at 1 and not exposed via performance:
       // our main danger is the _results_ of the head operations exceeding our Steps/lambda limits
       // some simple maths - the "head" data for a single object is a maximum of 1k(ish)

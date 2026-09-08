@@ -29,7 +29,7 @@ import {
   StepsS3CopyInvokeArguments,
   StepsS3CopyInvokeSettings,
   stateInput,
-  performanceArg,
+  invokeArg,
 } from "./steps-s3-copy-input";
 import { Aws, Duration, Stack } from "aws-cdk-lib";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
@@ -333,7 +333,7 @@ export class StepsS3CopyConstruct extends Construct {
       // via the distributed map itself. concurrency comes from the per-execution
       // performance invoke argument.
       maxItemsPerBatch: 1,
-      maxConcurrencyPath: performanceArg("largeCopyConcurrency"),
+      maxConcurrencyPath: invokeArg.performance("largeCopyConcurrency"),
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -358,7 +358,7 @@ export class StepsS3CopyConstruct extends Construct {
       addThawStep: true,
       aggressiveTimes: props.aggressiveTimes,
       maxItemsPerBatch: 1,
-      maxConcurrencyPath: performanceArg("largeCopyConcurrency"),
+      maxConcurrencyPath: invokeArg.performance("largeCopyConcurrency"),
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
