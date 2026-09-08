@@ -29,6 +29,7 @@ import {
   CopyErrorName,
   invokeArg,
   invokeSetting,
+  performanceArg,
 } from "../steps-s3-copy-input";
 
 type Props = {
@@ -69,12 +70,10 @@ export class CopyMapConstruct extends Construct {
     const TASK_LAUNCH_NUMBER = 500.0;
     const TASK_LAUNCH_PER_SECONDS = 60;
 
-    // Because the concurrency is now a per-execution value, the jitter "window" must be computed
-    // at runtime in JSONata (rather than at synth time). This mirrors the previous static maths:
-    //   waitWindow = floor(maxConcurrency / 500 * 60) + 1
-    // Each task then waits a random number of seconds in [0, waitWindow) before launching.
+    // The concurrency is a per-execution value, the jitter "window" must be computed
+    const concurrencyRef = "$states.input.BatchInput.largeCopyConcurrency";
     const waitWindowExpr =
-      `$floor((${props.maxConcurrencyPath} / ${TASK_LAUNCH_NUMBER})` +
+      `$floor(($number(${concurrencyRef}) / ${TASK_LAUNCH_NUMBER})` +
       ` * ${TASK_LAUNCH_PER_SECONDS}) + 1`;
 
     const delayStep = Wait.jsonata(this, id + "StartJitterDelay", {
@@ -198,6 +197,7 @@ export class CopyMapConstruct extends Construct {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),
         "continueOnError.$": invokeArg("continueOnError"),
+        "largeCopyConcurrency.$": performanceArg("largeCopyConcurrency"),
       },
       inputPath: props.inputPath,
       itemReader: {
