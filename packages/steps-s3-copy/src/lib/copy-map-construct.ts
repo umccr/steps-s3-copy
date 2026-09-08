@@ -40,7 +40,9 @@ type Props = {
   readonly inputPath: string;
 
   readonly maxItemsPerBatch: number;
-  readonly maxConcurrency: number;
+
+  // a JSONata/JSONPath reference to the per-execution concurrency value (from performance)
+  readonly maxConcurrencyPath: string;
 
   readonly taskDefinition: TaskDefinition;
   readonly containerDefinition: ContainerDefinition;
@@ -55,7 +57,7 @@ export class CopyMapConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    // we are passed in a desired maxConcurrency in our props
+    // we are passed in a per-execution maxConcurrency reference in our props
     // however - we need to fit in with the limits imposed by ECS/Fargate regarding
     // launch rates. So we introduce our own jitter for starting/
 
@@ -67,13 +69,16 @@ export class CopyMapConstruct extends Construct {
     const TASK_LAUNCH_NUMBER = 500.0;
     const TASK_LAUNCH_PER_SECONDS = 60;
 
-    const waitWindow =
-      Math.floor(
-        (props.maxConcurrency / TASK_LAUNCH_NUMBER) * TASK_LAUNCH_PER_SECONDS,
-      ) + 1;
+    // Because the concurrency is now a per-execution value, the jitter "window" must be computed
+    // at runtime in JSONata (rather than at synth time). This mirrors the previous static maths:
+    //   waitWindow = floor(maxConcurrency / 500 * 60) + 1
+    // Each task then waits a random number of seconds in [0, waitWindow) before launching.
+    const waitWindowExpr =
+      `$floor((${props.maxConcurrencyPath} / ${TASK_LAUNCH_NUMBER})` +
+      ` * ${TASK_LAUNCH_PER_SECONDS}) + 1`;
 
     const delayStep = Wait.jsonata(this, id + "StartJitterDelay", {
-      time: WaitTime.seconds(`{% $floor($random() * ${waitWindow}) %}`),
+      time: WaitTime.seconds(`{% $floor($random() * (${waitWindowExpr})) %}`),
     });
 
     /**
@@ -188,7 +193,7 @@ export class CopyMapConstruct extends Construct {
     this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
-      maxConcurrency: props.maxConcurrency,
+      maxConcurrencyPath: props.maxConcurrencyPath,
       batchInput: {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),

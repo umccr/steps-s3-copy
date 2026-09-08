@@ -29,6 +29,7 @@ import {
   StepsS3CopyInvokeArguments,
   StepsS3CopyInvokeSettings,
   stateInput,
+  performanceArg,
 } from "./steps-s3-copy-input";
 import { Aws, Duration, Stack } from "aws-cdk-lib";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
@@ -200,14 +201,14 @@ export class StepsS3CopyConstruct extends Construct {
 
       // Defaults (chosen to preserve historical behaviour): headConcurrency and
       // smallCopyConcurrency 10000 (the Distributed Map max, i.e. effectively uncapped),
-      // smallCopyBatchSize 128, largeCopyConcurrency 2000.
+      // smallCopyBatchSize 128, largeCopyConcurrency 96.
       performance: `{% (
         $p := [ ${stateInput("performance")}, {} ][0];
         {
           "headConcurrency": [ $p.headConcurrency, 10000 ][0],
           "smallCopyConcurrency": [ $p.smallCopyConcurrency, 10000 ][0],
           "smallCopyBatchSize": [ $p.smallCopyBatchSize, 128 ][0],
-          "largeCopyConcurrency": [ $p.largeCopyConcurrency, 2000 ][0]
+          "largeCopyConcurrency": [ $p.largeCopyConcurrency, 96 ][0]
         }
       ) %}`,
 
@@ -329,9 +330,10 @@ export class StepsS3CopyConstruct extends Construct {
 
     const largeCopierMap = new CopyMapConstruct(this, "Large", {
       // for larger items - designate a single copy at a time - gaining concurrency
-      // via the distributed map itself
+      // via the distributed map itself. concurrency comes from the per-execution
+      // performance invoke argument.
       maxItemsPerBatch: 1,
-      maxConcurrency: 96,
+      maxConcurrencyPath: performanceArg("largeCopyConcurrency"),
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -356,7 +358,7 @@ export class StepsS3CopyConstruct extends Construct {
       addThawStep: true,
       aggressiveTimes: props.aggressiveTimes,
       maxItemsPerBatch: 1,
-      maxConcurrency: 96,
+      maxConcurrencyPath: performanceArg("largeCopyConcurrency"),
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
