@@ -18,6 +18,13 @@ Edit the packages and deploy to dev
 bun run dev-deploy
 ```
 
+The dev stack looks up an existing VPC by name. By default it uses `main-vpc`. To deploy into a
+different VPC, pass the `vpcName` context:
+
+```shell
+bun run dev-deploy -c vpcName=my-vpc
+```
+
 To remove entirely
 
 ```shell
