@@ -6,6 +6,7 @@
  * Functions Distributed Map:
  *
  * - the "head" stage reads (HEADs) every source object. It touches the source system only.
+ *   Objects are batched into each HEAD Lambda invocation and HEADed sequentially within it.
  * - the "small" stage copies objects using a Lambda. Many small objects are batched into
  *   a single Lambda invocation to amortise start-up overhead, and parallelism comes from
  *   running many invocations at once.
