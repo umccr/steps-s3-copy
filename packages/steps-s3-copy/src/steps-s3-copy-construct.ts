@@ -199,9 +199,8 @@ export class StepsS3CopyConstruct extends Construct {
       // default to failing on the first error.
       continueOnError: `{% [ ${stateInput("continueOnError")}, false ][0] %}`,
 
-      // Defaults (chosen to preserve historical behaviour): headConcurrency and
-      // smallCopyConcurrency 10000 (the Distributed Map max, i.e. effectively uncapped),
-      // smallCopyBatchSize 128, largeCopyConcurrency 96.
+      // Default values: headConcurrency and smallCopyConcurrency 10000 (the effective limit may
+      // be lower due to account/compute quotas), smallCopyBatchSize 128, largeCopyConcurrency 96.
       performance: `{% (
         $p := [ ${stateInput("performance")}, {} ][0];
         {

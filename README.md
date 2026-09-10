@@ -229,9 +229,9 @@ export type StepsS3CopyInvokeArguments = {
    * to a default (AWS S3 tuned behaviour).
    */
   readonly performance?: {
-    /** Max source objects to HEAD concurrently. Default: 10000 (effectively uncapped). */
+    /** Max source objects to HEAD concurrently. Default: 10000.  */
     readonly headConcurrency?: number;
-    /** Max small-object copy Lambdas to run concurrently. Default: 10000 (effectively uncapped). */
+    /** Max small-object copy Lambdas to run concurrently. Default: 10000. */
     readonly smallCopyConcurrency?: number;
     /** Max small objects per small-object copy Lambda invocation. Default: 128. */
     readonly smallCopyBatchSize?: number;
