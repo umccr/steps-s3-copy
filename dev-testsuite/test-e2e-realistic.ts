@@ -115,7 +115,7 @@ test(
           instructionsKey: state.testInstructionsKey,
           destinationBucket: state.workingBucket,
           destinationPrefix: `${state.testDestPrefix}${DEST}`,
-          maxItemsPerBatch: 3,
+          performance: { smallCopyBatchSize: 3 },
           retainHtmlReport: true,
           retainSummaryCsv: true,
         }),

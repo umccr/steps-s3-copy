@@ -91,7 +91,7 @@ test(
           destinationPrefix: `${state.testDestPrefix}${DEST}`,
           // the destination is not in AWS so disable the region check
           destinationRequiredRegion: "",
-          maxItemsPerBatch: 3,
+          performance: { smallCopyBatchSize: 3 },
           bucketDefinitions: {
             [S3_BUCKET]: cephBucketDefinition,
           },

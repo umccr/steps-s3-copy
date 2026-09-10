@@ -33,7 +33,8 @@ export interface S3JsonlDistributedMapProps {
   };
   readonly itemSelector?: Readonly<Record<string, JsonPath | string>>;
 
-  readonly maxItemsPerBatch: number;
+  readonly maxItemsPerBatch?: number;
+  readonly maxItemsPerBatchPath?: JsonPath | string;
   readonly batchInput: object | undefined;
 
   readonly maxConcurrency?: number;
@@ -65,6 +66,11 @@ export class S3JsonlDistributedMap
     if (props.maxConcurrency && props.maxConcurrencyPath)
       throw Error(
         "Only one of maxConcurrency or maxConcurrencyPath can be set",
+      );
+
+    if (props.maxItemsPerBatch && props.maxItemsPerBatchPath)
+      throw Error(
+        "Only one of maxItemsPerBatch or maxItemsPerBatchPath can be set",
       );
 
     this.policy = new Policy(this, "IamRole");
@@ -135,6 +141,7 @@ export class S3JsonlDistributedMap
       ItemSelector: this.props.itemSelector,
       ItemBatcher: {
         MaxItemsPerBatch: this.props.maxItemsPerBatch,
+        MaxItemsPerBatchPath: this.props.maxItemsPerBatchPath,
         BatchInput: this.props.batchInput,
       },
       MaxConcurrency: this.props.maxConcurrency,
