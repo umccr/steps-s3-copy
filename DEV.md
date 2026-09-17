@@ -18,6 +18,15 @@ Edit the packages and deploy to dev
 bun run dev-deploy
 ```
 
+If a deployment needs settings to adjust the memory or concurrency, change the `cdk.json`
+`deployments` block.
+
+For example, to run the unimelb deployment:
+
+```shell
+bun run dev-deploy-unimelb
+```
+
 To remove entirely
 
 ```shell

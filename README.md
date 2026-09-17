@@ -58,10 +58,10 @@ export interface StepsS3CopyConstructProps {
   readonly workingBucket: string;
 
   /**
-   * A prefix in the workingBucket that will be used for all artifacts
-   * created. Note that the prefix can be something simple such as "temp".
-   * The copy out stack will handle making sure there is enough
-   * uniqueness in artifacts that they don't clash.
+   * A slash terminated prefix in the workingBucket that will be used for all artifacts
+   * created. Note that the prefix can be something simple such as a shared "temp/" folder, as
+   * the copy out stack will itself handle making sure there is enough
+   * uniqueness in artifacts so they don't clash.
    *
    * If undefined or the empty string, then artifacts will be created in the root
    * of the bucket.
@@ -82,6 +82,24 @@ export interface StepsS3CopyConstructProps {
    * primary use case is to copy objects "out" of the account/buckets.
    */
   readonly allowWriteToInstalledAccount?: boolean;
+
+  /**
+   * The maximum number of large-object copy tasks that may run at once.
+   * Defaults to 96.
+   */
+  readonly largeCopyMaxConcurrency?: number;
+
+  /**
+   * The number of small objects handed to a single copy Lambda invocation.
+   * Defaults to 128.
+   */
+  readonly smallCopyMaxItemsPerBatch?: number;
+
+  /**
+   * The memory, in MiB, given to the Lambda that copies small objects.
+   * Defaults to 128.
+   */
+  readonly smallCopyMemorySize?: number;
 }
 ```
 
