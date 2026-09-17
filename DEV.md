@@ -25,6 +25,12 @@ different VPC, pass the `vpcName` context:
 bun run dev-deploy -c vpcName=my-vpc
 ```
 
+The memory given to the small-object copy Lambda is set the same way:
+
+```shell
+bun run dev-deploy -c smallCopyMemorySize=2048
+```
+
 To remove entirely
 
 ```shell

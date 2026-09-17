@@ -320,11 +320,11 @@ export class StepsS3CopyConstruct extends Construct {
     const smallCopierMap = new SmallObjectsCopyMapConstruct(this, "Small", {
       // batch size and concurrency come from the per-execution performance invoke argument.
       // for small items we default to a batch size much bigger than what will work
-      // - this lets steps batch them up itself
-      // to the max that can fit in its payload limit
+      // - this lets steps batch them up itself to the max that can fit in its payload limit
       // this means that each invoke will for instance be copying 10-20 small items
       writerRole: this._workingRole,
       inputPath: "$coordinateCopyResults.copySets.small",
+      memorySize: props.smallCopyMemorySize,
     });
 
     const largeCopierMap = new CopyMapConstruct(this, "Large", {
@@ -350,6 +350,7 @@ export class StepsS3CopyConstruct extends Construct {
         aggressiveTimes: props.aggressiveTimes,
         writerRole: this._workingRole,
         inputPath: "$coordinateCopyResults.copySets.smallThaw",
+        memorySize: props.smallCopyMemorySize,
       },
     );
 

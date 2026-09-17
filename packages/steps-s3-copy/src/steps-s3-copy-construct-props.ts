@@ -57,4 +57,10 @@ export interface StepsS3CopyConstructProps {
    * primary use case is to copy objects "out" of the account/buckets.
    */
   readonly allowWriteToInstalledAccount?: boolean;
+
+  /**
+   * The memory, in MiB, given to the Lambda that copies small objects.
+   * Defaults to 128.
+   */
+  readonly smallCopyMemorySize?: number;
 }
