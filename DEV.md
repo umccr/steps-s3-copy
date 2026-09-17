@@ -18,13 +18,17 @@ Edit the packages and deploy to dev
 bun run dev-deploy
 ```
 
-If a deployment needs settings to adjust the memory or concurrency, change the `cdk.json`
-`deployments` block.
-
-For example, to run the unimelb deployment:
+The dev stack looks up an existing VPC by name. By default it uses `main-vpc`. To deploy into a
+different VPC, pass the `vpcName` context:
 
 ```shell
-bun run dev-deploy-unimelb
+bun run dev-deploy -c vpcName=my-vpc
+```
+
+The memory given to the small-object copy Lambda is set the same way:
+
+```shell
+bun run dev-deploy -c smallCopyMemorySize=2048
 ```
 
 To remove entirely

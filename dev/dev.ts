@@ -1,7 +1,4 @@
-import {
-  StepsS3CopyConstruct,
-  type StepsS3CopyConstructProps,
-} from "@umccr/steps-s3-copy";
+import { StepsS3CopyConstruct } from "@umccr/steps-s3-copy";
 import { TEST_BUCKET_ONE_DAY_PREFIX } from "../dev-constants/constants";
 import { SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import {
@@ -24,56 +21,15 @@ const description = "A steps orchestration for S3 object copying";
 const WORKING_BUCKET_PREFIX = "";
 
 /**
- * One deployment, from the "deployments" block in cdk.json.
- */
-type Deployment = {
-  readonly vpcName?: string;
-  readonly copy?: Pick<
-    StepsS3CopyConstructProps,
-    | "largeCopyMaxConcurrency"
-    | "smallCopyMaxItemsPerBatch"
-    | "smallCopyMemorySize"
-  >;
-};
-
-/**
- * The deployment named by `-c deployment=<name>`.
- */
-function deploymentContext(scope: Construct): Deployment {
-  const name = scope.node.tryGetContext("deployment");
-  if (name === undefined || name === null || name === "") {
-    return {};
-  }
-
-  const all = (scope.node.tryGetContext("deployments") ?? {}) as Record<
-    string,
-    Deployment
-  >;
-
-  const found = all[name];
-  if (found === undefined) {
-    const known = Object.keys(all).join(", ") || "none";
-
-    throw new Error(
-      `no deployment named "${name}" in cdk.json; known deployments: ${known}`,
-    );
-  }
-
-  return found;
-}
-
-/**
  * Development test deployment of the Steps S3 Copy functionality.
  */
 class StepsS3CopyStack extends Stack {
   constructor(scope?: Construct, id?: string, props?: StackProps) {
     super(scope, id, props);
 
-    const deployment = deploymentContext(this);
-
-    // VPC name comes from the named deployment, or directly via -c vpcName=my-vpc.
-    const vpcName =
-      deployment.vpcName ?? this.node.tryGetContext("vpcName") ?? "main-vpc";
+    // VPC name can be specified via context: -c vpcName=my-vpc
+    // Falls back to "main-vpc" if not provided.
+    const vpcName = this.node.tryGetContext("vpcName") ?? "main-vpc";
 
     const vpc = Vpc.fromLookup(this, "VPC", {
       vpcName: vpcName,
@@ -150,7 +106,8 @@ class StepsS3CopyStack extends Stack {
       aggressiveTimes: true,
       writerRoleName: "steps-s3-copy-role",
       allowWriteToInstalledAccount: true,
-      ...deployment.copy,
+      smallCopyMemorySize:
+        Number(this.node.tryGetContext("smallCopyMemorySize")) || undefined,
     });
 
     new CfnOutput(this, "StateMachineArn", {

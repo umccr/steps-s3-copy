@@ -1,17 +1,18 @@
 import { Construct } from "constructs";
 import {
-  DistributedMap,
-  ItemBatcher,
   JitterType,
   JsonPath,
-  OutputType,
-  ResultWriterV2,
-  S3JsonLItemReader,
   StateGraph,
-  Transformation,
   Wait,
   WaitTime,
-  WriterConfig,
+  // NOTE: the following imports are only used by the commented-out "BetterMap"
+  // DistributedMap,
+  // ItemBatcher,
+  // OutputType,
+  // ResultWriterV2,
+  // S3JsonLItemReader,
+  // Transformation,
+  // WriterConfig,
 } from "aws-cdk-lib/aws-stepfunctions";
 import { CopyRunTaskConstruct } from "./copy-run-task-construct";
 import { SubnetType } from "aws-cdk-lib/aws-ec2";
@@ -39,7 +40,9 @@ type Props = {
   readonly inputPath: string;
 
   readonly maxItemsPerBatch: number;
-  readonly maxConcurrency: number;
+
+  // a JSONata/JSONPath reference to the per-execution concurrency value (from performance)
+  readonly maxConcurrencyPath: string;
 
   readonly taskDefinition: TaskDefinition;
   readonly containerDefinition: ContainerDefinition;
@@ -54,7 +57,7 @@ export class CopyMapConstruct extends Construct {
   constructor(scope: Construct, id: string, props: Props) {
     super(scope, id);
 
-    // we are passed in a desired maxConcurrency in our props
+    // we are passed in a per-execution maxConcurrency reference in our props
     // however - we need to fit in with the limits imposed by ECS/Fargate regarding
     // launch rates. So we introduce our own jitter for starting/
 
@@ -66,13 +69,14 @@ export class CopyMapConstruct extends Construct {
     const TASK_LAUNCH_NUMBER = 500.0;
     const TASK_LAUNCH_PER_SECONDS = 60;
 
-    const waitWindow =
-      Math.floor(
-        (props.maxConcurrency / TASK_LAUNCH_NUMBER) * TASK_LAUNCH_PER_SECONDS,
-      ) + 1;
+    // The concurrency is a per-execution value, the jitter "window" must be computed
+    const concurrencyRef = "$states.input.BatchInput.largeCopyConcurrency";
+    const waitWindowExpr =
+      `$floor(($number(${concurrencyRef}) / ${TASK_LAUNCH_NUMBER})` +
+      ` * ${TASK_LAUNCH_PER_SECONDS}) + 1`;
 
     const delayStep = Wait.jsonata(this, id + "StartJitterDelay", {
-      time: WaitTime.seconds(`{% $floor($random() * ${waitWindow}) %}`),
+      time: WaitTime.seconds(`{% $floor($random() * (${waitWindowExpr})) %}`),
     });
 
     /**
@@ -156,6 +160,8 @@ export class CopyMapConstruct extends Construct {
     // NOTE
     // NOT USED YET - WE WANT TO MOVE TO THIS ASAP - BUT CURRENTLY THE resultWriterV2
     // DOES NOT ALLOW JSONATA IN THE BUCKET
+    //
+    /*
     new DistributedMap(this, id + "BetterMap", {
       toleratedFailurePercentage: 0,
       itemReader: new S3JsonLItemReader({
@@ -180,15 +186,17 @@ export class CopyMapConstruct extends Construct {
         }),
       }),
     });
+    */
 
     this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
       maxItemsPerBatch: props.maxItemsPerBatch,
-      maxConcurrency: props.maxConcurrency,
+      maxConcurrencyPath: props.maxConcurrencyPath,
       batchInput: {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),
         "continueOnError.$": invokeArg("continueOnError"),
+        "largeCopyConcurrency.$": invokeArg.performance("largeCopyConcurrency"),
       },
       inputPath: props.inputPath,
       itemReader: {

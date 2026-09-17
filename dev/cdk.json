@@ -1,15 +1,4 @@
 {
   "app": "bun run dev.ts",
-  "context": {
-    "deployments": {
-      "unimelb": {
-        "vpcName": "UomPrimaryVpc",
-        "copy": {
-          "largeCopyMaxConcurrency": 24,
-          "smallCopyMaxItemsPerBatch": 16,
-          "smallCopyMemorySize": 2048
-        }
-      }
-    }
-  }
+  "context": {}
 }

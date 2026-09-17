@@ -29,6 +29,7 @@ import {
   StepsS3CopyInvokeArguments,
   StepsS3CopyInvokeSettings,
   stateInput,
+  invokeArg,
 } from "./steps-s3-copy-input";
 import { Aws, Duration, Stack } from "aws-cdk-lib";
 import { ValidateThawParamsLambdaStepConstruct } from "./lib/validate-thaw-params-lambda-step-construct";
@@ -36,11 +37,6 @@ import { CanWriteLambdaStepConstruct } from "./lib/can-write-lambda-step-constru
 import { PricingDataLambdaStepConstruct } from "./lib/fetch-pricing-data-lambda-step-construct";
 import { CopyMapConstruct } from "./lib/copy-map-construct";
 import { StepsS3CopyConstructProps } from "./steps-s3-copy-construct-props";
-import {
-  DEFAULT_LARGE_COPY_MAX_CONCURRENCY,
-  DEFAULT_SMALL_COPY_MAX_ITEMS_PER_BATCH,
-  DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB,
-} from "./lib/copy-defaults";
 import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
@@ -202,12 +198,18 @@ export class StepsS3CopyConstruct extends Construct {
       dryRun: `{% [ ${stateInput("dryRun")}, false ][0] %}`,
       // default to failing on the first error.
       continueOnError: `{% [ ${stateInput("continueOnError")}, false ][0] %}`,
-      copyConcurrency: `{% [ $number(${stateInput(
-        "copyConcurrency",
-      )}), 80 ][0] %}`,
-      maxItemsPerBatch: `{% [ $number(${stateInput(
-        "maxItemsPerBatch",
-      )}), 8 ][0] %}`,
+
+      // Default values: headConcurrency and smallCopyConcurrency 10000 (the effective limit may
+      // be lower due to account/compute quotas), smallCopyBatchSize 128, largeCopyConcurrency 96.
+      performance: `{% (
+        $p := [ ${stateInput("performance")}, {} ][0];
+        {
+          "headConcurrency": [ $p.headConcurrency, 10000 ][0],
+          "smallCopyConcurrency": [ $p.smallCopyConcurrency, 10000 ][0],
+          "smallCopyBatchSize": [ $p.smallCopyBatchSize, 128 ][0],
+          "largeCopyConcurrency": [ $p.largeCopyConcurrency, 96 ][0]
+        }
+      ) %}`,
 
       // if thawParams is not passed in, we use an empty object
       thawParams: `{% $exists(${stateInput("thawParams")}) ? ${stateInput(
@@ -316,25 +318,21 @@ export class StepsS3CopyConstruct extends Construct {
     );
 
     const smallCopierMap = new SmallObjectsCopyMapConstruct(this, "Small", {
-      // for small items we use a value that is much bigger than what will work
-      // - this let steps batch them up itself
-      // to the max that can fit in its payload limit
+      // batch size and concurrency come from the per-execution performance invoke argument.
+      // for small items we default to a batch size much bigger than what will work
+      // - this lets steps batch them up itself to the max that can fit in its payload limit
       // this means that each invoke will for instance be copying 10-20 small items
       writerRole: this._workingRole,
-      maxItemsPerBatch:
-        props.smallCopyMaxItemsPerBatch ??
-        DEFAULT_SMALL_COPY_MAX_ITEMS_PER_BATCH,
-      memorySize:
-        props.smallCopyMemorySize ?? DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB,
       inputPath: "$coordinateCopyResults.copySets.small",
+      memorySize: props.smallCopyMemorySize,
     });
 
     const largeCopierMap = new CopyMapConstruct(this, "Large", {
       // for larger items - designate a single copy at a time - gaining concurrency
-      // via the distributed map itself
+      // via the distributed map itself. concurrency comes from the per-execution
+      // performance invoke argument.
       maxItemsPerBatch: 1,
-      maxConcurrency:
-        props.largeCopyMaxConcurrency ?? DEFAULT_LARGE_COPY_MAX_CONCURRENCY,
+      maxConcurrencyPath: invokeArg.performance("largeCopyConcurrency"),
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,
@@ -352,11 +350,7 @@ export class StepsS3CopyConstruct extends Construct {
         aggressiveTimes: props.aggressiveTimes,
         writerRole: this._workingRole,
         inputPath: "$coordinateCopyResults.copySets.smallThaw",
-        maxItemsPerBatch:
-          props.smallCopyMaxItemsPerBatch ??
-          DEFAULT_SMALL_COPY_MAX_ITEMS_PER_BATCH,
-        memorySize:
-          props.smallCopyMemorySize ?? DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB,
+        memorySize: props.smallCopyMemorySize,
       },
     );
 
@@ -364,8 +358,7 @@ export class StepsS3CopyConstruct extends Construct {
       addThawStep: true,
       aggressiveTimes: props.aggressiveTimes,
       maxItemsPerBatch: 1,
-      maxConcurrency:
-        props.largeCopyMaxConcurrency ?? DEFAULT_LARGE_COPY_MAX_CONCURRENCY,
+      maxConcurrencyPath: invokeArg.performance("largeCopyConcurrency"),
       cluster: cluster,
       clusterVpcSubnetSelection: props.vpcSubnetSelection,
       writerRole: this._workingRole,

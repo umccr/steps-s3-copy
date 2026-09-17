@@ -1,4 +1,55 @@
 /**
+ * Per-execution performance tuning for the copy stages.
+ *
+ * Before copying, a "head" stage reads every source object to gather its size and storage class.
+ * The copy itself then splits objects into two stages by size, each backed by its own Step
+ * Functions Distributed Map:
+ *
+ * - the "head" stage reads (HEADs) every source object. It touches the source system only.
+ *   Objects are batched into each HEAD Lambda invocation and HEADed sequentially within it.
+ * - the "small" stage copies objects using a Lambda. Many small objects are batched into
+ *   a single Lambda invocation to amortise start-up overhead, and parallelism comes from
+ *   running many invocations at once.
+ * - the "large" stage copies objects using a Fargate task, one object per task. Parallelism
+ *   comes entirely from running many tasks at once, so there is deliberately no batch-size
+ *   control for this stage (it is always one object per task).
+ *
+ * Only the concurrency and small-copy batch size are exposed here. The head and large stages
+ * always use a batch size of 1 by design (the head stage to keep its result payload small, the
+ * large stage to avoid serialising big copies within a single task), so those batch sizes are not
+ * configurable.
+ *
+ * All fields are optional. Anything left undefined falls back to a default that preserves the
+ * historical behaviour (tuned for AWS S3 as the destination).
+ */
+export type Performance = {
+  /**
+   * The maximum number of source objects to HEAD concurrently in the head stage. Lower this to
+   * reduce read load on a source system that cannot sustain high concurrency.
+   */
+  readonly headConcurrency?: number;
+
+  /**
+   * The maximum number of small-object copy Lambdas to run concurrently.
+   */
+  readonly smallCopyConcurrency?: number;
+
+  /**
+   * The maximum number of small objects handed to a single small-object copy Lambda invocation.
+   * Larger batches amortise Lambda start-up cost across more objects.
+   */
+  readonly smallCopyBatchSize?: number;
+
+  /**
+   * The maximum number of large-object copy Fargate tasks to run concurrently.
+   *
+   * Note there is intentionally no large-object batch size - each Fargate task copies exactly one
+   * object so that large copies run in parallel rather than being serialised within a task.
+   */
+  readonly largeCopyConcurrency?: number;
+};
+
+/**
  * The type that matches our expected input to the state machine.
  * This is more for internal consistency - it is not directly
  * used to define the "schema" of the state machine.
@@ -90,8 +141,15 @@ export type StepsS3CopyInvokeArguments = {
    */
   readonly continueOnError?: boolean;
 
-  readonly copyConcurrency?: number;
-  readonly maxItemsPerBatch?: number;
+  /**
+   * Optional per-execution performance tuning for the copy stages. Use this to limit the load
+   * placed on the source/destination systems - for example when copying to or from a system that
+   * cannot sustain the very high concurrency that AWS S3 can.
+   *
+   * Any field left undefined falls back to a default chosen to preserve the historical behaviour
+   * (tuned for AWS S3 as the destination).
+   */
+  readonly performance?: Performance;
 
   /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
@@ -136,9 +194,21 @@ export type StepsS3CopyInvokeSettings = {
 
 /**
  * Builds a JSONPath reference into the `$invokeArguments` state variable.
+ *
+ * Nested groups are available as namespaced helpers, e.g.
+ * `invokeArg.performance("largeCopyConcurrency")` -> `$invokeArguments.performance.largeCopyConcurrency`.
  */
-export const invokeArg = (key: keyof StepsS3CopyInvokeArguments): string =>
-  `$invokeArguments.${key}`;
+export const invokeArg = Object.assign(
+  (key: keyof StepsS3CopyInvokeArguments): string => `$invokeArguments.${key}`,
+  {
+    /**
+     * Builds a JSONPath reference into a field of the normalised
+     * `$invokeArguments.performance` object.
+     */
+    performance: (key: keyof Performance): string =>
+      `$invokeArguments.performance.${key}`,
+  },
+);
 
 /**
  * Builds a JSONPath reference into the `$invokeSettings` state variable.

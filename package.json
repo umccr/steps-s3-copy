@@ -14,9 +14,7 @@
     "package": "cd packages/steps-s3-copy && bun run package",
     "clean": "git clean -fXd",
     "dev-deploy": "bun run build && cd dev && bunx cdk deploy",
-    "dev-deploy-unimelb": "bun run build && cd dev && bunx cdk deploy -c deployment=unimelb",
-    "dev-diff-unimelb": "bun run build && cd dev && bunx cdk diff -c deployment=unimelb",
-    "dev-synth-unimelb": "bun run build && cd dev && bunx cdk synth -c deployment=unimelb",
+    "dev-deploy-unimelb": "bun run build && cd dev && bunx cdk deploy -c vpcName=UomPrimaryVpc -c smallCopyMemorySize=2048",
     "dev-destroy": "bun run build && cd dev && bunx cdk destroy",
     "dev-synth": "bun run build && cd dev && bunx cdk synth"
   },

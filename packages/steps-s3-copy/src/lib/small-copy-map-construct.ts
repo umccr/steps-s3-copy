@@ -16,12 +16,15 @@ import { Platform } from "aws-cdk-lib/aws-ecr-assets";
 import { JitterType } from "aws-cdk-lib/aws-stepfunctions";
 import { join } from "path";
 import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
-import { DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB } from "./copy-defaults";
+
+/**
+ * Default memory in MiB for the small-object copy Lambda.
+ */
+const DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB = 128;
 
 type Props = {
   readonly writerRole: IRole;
   readonly inputPath: string;
-  readonly maxItemsPerBatch: number;
   readonly memorySize?: number;
   readonly addThawStep?: boolean;
   readonly aggressiveTimes?: boolean;
@@ -84,7 +87,8 @@ export class SmallObjectsCopyMapConstruct extends Construct {
 
     this.distributedMap = new S3JsonlDistributedMap(this, id, {
       toleratedFailurePercentage: 0,
-      maxItemsPerBatch: props.maxItemsPerBatch,
+      maxItemsPerBatchPath: invokeArg.performance("smallCopyBatchSize"),
+      maxConcurrencyPath: invokeArg.performance("smallCopyConcurrency"),
       batchInput: {
         "thawParams.$": invokeArg("thawParams"),
         "bucketDefinitions.$": invokeArg("bucketDefinitions"),

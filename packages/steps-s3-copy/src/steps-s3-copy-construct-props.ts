@@ -59,18 +59,6 @@ export interface StepsS3CopyConstructProps {
   readonly allowWriteToInstalledAccount?: boolean;
 
   /**
-   * The maximum number of large-object copy tasks that may run at once.
-   * Defaults to 96.
-   */
-  readonly largeCopyMaxConcurrency?: number;
-
-  /**
-   * The number of small objects handed to a single copy Lambda invocation.
-   * Defaults to 128.
-   */
-  readonly smallCopyMaxItemsPerBatch?: number;
-
-  /**
    * The memory, in MiB, given to the Lambda that copies small objects.
    * Defaults to 128.
    */

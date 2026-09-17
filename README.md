@@ -84,18 +84,6 @@ export interface StepsS3CopyConstructProps {
   readonly allowWriteToInstalledAccount?: boolean;
 
   /**
-   * The maximum number of large-object copy tasks that may run at once.
-   * Defaults to 96.
-   */
-  readonly largeCopyMaxConcurrency?: number;
-
-  /**
-   * The number of small objects handed to a single copy Lambda invocation.
-   * Defaults to 128.
-   */
-  readonly smallCopyMaxItemsPerBatch?: number;
-
-  /**
    * The memory, in MiB, given to the Lambda that copies small objects.
    * Defaults to 128.
    */
@@ -240,8 +228,25 @@ export type StepsS3CopyInvokeArguments = {
    */
   readonly continueOnError?: boolean;
 
-  readonly copyConcurrency?: number;
-  readonly maxItemsPerBatch?: number;
+  /**
+   * Optional per-execution performance tuning for the copy stages. Use this to limit the load
+   * placed on the destination systems (for example when copying to a system that
+   * cannot sustain the very high concurrency that AWS S3 can). Any field left undefined falls back
+   * to a default (AWS S3 tuned behaviour).
+   */
+  readonly performance?: {
+    /** Max source objects to HEAD concurrently. Default: 10000.  */
+    readonly headConcurrency?: number;
+    /** Max small-object copy Lambdas to run concurrently. Default: 10000. */
+    readonly smallCopyConcurrency?: number;
+    /** Max small objects per small-object copy Lambda invocation. Default: 128. */
+    readonly smallCopyBatchSize?: number;
+    /** Max large-object copy Fargate tasks to run concurrently. Default: 96. */
+    readonly largeCopyConcurrency?: number;
+    // Note: the head and large stages always copy with a batch size of 1 by design
+    // (head to keep result payloads small, large to avoid serialising big copies within a
+    // task), so those batch sizes are intentionally not configurable.
+  };
 
   /**
    * Optional thawing parameters. Missing `thawParams` is normalised to `{}` by the state machine,
@@ -378,10 +383,15 @@ Invoke args:
   "htmlReport": true,
   "retainHtmlReport": true,
   "retainSummaryCsv": true,
-  "copyConcurrency": 80,
-  "maxItemsPerBatch": 8
+  "performance": {
+    "smallCopyConcurrency": 500,
+    "smallCopyBatchSize": 128,
+    "largeCopyConcurrency": 50
+  }
 }
 ```
+
+The `performance` block is optional. Omit it (or any field) to use the defaults tuned for AWS S3.
 
 In the working bucket, the following would be the structure:
 
