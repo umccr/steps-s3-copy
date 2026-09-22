@@ -17,9 +17,15 @@ import { JitterType } from "aws-cdk-lib/aws-stepfunctions";
 import { join } from "path";
 import { invokeArg, invokeSetting } from "../steps-s3-copy-input";
 
+/**
+ * Default memory in MiB for the small-object copy Lambda.
+ */
+const DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB = 128;
+
 type Props = {
   readonly writerRole: IRole;
   readonly inputPath: string;
+  readonly memorySize?: number;
   readonly addThawStep?: boolean;
   readonly aggressiveTimes?: boolean;
 };
@@ -149,7 +155,7 @@ export class SmallCopyLambdaConstruct extends Construct {
       role: props.writerRole,
       code: code,
       architecture: Architecture.ARM_64,
-      memorySize: 128,
+      memorySize: props.memorySize ?? DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB,
       // we can theoretically need to loop through lots of objects - and those object Heads etc may
       // be doing back-off/retries because of all the concurrent activity
       // so we give ourselves plenty of time

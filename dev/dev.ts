@@ -106,6 +106,8 @@ class StepsS3CopyStack extends Stack {
       aggressiveTimes: true,
       writerRoleName: "steps-s3-copy-role",
       allowWriteToInstalledAccount: true,
+      smallCopyMemorySize:
+        Number(this.node.tryGetContext("smallCopyMemorySize")) || undefined,
     });
 
     new CfnOutput(this, "StateMachineArn", {
