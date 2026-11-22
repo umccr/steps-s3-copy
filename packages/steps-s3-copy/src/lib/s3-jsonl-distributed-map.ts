@@ -1,3 +1,4 @@
+import { ArnFormat, Stack } from "aws-cdk-lib";
 import {
   Chain,
   IChainable,
@@ -98,6 +99,23 @@ export class S3JsonlDistributedMap
           "states:StopExecution",
         ],
         resources: [stateMachine.stateMachineArn],
+      }),
+    );
+
+    // allows redriving failed child executions of the map run (RedriveExecution
+    // is evaluated against the child execution ARNs, not the state machine ARN)
+    this.policy.addStatements(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["states:RedriveExecution"],
+        resources: [
+          Stack.of(stateMachine).formatArn({
+            service: "states",
+            resource: "execution",
+            resourceName: `${stateMachine.stateMachineName}/*:*`,
+            arnFormat: ArnFormat.COLON_RESOURCE_NAME,
+          }),
+        ],
       }),
     );
 
