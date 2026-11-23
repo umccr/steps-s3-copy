@@ -806,11 +806,11 @@ export async function readPricingDataJsonFromS3(
   const pricingData = JSON.parse(body) as PricingData;
 
   //Warn if last egress price tier does not end at Infinity, meaning the last cost tiering is not covered.
-  const egressPriceTiers = pricingData.crossRegionCosts?.egressPriceTiers ?? [];
+  const egressPriceTiers = pricingData.egressCosts?.egressPriceTiers ?? [];
   const lastTier = egressPriceTiers[egressPriceTiers.length - 1];
   if (lastTier?.endRangeGb !== Infinity) {
     console.warn(
-      "[COST WARNING] Last egress price tier does NOT have endRangeGb: Infinity. Some cross-region cost estimates may be incomplete.",
+      "[COST WARNING] Last egress price tier does NOT have endRangeGb: Infinity. Some egress cost estimates may be incomplete.",
     );
   }
 
