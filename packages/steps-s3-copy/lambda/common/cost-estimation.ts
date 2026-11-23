@@ -395,6 +395,52 @@ export async function fetchEgressCosts(
   return { egressPriceTiers };
 }
 
+/**
+ * Fetches the price per GB for sending data from one AWS region to another.
+ * AWS prices this per pair of regions, and unlike internet egress it is a single
+ * flat price, with no volume tiers.
+ */
+export async function fetchCrossRegionPrice(
+  fromRegion: string,
+  toRegion: string,
+): Promise<number> {
+  const client = createPricingClient();
+  const response = await throttledGetProducts(client, {
+    ServiceCode: "AWSDataTransfer",
+    Filters: [
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "fromRegionCode",
+        Value: fromRegion,
+      },
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "toRegionCode",
+        Value: toRegion,
+      },
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "transferType",
+        Value: "InterRegion Outbound",
+      },
+    ],
+    MaxResults: 1,
+  });
+  if (!response.PriceList?.length) return 0;
+
+  const priceItem = JSON.parse(response.PriceList[0] as string);
+  const terms = priceItem.terms?.OnDemand || {};
+
+  for (const termKey of Object.keys(terms)) {
+    const priceDimensions = terms[termKey].priceDimensions || {};
+    for (const dimKey of Object.keys(priceDimensions)) {
+      const usd = priceDimensions[dimKey].pricePerUnit?.USD;
+      if (usd) return parseFloat(usd);
+    }
+  }
+  return 0;
+}
+
 export async function fetchCrossRegionPutRequestPrice(
   fromRegion: string,
 ): Promise<number> {
