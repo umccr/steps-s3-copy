@@ -36,6 +36,7 @@ export type CostEstimate = {
 export interface PricingData {
   coldStorageCosts: ColdStorageRetrievalCosts;
   crossRegionCosts: CrossRegionCosts;
+  egressCosts: EgressCosts;
   computeCosts: ComputeCosts;
   fetchedAt: string;
 }
@@ -465,6 +466,20 @@ export function estimateCrossRegionCost(
 // --------------------------------------------------------------------------------------------
 // Egress cost est. for copies to buckets outside AWS (returns 0 for AWS buckets)
 // --------------------------------------------------------------------------------------------
+
+export type EgressCosts = {
+  egressPriceTiers: EgressPriceTier[];
+};
+
+/**
+ * Fetches the price tiers for sending data out of AWS to the internet.
+ */
+export async function fetchEgressCosts(
+  sourceRegion: string,
+): Promise<EgressCosts> {
+  const egressPriceTiers = await fetchCrossRegionEgressPrice(sourceRegion);
+  return { egressPriceTiers };
+}
 
 /**
  * Calculates the cost of sending data out of AWS to a bucket outside AWS,
