@@ -1,6 +1,7 @@
 import {
   fetchColdStorageRetrievalCosts,
   fetchCrossRegionCosts,
+  fetchEgressCosts,
   fetchComputeCosts,
 } from "../common/cost-estimation";
 import type { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
@@ -23,15 +24,30 @@ export const handler = async (event: InvokeEvent) => {
     throw new Error("sourceRequiredRegion must be defined");
   }
 
+  // A region set in the destination bucket's definition takes precedence
+  // over the required destination region from the input
+  const destinationBucket = event.invokeArguments.destinationBucket;
+  const destinationRegion =
+    event.invokeArguments.bucketDefinitions?.[destinationBucket]?.region ??
+    event.invokeArguments.destinationRequiredRegion;
+  if (!destinationRegion) {
+    throw new Error("destinationRequiredRegion must be defined");
+  }
+
   // Fetch pricing data
   const coldStorageCosts =
     await fetchColdStorageRetrievalCosts(sourceRequiredRegion);
-  const crossRegionCosts = await fetchCrossRegionCosts(sourceRequiredRegion);
+  const crossRegionCosts = await fetchCrossRegionCosts(
+    sourceRequiredRegion,
+    destinationRegion,
+  );
+  const egressCosts = await fetchEgressCosts(sourceRequiredRegion);
   const computeCosts = await fetchComputeCosts(sourceRequiredRegion);
 
   const pricingData = {
     coldStorageCosts,
     crossRegionCosts,
+    egressCosts,
     computeCosts,
     fetchedAt: new Date().toISOString(),
   };
