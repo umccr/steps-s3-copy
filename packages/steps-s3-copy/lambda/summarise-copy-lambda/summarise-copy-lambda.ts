@@ -41,6 +41,7 @@ type TransferStatus = "ERROR" | "ALREADYCOPIED" | "COPIED" | "ESTIMATED";
 
 interface costEstimate {
   crossRegionCostUSD: number;
+  egressCostUSD: number;
   coldStorageRetrievalCostUSD: number;
   computeCostUSD: number;
 }

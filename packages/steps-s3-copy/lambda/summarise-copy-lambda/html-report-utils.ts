@@ -4,6 +4,7 @@ import type { ReportMetadata } from "./summarise-copy-lambda.ts";
 import type {
   ColdStorageRetrievalCosts,
   CrossRegionCosts,
+  EgressCosts,
   ComputeCosts,
 } from "../common/cost-estimation";
 
@@ -185,6 +186,7 @@ export function createFilesTableBlock(
     r.copyResultMetadata.name,
     formatBytes(r.copySetsMetadata.size),
     r.copySetsMetadata.costEstimate.crossRegionCostUSD,
+    r.copySetsMetadata.costEstimate.egressCostUSD ?? 0,
     r.copySetsMetadata.costEstimate.coldStorageRetrievalCostUSD,
     r.copySetsMetadata.costEstimate.computeCostUSD,
   ]);
@@ -263,6 +265,7 @@ export function createFilesTableBlock(
             <col style="width:18.2ch;">  <!-- Object -->
             <col style="width:7.9ch;">  <!-- Size -->
             <col style="width:18ch;">  <!-- Cross-Region Cost -->
+            <col style="width:18ch;">  <!-- Egress Cost -->
             <col style="width:18ch;">  <!-- Cold Storage Retrieval Cost -->
             <col style="width:18ch;">  <!-- Compute Cost -->
           </colgroup>
@@ -271,6 +274,7 @@ export function createFilesTableBlock(
               <th>Object</th>
               <th class="text-center">Size</th>
               <th class="text-center">Cross-Region Cost (USD)</th>
+              <th class="text-center">Egress Cost (USD)</th>
               <th class="text-center">Cold Storage Retrieval Cost (USD)</th>
               <th class="text-center">Compute Cost (USD)</th>
             </tr>
@@ -302,11 +306,13 @@ export function createFilesTableBlock(
  */
 export function createCostEstimationBlock(
   totalCrossRegionCost: number,
+  totalEgressCost: number,
   totalColdCost: number,
   totalComputeCost: number,
   totalCost: number,
   coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
   crossRegionCosts: CrossRegionCosts,
+  egressCosts: EgressCosts,
   computeCosts: ComputeCosts,
   pricingDataFetchedAt: string,
 ): string {
@@ -334,6 +340,11 @@ export function createCostEstimationBlock(
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Cross-region:</strong>
 					<span class="text-muted">$${totalCrossRegionCost.toFixed(4)} USD</span>
+				</li>
+				<li class="mb-2">
+					<span style="display: inline-block; width: 12px; height: 12px; background-color: #D13212; border-radius: 2px; margin-right: 8px;"></span>
+					<strong>Egress (outside AWS):</strong>
+					<span class="text-muted">$${totalEgressCost.toFixed(4)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
@@ -367,9 +378,27 @@ export function createCostEstimationBlock(
             <strong>Cross-region:</strong>
             <ul class="mt-1 ps-3">
               <li>
-                <span style="color:#527FFF;"><strong>Egress (tiered, per GB):</strong></span>
+                <span style="color:#527FFF;"><strong>Transfer between regions:</strong></span> <code>$${crossRegionCosts.pricePerGbUsd.toFixed(
+                  4,
+                )} USD/GB</code>
+              </li>
+              <li class="mt-1">
+                <span style="color:#527FFF;"><strong>PUT requests:</strong></span> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
+                  6,
+                )} USD/request</code>
+              </li>
+              <li class="mt-1 text-muted">S3 in-region copies are free.</li>
+            </ul>
+          </li>
+
+          <!-- Egress Costs -->
+          <li class="mb-2">
+            <strong>Egress (to buckets outside AWS):</strong>
+            <ul class="mt-1 ps-3">
+              <li>
+                <span style="color:#527FFF;"><strong>Data transfer out (tiered, per GB):</strong></span>
                 <ul class="ps-3" style="font-family:monospace; font-size: 95%;">
-                  ${crossRegionCosts.egressPriceTiers
+                  ${egressCosts.egressPriceTiers
                     .map((t) =>
                       t.endRangeGb === Infinity
                         ? `<li><code>&gt;${t.beginRangeGb.toLocaleString()} GB</code> → <code>$${t.pricePerGbUsd.toFixed(
@@ -382,12 +411,7 @@ export function createCostEstimationBlock(
                     .join("")}
                 </ul>
               </li>
-              <li class="mt-1">
-                <span style="color:#527FFF;"><strong>PUT requests:</strong></span> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
-                  6,
-                )} USD/request</code>
-              </li>
-              <li class="mt-1 text-muted">S3 in-region copies are free.</li>
+              <li class="mt-1 text-muted">Request charges from the other storage provider are not included.</li>
             </ul>
           </li>
 
@@ -489,10 +513,10 @@ export function createCostEstimationBlock(
 		new Chart(ctx, {
 			type: 'pie',
 			data: {
-				labels: ['Cross-Region', 'Cold Storage Retrieval', 'Compute'],
+				labels: ['Cross-Region', 'Egress', 'Cold Storage Retrieval', 'Compute'],
 				datasets: [{
-					data: [${totalCrossRegionCost}, ${totalColdCost}, ${totalComputeCost}],
-					backgroundColor: ['#FF9900', '#1EA591', '#527FFF'],
+					data: [${totalCrossRegionCost}, ${totalEgressCost}, ${totalColdCost}, ${totalComputeCost}],
+					backgroundColor: ['#FF9900', '#D13212', '#1EA591', '#527FFF'],
 					borderWidth: 2,
 					borderColor: '#fff'
 				}]
