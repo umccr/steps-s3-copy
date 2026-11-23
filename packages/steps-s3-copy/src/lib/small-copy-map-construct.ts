@@ -175,5 +175,16 @@ export class SmallCopyLambdaConstruct extends Construct {
       jitterStrategy: JitterType.FULL,
       maxDelay: Duration.minutes(2),
     });
+
+    // after a long idle period Lambda puts container image functions to sleep,
+    // and the first invoke fails while it wakes them up again - so we wait and retry
+    this.invocableLambda.addRetry({
+      errors: ["Lambda.CodeArtifactUserPendingException"],
+      maxAttempts: 6,
+      backoffRate: 2,
+      interval: Duration.seconds(5),
+      jitterStrategy: JitterType.FULL,
+      maxDelay: Duration.minutes(1),
+    });
   }
 }
