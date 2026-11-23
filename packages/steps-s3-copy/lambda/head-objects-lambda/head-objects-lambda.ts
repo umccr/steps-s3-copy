@@ -20,6 +20,7 @@ import type { PricingData, CostEstimate } from "../common/cost-estimation";
 import {
   estimateColdStorageRetrievalCost,
   estimateCrossRegionCost,
+  estimateEgressCost,
   estimateComputeCost,
   readPricingDataJsonFromS3,
 } from "../common/cost-estimation";
@@ -230,6 +231,7 @@ export async function handler(
 
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
   const crossRegionCosts = pricingData.crossRegionCosts;
+  const egressCosts = pricingData.egressCosts;
   const computeCosts = pricingData.computeCosts;
 
   // *or* by calling HeadObject
@@ -353,6 +355,11 @@ export async function handler(
                 crossRegionCosts,
                 size,
               ),
+              egressCostUSD: estimateEgressCost(
+                isOutsideAws,
+                egressCosts,
+                size,
+              ),
 
               coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
                 isColdStorage,
@@ -442,6 +449,7 @@ export async function handler(
             crossRegionCosts,
             size,
           ),
+          egressCostUSD: estimateEgressCost(isOutsideAws, egressCosts, size),
           coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
             isColdStorage,
             size,
