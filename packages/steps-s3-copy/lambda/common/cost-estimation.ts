@@ -344,9 +344,12 @@ interface EgressPriceTier {
   pricePerGbUsd: number;
 }
 
-export async function fetchCrossRegionEgressPrice(
+/**
+ * Fetches the price tiers for sending data out of AWS to the internet.
+ */
+export async function fetchEgressCosts(
   fromRegion: string,
-): Promise<EgressPriceTier[]> {
+): Promise<EgressCosts> {
   const client = createPricingClient();
   const response = await throttledGetProducts(client, {
     ServiceCode: "AWSDataTransfer",
@@ -364,7 +367,7 @@ export async function fetchCrossRegionEgressPrice(
     ],
     MaxResults: 1,
   });
-  if (!response.PriceList?.length) return [];
+  if (!response.PriceList?.length) return { egressPriceTiers: [] };
 
   const priceItem = JSON.parse(response.PriceList[0] as string);
   const terms = priceItem.terms?.OnDemand || {};
@@ -386,7 +389,10 @@ export async function fetchCrossRegionEgressPrice(
   }
 
   // Sort by beginRange ascending
-  return tiers.sort((a, b) => a.beginRangeGb - b.beginRangeGb);
+  const egressPriceTiers = tiers.sort(
+    (a, b) => a.beginRangeGb - b.beginRangeGb,
+  );
+  return { egressPriceTiers };
 }
 
 export async function fetchCrossRegionPutRequestPrice(
@@ -470,16 +476,6 @@ export function estimateCrossRegionCost(
 export type EgressCosts = {
   egressPriceTiers: EgressPriceTier[];
 };
-
-/**
- * Fetches the price tiers for sending data out of AWS to the internet.
- */
-export async function fetchEgressCosts(
-  sourceRegion: string,
-): Promise<EgressCosts> {
-  const egressPriceTiers = await fetchCrossRegionEgressPrice(sourceRegion);
-  return { egressPriceTiers };
-}
 
 /**
  * Calculates the cost of sending data out of AWS to a bucket outside AWS,
