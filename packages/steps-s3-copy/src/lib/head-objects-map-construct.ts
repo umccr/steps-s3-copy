@@ -54,6 +54,9 @@ export class HeadObjectsMapConstruct extends Construct {
       // so that means we can fit 256 of them in the standard Steps result payload (256kb)
       maxItemsPerBatch: 1,
       batchInput: {
+        "destinationBucket.$": JsonPath.stringAt(
+          invokeArg("destinationBucket"),
+        ),
         "destinationPrefix.$": JsonPath.stringAt(
           invokeArg("destinationPrefix"),
         ),
