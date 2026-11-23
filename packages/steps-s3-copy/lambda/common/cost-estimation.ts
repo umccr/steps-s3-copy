@@ -29,6 +29,7 @@ import {
 
 export type CostEstimate = {
   crossRegionCostUSD: number;
+  egressCostUSD: number;
   coldStorageRetrievalCostUSD: number;
   computeCostUSD: number;
 };
