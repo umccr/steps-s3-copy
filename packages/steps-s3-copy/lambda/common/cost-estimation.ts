@@ -324,18 +324,24 @@ export function estimateColdStorageRetrievalCost(
 // --------------------------------------------------------------------------------------------
 
 export type CrossRegionCosts = {
-  egressPriceTiers: EgressPriceTier[];
+  pricePerGbUsd: number;
   putPricePerRequest: number;
 };
 
+/**
+ * Fetches the prices for copying from the source region to the destination region:
+ * the transfer price per GB between the two regions, and the PUT request price,
+ * which AWS bills in the region of the destination bucket.
+ */
 export async function fetchCrossRegionCosts(
   sourceRegion: string,
+  destinationRegion: string,
 ): Promise<CrossRegionCosts> {
-  const [egressPriceTiers, putPricePerRequest] = await Promise.all([
-    fetchCrossRegionEgressPrice(sourceRegion),
-    fetchCrossRegionPutRequestPrice(sourceRegion),
+  const [pricePerGbUsd, putPricePerRequest] = await Promise.all([
+    fetchCrossRegionPrice(sourceRegion, destinationRegion),
+    fetchCrossRegionPutRequestPrice(destinationRegion),
   ]);
-  return { egressPriceTiers, putPricePerRequest };
+  return { pricePerGbUsd, putPricePerRequest };
 }
 
 interface EgressPriceTier {
