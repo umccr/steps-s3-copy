@@ -69,6 +69,7 @@ let unitState: UnitTestSetupState;
  */
 function batchInput(): HeadObjectsLambdaInvokeEvent["BatchInput"] {
   return {
+    destinationBucket: "test-destination-bucket",
     destinationPrefix: DESTINATION_PREFIX,
     maximumExpansion: 5,
     workingBucket: state.workingBucket,
