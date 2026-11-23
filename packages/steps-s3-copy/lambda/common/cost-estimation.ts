@@ -475,7 +475,8 @@ export async function fetchCrossRegionPutRequestPrice(
 }
 
 /**
- * Calculates cross-region S3 egress cost with progressive AWS pricing tiers.
+ * Calculates the cost of a cross-region S3 copy: the flat transfer price per GB
+ * between the two regions, plus the PUT requests in the destination region.
  */
 export function estimateCrossRegionCost(
   isCrossRegion: boolean,
@@ -486,30 +487,7 @@ export function estimateCrossRegionCost(
   if (!isCrossRegion) return 0;
 
   const totalGB = bytesToGB(sizeBytes);
-
-  // Apply each tier in order, allocating as much of the transfer as possible to each tier
-  let gbRemaining = totalGB;
-  let totalEgressCost = 0;
-  for (const tier of crossRegionCosts.egressPriceTiers) {
-    const tierSize =
-      (tier.endRangeGb === Infinity ? Infinity : tier.endRangeGb) -
-      tier.beginRangeGb;
-    const gbInTier = Math.min(gbRemaining, tierSize);
-
-    if (gbInTier > 0) {
-      totalEgressCost += gbInTier * tier.pricePerGbUsd;
-      gbRemaining -= gbInTier;
-    }
-    //  Once ALL GB have been billed
-    if (gbRemaining <= 0) break;
-  }
-
-  // Warning for tier no covered.
-  if (gbRemaining > 0.00001) {
-    console.warn(
-      `[COST WARNING] Unmatched egress price tier: ${gbRemaining} GB not covered in estimateCrossRegionCost. Estimate may be too low.`,
-    );
-  }
+  const transferCost = totalGB * crossRegionCosts.pricePerGbUsd;
 
   // Calculate the number of request
   const numPutRequests = Math.max(
@@ -518,7 +496,7 @@ export function estimateCrossRegionCost(
   );
   const putRequestCost = numPutRequests * crossRegionCosts.putPricePerRequest;
 
-  return totalEgressCost + putRequestCost;
+  return transferCost + putRequestCost;
 }
 
 // --------------------------------------------------------------------------------------------
@@ -535,7 +513,7 @@ export type EgressCosts = {
  */
 export function estimateEgressCost(
   isOutsideAws: boolean,
-  crossRegionCosts: CrossRegionCosts,
+  egressCosts: EgressCosts,
   sizeBytes: number,
 ): number {
   if (!isOutsideAws) return 0;
@@ -545,7 +523,7 @@ export function estimateEgressCost(
   // Apply each tier in order, allocating as much of the transfer as possible to each tier
   let gbRemaining = totalGB;
   let totalEgressCost = 0;
-  for (const tier of crossRegionCosts.egressPriceTiers) {
+  for (const tier of egressCosts.egressPriceTiers) {
     const tierSize = tier.endRangeGb - tier.beginRangeGb;
     const gbInTier = Math.min(gbRemaining, tierSize);
 
