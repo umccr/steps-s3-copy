@@ -497,14 +497,34 @@ export function computeDestinationKey(
 }
 
 /**
- * Returns true if the bucket lives outside AWS, i.e. it has a custom endpoint URL
+ * Returns true if the source and destination buckets are in different AWS regions.
+ * A region set for a bucket in its bucket definition takes precedence over the
+ * required region from the input.
+ */
+function isCrossRegion(
+  sourceBucket: string,
+  sourceRequiredRegion: string,
+  destinationBucket: string,
+  destinationRequiredRegion: string,
+  bucketDefinitions: Record<string, BucketDefinition> | undefined,
+): boolean {
+  const sourceRegion =
+    bucketDefinitions?.[sourceBucket]?.region ?? sourceRequiredRegion;
+  const destinationRegion =
+    bucketDefinitions?.[destinationBucket]?.region ?? destinationRequiredRegion;
+
+  return sourceRegion !== destinationRegion;
+}
+
+/**
+ * Returns true if the destination bucket lives outside AWS, i.e. it has a custom endpoint URL
  * that does not point to an AWS host.
  */
 function isOutsideAws(
-  bucketName: string,
+  destinationBucket: string,
   bucketDefinitions: Record<string, BucketDefinition> | undefined,
 ): boolean {
-  const endpointUrl = bucketDefinitions?.[bucketName]?.endpointUrl;
+  const endpointUrl = bucketDefinitions?.[destinationBucket]?.endpointUrl;
   if (!endpointUrl) return false;
 
   const hostname = new URL(endpointUrl).hostname;
