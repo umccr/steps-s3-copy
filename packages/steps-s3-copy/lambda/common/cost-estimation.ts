@@ -463,6 +463,48 @@ export function estimateCrossRegionCost(
 }
 
 // --------------------------------------------------------------------------------------------
+// Egress cost est. for copies to buckets outside AWS (returns 0 for AWS buckets)
+// --------------------------------------------------------------------------------------------
+
+/**
+ * Calculates the cost of sending data out of AWS to a bucket outside AWS,
+ * using the progressive AWS egress pricing tiers.
+ */
+export function estimateEgressCost(
+  isOutsideAws: boolean,
+  crossRegionCosts: CrossRegionCosts,
+  sizeBytes: number,
+): number {
+  if (!isOutsideAws) return 0;
+
+  const totalGB = bytesToGB(sizeBytes);
+
+  // Apply each tier in order, allocating as much of the transfer as possible to each tier
+  let gbRemaining = totalGB;
+  let totalEgressCost = 0;
+  for (const tier of crossRegionCosts.egressPriceTiers) {
+    const tierSize = tier.endRangeGb - tier.beginRangeGb;
+    const gbInTier = Math.min(gbRemaining, tierSize);
+
+    if (gbInTier > 0) {
+      totalEgressCost += gbInTier * tier.pricePerGbUsd;
+      gbRemaining -= gbInTier;
+    }
+    // Once ALL GB have been billed
+    if (gbRemaining <= 0) break;
+  }
+
+  // Warning for tier not covered.
+  if (gbRemaining > 0.00001) {
+    console.warn(
+      `[COST WARNING] Unmatched egress price tier: ${gbRemaining} GB not covered in estimateEgressCost. Estimate may be too low.`,
+    );
+  }
+
+  return totalEgressCost;
+}
+
+// --------------------------------------------------------------------------------------------
 // Compute cost estimation
 // --------------------------------------------------------------------------------------------
 
