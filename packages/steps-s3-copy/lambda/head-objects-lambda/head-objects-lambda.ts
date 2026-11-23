@@ -496,6 +496,21 @@ export function computeDestinationKey(
   return join(destinationPrefixKey, destinationRelativeKey, destinationRel);
 }
 
+/**
+ * Returns true if the bucket lives outside AWS, i.e. it has a custom endpoint URL
+ * that does not point to an AWS host.
+ */
+function isOutsideAws(
+  bucketName: string,
+  bucketDefinitions: Record<string, BucketDefinition> | undefined,
+): boolean {
+  const endpointUrl = bucketDefinitions?.[bucketName]?.endpointUrl;
+  if (!endpointUrl) return false;
+
+  const hostname = new URL(endpointUrl).hostname;
+  return !hostname.endsWith(".amazonaws.com");
+}
+
 export class IsThawingError extends Error {
   constructor(message: string) {
     super();
