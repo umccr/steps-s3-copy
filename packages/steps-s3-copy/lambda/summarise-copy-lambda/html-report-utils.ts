@@ -31,6 +31,16 @@ export const formatBytes = (n?: number) => {
   return `${v.toFixed(2)} ${units[i]}`;
 };
 
+// Format a USD amount for people to read: amounts of $1 or more get 2 decimal places
+// (e.g. 1.00806 -> "1.01"), smaller amounts keep 2 significant figures (e.g. 0.000234 -> "0.00023")
+export function formatUsd(amount: number): string {
+  if (amount === 0 || Math.abs(amount) >= 1) return amount.toFixed(2);
+
+  const decimals = 1 - Math.floor(Math.log10(Math.abs(amount)));
+  // drop trailing zeros past the 2nd decimal place (e.g. "0.00020" -> "0.0002")
+  return amount.toFixed(decimals).replace(/(\.\d{2}\d*?)0+$/, "$1");
+}
+
 // Format seconds as HH:MM:SS
 export const secondsToHMS = (sec?: number) => {
   if (sec == null) return "-";
@@ -339,22 +349,22 @@ export function createCostEstimationBlock(
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Cross-region:</strong>
-					<span class="text-muted">$${totalCrossRegionCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalCrossRegionCost)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #D13212; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Egress (outside AWS):</strong>
-					<span class="text-muted">$${totalEgressCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalEgressCost)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Cold storage retrieval:</strong>
-					<span class="text-muted">$${totalColdCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalColdCost)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #527FFF; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Compute:</strong>
-					<span class="text-muted">$${totalComputeCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalComputeCost)} USD</span>
 				</li>
 				<li class="pt-2 mt-2 border-top">
 					<strong class="h5">Total:</strong>
