@@ -11,6 +11,8 @@ import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
 import {
   checkColdStorage,
+  checkCrossRegion,
+  checkOutsideAws,
   getThawParams,
   PRICING_DATA_FILENAME,
 } from "../common/constants";
@@ -494,41 +496,6 @@ export function computeDestinationKey(
     : basename(sourceKey);
 
   return join(destinationPrefixKey, destinationRelativeKey, destinationRel);
-}
-
-/**
- * Returns true if the source and destination buckets are in different AWS regions.
- * A region set for a bucket in its bucket definition takes precedence over the
- * required region from the input.
- */
-function isCrossRegion(
-  sourceBucket: string,
-  sourceRequiredRegion: string,
-  destinationBucket: string,
-  destinationRequiredRegion: string,
-  bucketDefinitions: Record<string, BucketDefinition> | undefined,
-): boolean {
-  const sourceRegion =
-    bucketDefinitions?.[sourceBucket]?.region ?? sourceRequiredRegion;
-  const destinationRegion =
-    bucketDefinitions?.[destinationBucket]?.region ?? destinationRequiredRegion;
-
-  return sourceRegion !== destinationRegion;
-}
-
-/**
- * Returns true if the destination bucket lives outside AWS, i.e. it has a custom endpoint URL
- * that does not point to an AWS host.
- */
-function isOutsideAws(
-  destinationBucket: string,
-  bucketDefinitions: Record<string, BucketDefinition> | undefined,
-): boolean {
-  const endpointUrl = bucketDefinitions?.[destinationBucket]?.endpointUrl;
-  if (!endpointUrl) return false;
-
-  const hostname = new URL(endpointUrl).hostname;
-  return !hostname.endsWith(".amazonaws.com");
 }
 
 export class IsThawingError extends Error {
