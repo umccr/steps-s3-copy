@@ -221,6 +221,11 @@
         table-layout: fixed;
         white-space: nowrap;
       }
+      /* The sort arrow sits in the header's right padding - give right-aligned cells
+         the same right padding so the figures line up under their column names */
+      table.dataTable tbody td.text-end {
+        padding-right: 26px;
+      }
 
       /* Keep headers aligned to the right for numeric cols */
       th.text-end,
@@ -464,6 +469,8 @@
             columnDefs: [
               { targets: 0, width: "32ch" },
               { targets: 1, width: "14ch" },
+              // right-align the number columns, like their headers
+              { targets: [1, 2, 3, 4, 5], className: "text-end" },
             ],
           });
 
@@ -480,6 +487,8 @@
             columnDefs: [
               { targets: 0, width: "32ch" },
               { targets: 1, width: "14ch" },
+              // right-align the number columns, like their headers
+              { targets: [1, 2, 3, 4, 5], className: "text-end" },
             ],
           });
 

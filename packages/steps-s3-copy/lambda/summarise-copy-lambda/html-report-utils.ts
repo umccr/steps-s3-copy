@@ -232,7 +232,7 @@ export function createFilesTableBlock(
       <button class="nav-link active" id="results-tab" data-bs-toggle="tab" data-bs-target="#results" type="button" role="tab" aria-controls="results" aria-selected="true">Copy Results</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab" aria-controls="costs" aria-selected="false">Estimated Cost</button>
+      <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab" aria-controls="costs" aria-selected="false">Estimated Cost (USD)</button>
     </li>
   </ul>
 
@@ -245,19 +245,19 @@ export function createFilesTableBlock(
             <col style="width:14ch;">  <!-- Size -->
             <col style="width:14ch;">  <!-- Status -->
             <col style="width:14ch;">  <!-- Transferred -->
-            <col style="width:18ch;">  <!-- Transf. speed (MiB/s) -->
-            <col style="width:22ch;">  <!-- Elapsed time (hh:mm:ss) -->
+            <col style="width:26ch;">  <!-- Transf. speed (MiB/s) -->
+            <col style="width:30ch;">  <!-- Elapsed time (hh:mm:ss) -->
             <col style="width:22ch;">  <!-- Message -->
             <col style="width:80ch;">  <!-- Destination path-->
           </colgroup>
           <thead>
             <tr>
               <th>Object</th>
-              <th class="text-center">Size</th>
-              <th class="text-center">Status</th>
-              <th class="text-center">Transferred</th>
-              <th class="text-center">Transf. speed (MiB/s)</th>
-              <th class="text-center">Elapsed time (hh:mm:ss)</th>
+              <th class="text-end">Size</th>
+              <th class="text-end">Status</th>
+              <th class="text-end">Transferred</th>
+              <th class="text-end">Transf. speed (MiB/s)</th>
+              <th class="text-end">Elapsed time (hh:mm:ss)</th>
               <th>Message</th>
               <th>Destination path</th>
             </tr>
@@ -272,21 +272,21 @@ export function createFilesTableBlock(
       <div class="table-responsive">
         <table id="costs-table" class="table table-sm table-hover align-middle table-fixed">
           <colgroup>
-            <col style="width:18.2ch;">  <!-- Object -->
-            <col style="width:7.9ch;">  <!-- Size -->
-            <col style="width:18ch;">  <!-- Cross-Region Cost -->
-            <col style="width:18ch;">  <!-- Egress Cost -->
-            <col style="width:18ch;">  <!-- Cold Storage Retrieval Cost -->
-            <col style="width:18ch;">  <!-- Compute Cost -->
+            <col style="width:32ch;">  <!-- Object -->
+            <col style="width:14ch;">  <!-- Size -->
+            <col style="width:18ch;">  <!-- Cross-Region -->
+            <col style="width:18ch;">  <!-- Egress -->
+            <col style="width:28ch;">  <!-- Cold Storage Retrieval -->
+            <col style="width:18ch;">  <!-- Compute -->
           </colgroup>
           <thead>
             <tr>
               <th>Object</th>
-              <th class="text-center">Size</th>
-              <th class="text-center">Cross-Region Cost (USD)</th>
-              <th class="text-center">Egress Cost (USD)</th>
-              <th class="text-center">Cold Storage Retrieval Cost (USD)</th>
-              <th class="text-center">Compute Cost (USD)</th>
+              <th class="text-end">Size</th>
+              <th class="text-end">Cross-Region</th>
+              <th class="text-end">Egress</th>
+              <th class="text-end">Cold Storage Retrieval</th>
+              <th class="text-end">Compute</th>
             </tr>
           </thead>
           <tbody>
