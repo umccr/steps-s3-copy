@@ -10,17 +10,24 @@ import {
 import pThrottle from "p-throttle";
 
 import {
+  // helpers
   bytesToGB,
   defaultCopyDurationSeconds,
-  DEFAULT_COPY_SPEED_MIBPS,
-  FARGATE_MIN_BILLING_SECONDS,
-  SIZE_THRESHOLD_BYTES,
+  // size tiers
+  SMALL_SIZE_THRESHOLD_BYTES,
+  MEDIUM_SIZE_THRESHOLD_BYTES,
   MULTIPART_CHUNK_SIZE,
+  // lambda compute
+  SMALL_LAMBDA_MEMORY_MB,
+  MEDIUM_LAMBDA_MEMORY_MB,
+  DEFAULT_LAMBDA_OVERHEAD_SEC,
+  // fargate compute
   FARGATE_CPU_VCPU,
   FARGATE_MEMORY_MB,
+  FARGATE_MIN_BILLING_SECONDS,
   DEFAULT_FARGATE_OVERHEAD_SEC,
-  LAMBDA_MEMORY_MB,
-  DEFAULT_LAMBDA_OVERHEAD_SEC,
+  // copy speed
+  DEFAULT_COPY_SPEED_MIBPS,
 } from "./constants";
 
 // Cost estimation logic for thawing, cross-region transfer, and compute costs.
@@ -774,8 +781,18 @@ export function estimateComputeCost(
   sizeBytes: number,
   computeCosts: ComputeCosts,
 ): number {
-  if (sizeBytes <= SIZE_THRESHOLD_BYTES) {
-    return estimateComputeCostLambda(LAMBDA_MEMORY_MB, sizeBytes, computeCosts);
+  if (sizeBytes <= SMALL_SIZE_THRESHOLD_BYTES) {
+    return estimateComputeCostLambda(
+      SMALL_LAMBDA_MEMORY_MB,
+      sizeBytes,
+      computeCosts,
+    );
+  } else if (sizeBytes <= MEDIUM_SIZE_THRESHOLD_BYTES) {
+    return estimateComputeCostLambda(
+      MEDIUM_LAMBDA_MEMORY_MB,
+      sizeBytes,
+      computeCosts,
+    );
   } else {
     return estimateComputeCostFargate(
       FARGATE_CPU_VCPU,
