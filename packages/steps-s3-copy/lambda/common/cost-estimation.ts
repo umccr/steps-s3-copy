@@ -29,6 +29,7 @@ import {
 
 export type CostEstimate = {
   crossRegionCostUSD: number;
+  egressCostUSD: number;
   coldStorageRetrievalCostUSD: number;
   computeCostUSD: number;
 };
@@ -36,6 +37,7 @@ export type CostEstimate = {
 export interface PricingData {
   coldStorageCosts: ColdStorageRetrievalCosts;
   crossRegionCosts: CrossRegionCosts;
+  egressCosts: EgressCosts;
   computeCosts: ComputeCosts;
   fetchedAt: string;
 }
@@ -323,18 +325,24 @@ export function estimateColdStorageRetrievalCost(
 // --------------------------------------------------------------------------------------------
 
 export type CrossRegionCosts = {
-  egressPriceTiers: EgressPriceTier[];
+  pricePerGbUsd: number;
   putPricePerRequest: number;
 };
 
+/**
+ * Fetches the prices for copying from the source region to the destination region:
+ * the transfer price per GB between the two regions, and the PUT request price,
+ * which AWS bills in the region of the destination bucket.
+ */
 export async function fetchCrossRegionCosts(
   sourceRegion: string,
+  destinationRegion: string,
 ): Promise<CrossRegionCosts> {
-  const [egressPriceTiers, putPricePerRequest] = await Promise.all([
-    fetchCrossRegionEgressPrice(sourceRegion),
-    fetchCrossRegionPutRequestPrice(sourceRegion),
+  const [pricePerGbUsd, putPricePerRequest] = await Promise.all([
+    fetchCrossRegionPrice(sourceRegion, destinationRegion),
+    fetchCrossRegionPutRequestPrice(destinationRegion),
   ]);
-  return { egressPriceTiers, putPricePerRequest };
+  return { pricePerGbUsd, putPricePerRequest };
 }
 
 interface EgressPriceTier {
@@ -343,9 +351,12 @@ interface EgressPriceTier {
   pricePerGbUsd: number;
 }
 
-export async function fetchCrossRegionEgressPrice(
+/**
+ * Fetches the price tiers for sending data out of AWS to the internet.
+ */
+export async function fetchEgressCosts(
   fromRegion: string,
-): Promise<EgressPriceTier[]> {
+): Promise<EgressCosts> {
   const client = createPricingClient();
   const response = await throttledGetProducts(client, {
     ServiceCode: "AWSDataTransfer",
@@ -363,7 +374,7 @@ export async function fetchCrossRegionEgressPrice(
     ],
     MaxResults: 1,
   });
-  if (!response.PriceList?.length) return [];
+  if (!response.PriceList?.length) return { egressPriceTiers: [] };
 
   const priceItem = JSON.parse(response.PriceList[0] as string);
   const terms = priceItem.terms?.OnDemand || {};
@@ -385,7 +396,56 @@ export async function fetchCrossRegionEgressPrice(
   }
 
   // Sort by beginRange ascending
-  return tiers.sort((a, b) => a.beginRangeGb - b.beginRangeGb);
+  const egressPriceTiers = tiers.sort(
+    (a, b) => a.beginRangeGb - b.beginRangeGb,
+  );
+  return { egressPriceTiers };
+}
+
+/**
+ * Fetches the price per GB for sending data from one AWS region to another.
+ * AWS prices this per pair of regions, and unlike internet egress it is a single
+ * flat price, with no volume tiers.
+ */
+export async function fetchCrossRegionPrice(
+  fromRegion: string,
+  toRegion: string,
+): Promise<number> {
+  const client = createPricingClient();
+  const response = await throttledGetProducts(client, {
+    ServiceCode: "AWSDataTransfer",
+    Filters: [
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "fromRegionCode",
+        Value: fromRegion,
+      },
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "toRegionCode",
+        Value: toRegion,
+      },
+      {
+        Type: FilterType.TERM_MATCH,
+        Field: "transferType",
+        Value: "InterRegion Outbound",
+      },
+    ],
+    MaxResults: 1,
+  });
+  if (!response.PriceList?.length) return 0;
+
+  const priceItem = JSON.parse(response.PriceList[0] as string);
+  const terms = priceItem.terms?.OnDemand || {};
+
+  for (const termKey of Object.keys(terms)) {
+    const priceDimensions = terms[termKey].priceDimensions || {};
+    for (const dimKey of Object.keys(priceDimensions)) {
+      const usd = priceDimensions[dimKey].pricePerUnit?.USD;
+      if (usd) return parseFloat(usd);
+    }
+  }
+  return 0;
 }
 
 export async function fetchCrossRegionPutRequestPrice(
@@ -416,7 +476,8 @@ export async function fetchCrossRegionPutRequestPrice(
 }
 
 /**
- * Calculates cross-region S3 egress cost with progressive AWS pricing tiers.
+ * Calculates the cost of a cross-region S3 copy: the flat transfer price per GB
+ * between the two regions, plus the PUT requests in the destination region.
  */
 export function estimateCrossRegionCost(
   isCrossRegion: boolean,
@@ -427,30 +488,7 @@ export function estimateCrossRegionCost(
   if (!isCrossRegion) return 0;
 
   const totalGB = bytesToGB(sizeBytes);
-
-  // Apply each tier in order, allocating as much of the transfer as possible to each tier
-  let gbRemaining = totalGB;
-  let totalEgressCost = 0;
-  for (const tier of crossRegionCosts.egressPriceTiers) {
-    const tierSize =
-      (tier.endRangeGb === Infinity ? Infinity : tier.endRangeGb) -
-      tier.beginRangeGb;
-    const gbInTier = Math.min(gbRemaining, tierSize);
-
-    if (gbInTier > 0) {
-      totalEgressCost += gbInTier * tier.pricePerGbUsd;
-      gbRemaining -= gbInTier;
-    }
-    //  Once ALL GB have been billed
-    if (gbRemaining <= 0) break;
-  }
-
-  // Warning for tier no covered.
-  if (gbRemaining > 0.00001) {
-    console.warn(
-      `[COST WARNING] Unmatched egress price tier: ${gbRemaining} GB not covered in estimateCrossRegionCost. Estimate may be too low.`,
-    );
-  }
+  const transferCost = totalGB * crossRegionCosts.pricePerGbUsd;
 
   // Calculate the number of request
   const numPutRequests = Math.max(
@@ -459,7 +497,53 @@ export function estimateCrossRegionCost(
   );
   const putRequestCost = numPutRequests * crossRegionCosts.putPricePerRequest;
 
-  return totalEgressCost + putRequestCost;
+  return transferCost + putRequestCost;
+}
+
+// --------------------------------------------------------------------------------------------
+// Egress cost est. for copies to buckets outside AWS (returns 0 for AWS buckets)
+// --------------------------------------------------------------------------------------------
+
+export type EgressCosts = {
+  egressPriceTiers: EgressPriceTier[];
+};
+
+/**
+ * Calculates the cost of sending data out of AWS to a bucket outside AWS,
+ * using the progressive AWS egress pricing tiers.
+ */
+export function estimateEgressCost(
+  isOutsideAws: boolean,
+  egressCosts: EgressCosts,
+  sizeBytes: number,
+): number {
+  if (!isOutsideAws) return 0;
+
+  const totalGB = bytesToGB(sizeBytes);
+
+  // Apply each tier in order, allocating as much of the transfer as possible to each tier
+  let gbRemaining = totalGB;
+  let totalEgressCost = 0;
+  for (const tier of egressCosts.egressPriceTiers) {
+    const tierSize = tier.endRangeGb - tier.beginRangeGb;
+    const gbInTier = Math.min(gbRemaining, tierSize);
+
+    if (gbInTier > 0) {
+      totalEgressCost += gbInTier * tier.pricePerGbUsd;
+      gbRemaining -= gbInTier;
+    }
+    // Once ALL GB have been billed
+    if (gbRemaining <= 0) break;
+  }
+
+  // Warning for tier not covered.
+  if (gbRemaining > 0.00001) {
+    console.warn(
+      `[COST WARNING] Unmatched egress price tier: ${gbRemaining} GB not covered in estimateEgressCost. Estimate may be too low.`,
+    );
+  }
+
+  return totalEgressCost;
 }
 
 // --------------------------------------------------------------------------------------------
@@ -723,11 +807,11 @@ export async function readPricingDataJsonFromS3(
   const pricingData = JSON.parse(body) as PricingData;
 
   //Warn if last egress price tier does not end at Infinity, meaning the last cost tiering is not covered.
-  const egressPriceTiers = pricingData.crossRegionCosts?.egressPriceTiers ?? [];
+  const egressPriceTiers = pricingData.egressCosts?.egressPriceTiers ?? [];
   const lastTier = egressPriceTiers[egressPriceTiers.length - 1];
   if (lastTier?.endRangeGb !== Infinity) {
     console.warn(
-      "[COST WARNING] Last egress price tier does NOT have endRangeGb: Infinity. Some cross-region cost estimates may be incomplete.",
+      "[COST WARNING] Last egress price tier does NOT have endRangeGb: Infinity. Some egress cost estimates may be incomplete.",
     );
   }
 

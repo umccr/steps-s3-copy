@@ -77,6 +77,10 @@ export async function createHtmlReport(opts: {
       sum + (s?.copySetsMetadata?.costEstimate?.crossRegionCostUSD ?? 0),
     0,
   );
+  const totalEgressCost = (reportMetadata ?? []).reduce(
+    (sum, s) => sum + (s?.copySetsMetadata?.costEstimate?.egressCostUSD ?? 0),
+    0,
+  );
   const totalColdCost = (reportMetadata ?? []).reduce(
     (sum, s) =>
       sum +
@@ -87,21 +91,25 @@ export async function createHtmlReport(opts: {
     (sum, s) => sum + (s?.copySetsMetadata?.costEstimate?.computeCostUSD ?? 0),
     0,
   );
-  const totalCost = totalCrossRegionCost + totalColdCost + totalComputeCost;
+  const totalCost =
+    totalCrossRegionCost + totalEgressCost + totalColdCost + totalComputeCost;
 
   // Create cost estimation block HTML
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
   const crossRegionCosts = pricingData.crossRegionCosts;
+  const egressCosts = pricingData.egressCosts;
   const computeCosts = pricingData.computeCosts;
   const fetchedAt = pricingData.fetchedAt;
 
   const costEstimationBlock = createCostEstimationBlock(
     totalCrossRegionCost,
+    totalEgressCost,
     totalColdCost,
     totalComputeCost,
     totalCost,
     coldStorageRetrievalCosts,
     crossRegionCosts,
+    egressCosts,
     computeCosts,
     fetchedAt,
   );

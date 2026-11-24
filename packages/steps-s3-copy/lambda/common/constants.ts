@@ -1,3 +1,5 @@
+import type { BucketDefinition } from "../../src/steps-s3-copy-input";
+
 /**
  * Size threshold for determining small vs large object.
  * Set to 5 MiB as that is the definitional minimum size of a multipart part.
@@ -28,6 +30,41 @@ export function checkColdStorage(
     return true;
   if (storageClass === "INTELLIGENT_TIERING" && archiveStatus) return true;
   return false;
+}
+
+/**
+ * Returns true if the source and destination buckets are in different AWS regions.
+ * A region set for a bucket in its bucket definition takes precedence over the
+ * required region from the input.
+ */
+export function checkCrossRegion(
+  sourceBucket: string,
+  sourceRequiredRegion: string,
+  destinationBucket: string,
+  destinationRequiredRegion: string,
+  bucketDefinitions: Record<string, BucketDefinition> | undefined,
+): boolean {
+  const sourceRegion =
+    bucketDefinitions?.[sourceBucket]?.region ?? sourceRequiredRegion;
+  const destinationRegion =
+    bucketDefinitions?.[destinationBucket]?.region ?? destinationRequiredRegion;
+
+  return sourceRegion !== destinationRegion;
+}
+
+/**
+ * Returns true if the destination bucket lives outside AWS, i.e. it has a custom endpoint URL
+ * that does not point to an AWS host.
+ */
+export function checkOutsideAws(
+  destinationBucket: string,
+  bucketDefinitions: Record<string, BucketDefinition> | undefined,
+): boolean {
+  const endpointUrl = bucketDefinitions?.[destinationBucket]?.endpointUrl;
+  if (!endpointUrl) return false;
+
+  const hostname = new URL(endpointUrl).hostname;
+  return !hostname.endsWith(".amazonaws.com");
 }
 
 // -----------------------------------------------------------------

@@ -7,6 +7,7 @@ import type { ReportMetadata } from "../packages/steps-s3-copy/lambda/summarise-
 import {
   fetchColdStorageRetrievalCosts,
   fetchCrossRegionCosts,
+  fetchEgressCosts,
   fetchComputeCosts,
 } from "../packages/steps-s3-copy/lambda/common/cost-estimation";
 
@@ -21,14 +22,20 @@ const pricingFileExists = existsSync(pricingFile);
 
 if (!pricingFileExists) {
   const sourceRegion = "ap-southeast-1";
+  const destinationRegion = "ap-southeast-2";
 
   const coldStorageCosts = await fetchColdStorageRetrievalCosts(sourceRegion);
-  const crossRegionCosts = await fetchCrossRegionCosts(sourceRegion);
+  const crossRegionCosts = await fetchCrossRegionCosts(
+    sourceRegion,
+    destinationRegion,
+  );
+  const egressCosts = await fetchEgressCosts(sourceRegion);
   const computeCosts = await fetchComputeCosts(sourceRegion);
 
   const fetchedPricingData = {
     coldStorageCosts,
     crossRegionCosts,
+    egressCosts,
     computeCosts,
     fetchedAt: new Date().toISOString(),
   };
@@ -61,6 +68,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       size: 123456789,
       costEstimate: {
         crossRegionCostUSD: 0.12,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.05,
         computeCostUSD: 0.01,
       },
@@ -82,6 +90,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       size: 987654321,
       costEstimate: {
         crossRegionCostUSD: 0.1,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -103,6 +112,7 @@ const reportMetadataDryRun: ReportMetadata[] = [
       size: 345678901,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -127,6 +137,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 123456789,
       costEstimate: {
         crossRegionCostUSD: 0.12,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.05,
         computeCostUSD: 0.01,
       },
@@ -148,6 +159,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 987654321,
       costEstimate: {
         crossRegionCostUSD: 0.1,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -170,6 +182,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 345678901,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -191,6 +204,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 456789012,
       costEstimate: {
         crossRegionCostUSD: 0.23,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.07,
         computeCostUSD: 0.02,
       },
@@ -212,6 +226,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 56789012,
       costEstimate: {
         crossRegionCostUSD: 0.03,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -233,6 +248,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 67890123,
       costEstimate: {
         crossRegionCostUSD: 0.04,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.01,
         computeCostUSD: 0.01,
       },
@@ -254,6 +270,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 1234,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -275,6 +292,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 45678,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -296,6 +314,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 7890123,
       costEstimate: {
         crossRegionCostUSD: 0.01,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -317,6 +336,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 2345678901,
       costEstimate: {
         crossRegionCostUSD: 0.45,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.22,
         computeCostUSD: 0.03,
       },
@@ -338,6 +358,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 345678,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -359,6 +380,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 234567,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -380,6 +402,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 198765,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -401,6 +424,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 1456789012,
       costEstimate: {
         crossRegionCostUSD: 0.31,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.12,
         computeCostUSD: 0.02,
       },
@@ -422,6 +446,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 812345678,
       costEstimate: {
         crossRegionCostUSD: 0.18,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.06,
         computeCostUSD: 0.02,
       },
@@ -443,6 +468,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 834567890,
       costEstimate: {
         crossRegionCostUSD: 0.19,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.06,
         computeCostUSD: 0.02,
       },
@@ -464,6 +490,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 4567890,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -485,6 +512,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 67890,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -506,6 +534,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 8901234,
       costEstimate: {
         crossRegionCostUSD: 0.01,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -527,6 +556,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 190123456,
       costEstimate: {
         crossRegionCostUSD: 0.08,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.03,
         computeCostUSD: 0.01,
       },
@@ -548,6 +578,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 2901234567,
       costEstimate: {
         crossRegionCostUSD: 0.55,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.28,
         computeCostUSD: 0.04,
       },
@@ -569,6 +600,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 120123456,
       costEstimate: {
         crossRegionCostUSD: 0.06,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.02,
         computeCostUSD: 0.01,
       },
@@ -590,6 +622,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 220123456,
       costEstimate: {
         crossRegionCostUSD: 0.09,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.03,
         computeCostUSD: 0.01,
       },
@@ -611,6 +644,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 32123456,
       costEstimate: {
         crossRegionCostUSD: 0.02,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -632,6 +666,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 4212345,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -653,6 +688,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 52123456,
       costEstimate: {
         crossRegionCostUSD: 0.02,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.01,
         computeCostUSD: 0.01,
       },
@@ -674,6 +710,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 12345,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -695,6 +732,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 23456,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.0,
       },
@@ -716,6 +754,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 3456789,
       costEstimate: {
         crossRegionCostUSD: 0.0,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },
@@ -737,6 +776,7 @@ const reportMetadataCopy: ReportMetadata[] = [
       size: 14567890,
       costEstimate: {
         crossRegionCostUSD: 0.01,
+        egressCostUSD: 0.0,
         coldStorageRetrievalCostUSD: 0.0,
         computeCostUSD: 0.01,
       },

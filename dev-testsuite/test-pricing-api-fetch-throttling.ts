@@ -1,6 +1,7 @@
 import {
   fetchColdStorageRetrievalCosts,
   fetchCrossRegionCosts,
+  fetchEgressCosts,
   fetchComputeCosts,
 } from "../packages/steps-s3-copy/lambda/common/cost-estimation";
 
@@ -11,7 +12,8 @@ const REPEATS = 100;
 const tasks = Array.from({ length: REPEATS }, () =>
   Promise.all([
     fetchColdStorageRetrievalCosts("ap-southeast-2"),
-    fetchCrossRegionCosts("ap-southeast-2"),
+    fetchCrossRegionCosts("ap-southeast-2", "ap-southeast-1"),
+    fetchEgressCosts("ap-southeast-2"),
     fetchComputeCosts("ap-southeast-2"),
   ]),
 );
@@ -29,14 +31,15 @@ const COLORS = { green: "\x1b[32m", red: "\x1b[31m", reset: "\x1b[0m" };
 const okSym = (v: boolean) =>
   v ? `${COLORS.green}✔${COLORS.reset}` : `${COLORS.red}✖${COLORS.reset}`;
 
-results.forEach(([cold, cross, compute], idx) => {
+results.forEach(([cold, cross, egress, compute], idx) => {
   const coldOk = isNonEmpty(cold);
   const crossOk = isNonEmpty(cross);
+  const egressOk = isNonEmpty(egress.egressPriceTiers);
   const computeOk = isNonEmpty(compute.lambda);
 
   console.log(
     `run ${idx + 1}: cold=${okSym(coldOk)} cross=${okSym(
       crossOk,
-    )} compute=${okSym(computeOk)}`,
+    )} egress=${okSym(egressOk)} compute=${okSym(computeOk)}`,
   );
 });

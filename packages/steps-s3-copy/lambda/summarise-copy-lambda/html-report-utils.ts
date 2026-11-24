@@ -4,6 +4,7 @@ import type { ReportMetadata } from "./summarise-copy-lambda.ts";
 import type {
   ColdStorageRetrievalCosts,
   CrossRegionCosts,
+  EgressCosts,
   ComputeCosts,
 } from "../common/cost-estimation";
 
@@ -29,6 +30,16 @@ export const formatBytes = (n?: number) => {
   }
   return `${v.toFixed(2)} ${units[i]}`;
 };
+
+// Format a USD amount for people to read: amounts of $1 or more get 2 decimal places
+// (e.g. 1.00806 -> "1.01"), smaller amounts keep 2 significant figures (e.g. 0.000234 -> "0.00023")
+export function formatUsd(amount: number): string {
+  if (amount === 0 || Math.abs(amount) >= 1) return amount.toFixed(2);
+
+  const decimals = 1 - Math.floor(Math.log10(Math.abs(amount)));
+  // drop trailing zeros past the 2nd decimal place (e.g. "0.00020" -> "0.0002")
+  return amount.toFixed(decimals).replace(/(\.\d{2}\d*?)0+$/, "$1");
+}
 
 // Format seconds as HH:MM:SS
 export const secondsToHMS = (sec?: number) => {
@@ -185,6 +196,7 @@ export function createFilesTableBlock(
     r.copyResultMetadata.name,
     formatBytes(r.copySetsMetadata.size),
     r.copySetsMetadata.costEstimate.crossRegionCostUSD,
+    r.copySetsMetadata.costEstimate.egressCostUSD ?? 0,
     r.copySetsMetadata.costEstimate.coldStorageRetrievalCostUSD,
     r.copySetsMetadata.costEstimate.computeCostUSD,
   ]);
@@ -220,7 +232,7 @@ export function createFilesTableBlock(
       <button class="nav-link active" id="results-tab" data-bs-toggle="tab" data-bs-target="#results" type="button" role="tab" aria-controls="results" aria-selected="true">Copy Results</button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab" aria-controls="costs" aria-selected="false">Estimated Cost</button>
+      <button class="nav-link" id="costs-tab" data-bs-toggle="tab" data-bs-target="#costs" type="button" role="tab" aria-controls="costs" aria-selected="false">Estimated Cost (USD)</button>
     </li>
   </ul>
 
@@ -233,19 +245,19 @@ export function createFilesTableBlock(
             <col style="width:14ch;">  <!-- Size -->
             <col style="width:14ch;">  <!-- Status -->
             <col style="width:14ch;">  <!-- Transferred -->
-            <col style="width:18ch;">  <!-- Transf. speed (MiB/s) -->
-            <col style="width:22ch;">  <!-- Elapsed time (hh:mm:ss) -->
+            <col style="width:26ch;">  <!-- Transf. speed (MiB/s) -->
+            <col style="width:30ch;">  <!-- Elapsed time (hh:mm:ss) -->
             <col style="width:22ch;">  <!-- Message -->
             <col style="width:80ch;">  <!-- Destination path-->
           </colgroup>
           <thead>
             <tr>
               <th>Object</th>
-              <th class="text-center">Size</th>
-              <th class="text-center">Status</th>
-              <th class="text-center">Transferred</th>
-              <th class="text-center">Transf. speed (MiB/s)</th>
-              <th class="text-center">Elapsed time (hh:mm:ss)</th>
+              <th class="text-end">Size</th>
+              <th class="text-end">Status</th>
+              <th class="text-end">Transferred</th>
+              <th class="text-end">Transf. speed (MiB/s)</th>
+              <th class="text-end">Elapsed time (hh:mm:ss)</th>
               <th>Message</th>
               <th>Destination path</th>
             </tr>
@@ -260,19 +272,21 @@ export function createFilesTableBlock(
       <div class="table-responsive">
         <table id="costs-table" class="table table-sm table-hover align-middle table-fixed">
           <colgroup>
-            <col style="width:18.2ch;">  <!-- Object -->
-            <col style="width:7.9ch;">  <!-- Size -->
-            <col style="width:18ch;">  <!-- Cross-Region Cost -->
-            <col style="width:18ch;">  <!-- Cold Storage Retrieval Cost -->
-            <col style="width:18ch;">  <!-- Compute Cost -->
+            <col style="width:32ch;">  <!-- Object -->
+            <col style="width:14ch;">  <!-- Size -->
+            <col style="width:18ch;">  <!-- Cross-Region -->
+            <col style="width:18ch;">  <!-- Egress -->
+            <col style="width:28ch;">  <!-- Cold Storage Retrieval -->
+            <col style="width:18ch;">  <!-- Compute -->
           </colgroup>
           <thead>
             <tr>
               <th>Object</th>
-              <th class="text-center">Size</th>
-              <th class="text-center">Cross-Region Cost (USD)</th>
-              <th class="text-center">Cold Storage Retrieval Cost (USD)</th>
-              <th class="text-center">Compute Cost (USD)</th>
+              <th class="text-end">Size</th>
+              <th class="text-end">Cross-Region</th>
+              <th class="text-end">Egress</th>
+              <th class="text-end">Cold Storage Retrieval</th>
+              <th class="text-end">Compute</th>
             </tr>
           </thead>
           <tbody>
@@ -302,11 +316,13 @@ export function createFilesTableBlock(
  */
 export function createCostEstimationBlock(
   totalCrossRegionCost: number,
+  totalEgressCost: number,
   totalColdCost: number,
   totalComputeCost: number,
   totalCost: number,
   coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
   crossRegionCosts: CrossRegionCosts,
+  egressCosts: EgressCosts,
   computeCosts: ComputeCosts,
   pricingDataFetchedAt: string,
 ): string {
@@ -333,17 +349,22 @@ export function createCostEstimationBlock(
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #FF9900; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Cross-region:</strong>
-					<span class="text-muted">$${totalCrossRegionCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalCrossRegionCost)} USD</span>
+				</li>
+				<li class="mb-2">
+					<span style="display: inline-block; width: 12px; height: 12px; background-color: #D13212; border-radius: 2px; margin-right: 8px;"></span>
+					<strong>Egress (outside AWS):</strong>
+					<span class="text-muted">$${formatUsd(totalEgressCost)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #1EA591; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Cold storage retrieval:</strong>
-					<span class="text-muted">$${totalColdCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalColdCost)} USD</span>
 				</li>
 				<li class="mb-2">
 					<span style="display: inline-block; width: 12px; height: 12px; background-color: #527FFF; border-radius: 2px; margin-right: 8px;"></span>
 					<strong>Compute:</strong>
-					<span class="text-muted">$${totalComputeCost.toFixed(4)} USD</span>
+					<span class="text-muted">$${formatUsd(totalComputeCost)} USD</span>
 				</li>
 				<li class="pt-2 mt-2 border-top">
 					<strong class="h5">Total:</strong>
@@ -367,9 +388,27 @@ export function createCostEstimationBlock(
             <strong>Cross-region:</strong>
             <ul class="mt-1 ps-3">
               <li>
-                <span style="color:#527FFF;"><strong>Egress (tiered, per GB):</strong></span>
+                <span style="color:#527FFF;"><strong>Transfer between regions:</strong></span> <code>$${crossRegionCosts.pricePerGbUsd.toFixed(
+                  4,
+                )} USD/GB</code>
+              </li>
+              <li class="mt-1">
+                <span style="color:#527FFF;"><strong>PUT requests:</strong></span> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
+                  6,
+                )} USD/request</code>
+              </li>
+              <li class="mt-1 text-muted">S3 in-region copies are free.</li>
+            </ul>
+          </li>
+
+          <!-- Egress Costs -->
+          <li class="mb-2">
+            <strong>Egress (to buckets outside AWS):</strong>
+            <ul class="mt-1 ps-3">
+              <li>
+                <span style="color:#527FFF;"><strong>Data transfer out (tiered, per GB):</strong></span>
                 <ul class="ps-3" style="font-family:monospace; font-size: 95%;">
-                  ${crossRegionCosts.egressPriceTiers
+                  ${egressCosts.egressPriceTiers
                     .map((t) =>
                       t.endRangeGb === Infinity
                         ? `<li><code>&gt;${t.beginRangeGb.toLocaleString()} GB</code> → <code>$${t.pricePerGbUsd.toFixed(
@@ -382,12 +421,7 @@ export function createCostEstimationBlock(
                     .join("")}
                 </ul>
               </li>
-              <li class="mt-1">
-                <span style="color:#527FFF;"><strong>PUT requests:</strong></span> <code>$${crossRegionCosts.putPricePerRequest.toFixed(
-                  6,
-                )} USD/request</code>
-              </li>
-              <li class="mt-1 text-muted">S3 in-region copies are free.</li>
+              <li class="mt-1 text-muted">Request charges from the other storage provider are not included.</li>
             </ul>
           </li>
 
@@ -489,10 +523,10 @@ export function createCostEstimationBlock(
 		new Chart(ctx, {
 			type: 'pie',
 			data: {
-				labels: ['Cross-Region', 'Cold Storage Retrieval', 'Compute'],
+				labels: ['Cross-Region', 'Egress', 'Cold Storage Retrieval', 'Compute'],
 				datasets: [{
-					data: [${totalCrossRegionCost}, ${totalColdCost}, ${totalComputeCost}],
-					backgroundColor: ['#FF9900', '#1EA591', '#527FFF'],
+					data: [${totalCrossRegionCost}, ${totalEgressCost}, ${totalColdCost}, ${totalComputeCost}],
+					backgroundColor: ['#FF9900', '#D13212', '#1EA591', '#527FFF'],
 					borderWidth: 2,
 					borderColor: '#fff'
 				}]

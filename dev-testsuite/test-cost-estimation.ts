@@ -10,6 +10,7 @@ import type {
   CostEstimate,
   ColdStorageRetrievalCosts,
   CrossRegionCosts,
+  EgressCosts,
   ComputeCosts,
 } from "../packages/steps-s3-copy/lambda//common/cost-estimation";
 
@@ -18,6 +19,8 @@ import {
   estimateColdStorageRetrievalCost,
   fetchCrossRegionCosts,
   estimateCrossRegionCost,
+  fetchEgressCosts,
+  estimateEgressCost,
   fetchComputeCosts,
   estimateComputeCost,
 } from "../packages/steps-s3-copy/lambda//common/cost-estimation";
@@ -31,14 +34,20 @@ const pricingFileExists = fs.existsSync(pricingFile);
 
 if (!pricingFileExists) {
   const sourceRegion = "ap-southeast-1";
+  const destinationRegion = "ap-southeast-2";
 
   const coldStorageCosts = await fetchColdStorageRetrievalCosts(sourceRegion);
-  const crossRegionCosts = await fetchCrossRegionCosts(sourceRegion);
+  const crossRegionCosts = await fetchCrossRegionCosts(
+    sourceRegion,
+    destinationRegion,
+  );
+  const egressCosts = await fetchEgressCosts(sourceRegion);
   const computeCosts = await fetchComputeCosts(sourceRegion);
 
   const fetchedPricingData = {
     coldStorageCosts,
     crossRegionCosts,
+    egressCosts,
     computeCosts,
     fetchedAt: new Date().toISOString(),
   };
@@ -74,6 +83,7 @@ type TestCase = {
   name: string;
   sizeBytes: number;
   isCrossRegion: boolean;
+  isOutsideAws?: boolean;
   storageClass: string;
   archiveStatus?: string;
   retrievalSpeed: string;
@@ -107,25 +117,37 @@ const testCases: TestCase[] = [
     restoreWindowDays: 7,
   },
   {
-    name: "Egress tier 2 (>10TB), cross-region",
+    name: "Small file, outside AWS",
+    sizeBytes: 100 * 1024 * 1024,
+    isCrossRegion: false,
+    isOutsideAws: true,
+    storageClass: "STANDARD",
+    retrievalSpeed: "Standard",
+    restoreWindowDays: 7,
+  },
+  {
+    name: "Egress tier 2 (>10TB), outside AWS",
     sizeBytes: 11 * 1024 * 1024 * 1024 * 1024,
-    isCrossRegion: true,
+    isCrossRegion: false,
+    isOutsideAws: true,
     storageClass: "STANDARD",
     retrievalSpeed: "Standard",
     restoreWindowDays: 7,
   },
   {
-    name: "Egress tier 3 (>50TB), cross-region",
+    name: "Egress tier 3 (>50TB), outside AWS",
     sizeBytes: 52 * 1024 * 1024 * 1024 * 1024,
-    isCrossRegion: true,
+    isCrossRegion: false,
+    isOutsideAws: true,
     storageClass: "STANDARD",
     retrievalSpeed: "Standard",
     restoreWindowDays: 7,
   },
   {
-    name: "Egress tier 4 (>150TB), cross-region",
+    name: "Egress tier 4 (>150TB), outside AWS",
     sizeBytes: 155 * 1024 * 1024 * 1024 * 1024,
-    isCrossRegion: true,
+    isCrossRegion: false,
+    isOutsideAws: true,
     storageClass: "STANDARD",
     retrievalSpeed: "Standard",
     restoreWindowDays: 7,
@@ -210,12 +232,18 @@ function calculateCostEstimate(
   testCase: TestCase,
   coldStorageRetrievalCosts: ColdStorageRetrievalCosts,
   crossRegionCosts: CrossRegionCosts,
+  egressCosts: EgressCosts,
   computeCosts: ComputeCosts,
 ): CostEstimate {
   return {
     crossRegionCostUSD: estimateCrossRegionCost(
       testCase.isCrossRegion,
       crossRegionCosts,
+      testCase.sizeBytes,
+    ),
+    egressCostUSD: estimateEgressCost(
+      testCase.isOutsideAws ?? false,
+      egressCosts,
       testCase.sizeBytes,
     ),
     coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
@@ -237,16 +265,19 @@ const rows = testCases.map((testCase) => {
     testCase,
     pricingData.coldStorageCosts,
     pricingData.crossRegionCosts,
+    pricingData.egressCosts,
     pricingData.computeCosts,
   );
 
   return {
     name: testCase.name,
     crossRegionCostUSD: costEstimate.crossRegionCostUSD,
+    egressCostUSD: costEstimate.egressCostUSD,
     coldStorageRetrievalCostUSD: costEstimate.coldStorageRetrievalCostUSD,
     computeCostUSD: costEstimate.computeCostUSD,
     totalCostUSD:
       costEstimate.crossRegionCostUSD +
+      costEstimate.egressCostUSD +
       costEstimate.coldStorageRetrievalCostUSD +
       costEstimate.computeCostUSD,
   };

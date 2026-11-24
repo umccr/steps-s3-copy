@@ -11,6 +11,8 @@ import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
 import {
   checkColdStorage,
+  checkCrossRegion,
+  checkOutsideAws,
   getThawParams,
   PRICING_DATA_FILENAME,
 } from "../common/constants";
@@ -18,6 +20,7 @@ import type { PricingData, CostEstimate } from "../common/cost-estimation";
 import {
   estimateColdStorageRetrievalCost,
   estimateCrossRegionCost,
+  estimateEgressCost,
   estimateComputeCost,
   readPricingDataJsonFromS3,
 } from "../common/cost-estimation";
@@ -32,6 +35,7 @@ export type HeadObjectsLambdaInvokeEvent = {
     workingBucket: string;
     workingBucketPrefix: string;
     instructionsPrefix: string;
+    destinationBucket: string;
     destinationPrefix: string;
     maximumExpansion: number;
     bucketDefinitions?: Record<string, BucketDefinition>;
@@ -213,9 +217,6 @@ export async function handler(
 
   const s3Client = new S3Client({});
 
-  // The region of the source bucket
-  const sourceRegion = event.BatchInput.sourceRequiredRegion;
-
   // The path to the pricing data JSON file in S3 written in fetch-picing step.
   const sourceFilePrefix =
     event.BatchInput.workingBucketPrefix + event.BatchInput.instructionsPrefix;
@@ -230,6 +231,7 @@ export async function handler(
 
   const coldStorageRetrievalCosts = pricingData.coldStorageCosts;
   const crossRegionCosts = pricingData.crossRegionCosts;
+  const egressCosts = pricingData.egressCosts;
   const computeCosts = pricingData.computeCosts;
 
   // *or* by calling HeadObject
@@ -309,8 +311,17 @@ export async function handler(
             archiveStatus = headResult.ArchiveStatus;
           }
           const isColdStorage = checkColdStorage(storageClass, archiveStatus);
-          const destinationRegion = event.BatchInput.destinationRequiredRegion;
-          const iscrossRegion = sourceRegion !== destinationRegion;
+          const isCrossRegion = checkCrossRegion(
+            o.sourceBucket,
+            event.BatchInput.sourceRequiredRegion,
+            event.BatchInput.destinationBucket,
+            event.BatchInput.destinationRequiredRegion,
+            event.BatchInput.bucketDefinitions,
+          );
+          const isOutsideAws = checkOutsideAws(
+            event.BatchInput.destinationBucket,
+            event.BatchInput.bucketDefinitions,
+          );
 
           const { retrievalSpeed, restoreWindowDays } = getThawParams(
             storageClass,
@@ -340,8 +351,13 @@ export async function handler(
             // Cost estimation for wildcard expanded items
             costEstimate: {
               crossRegionCostUSD: estimateCrossRegionCost(
-                iscrossRegion,
+                isCrossRegion,
                 crossRegionCosts,
+                size,
+              ),
+              egressCostUSD: estimateEgressCost(
+                isOutsideAws,
+                egressCosts,
                 size,
               ),
 
@@ -390,8 +406,17 @@ export async function handler(
       const archiveStatus = headResult.ArchiveStatus;
       const isColdStorage = checkColdStorage(storageClass, archiveStatus);
 
-      const destinationRegion = event.BatchInput.destinationRequiredRegion;
-      const iscrossRegion = sourceRegion !== destinationRegion;
+      const isCrossRegion = checkCrossRegion(
+        o.sourceBucket,
+        event.BatchInput.sourceRequiredRegion,
+        event.BatchInput.destinationBucket,
+        event.BatchInput.destinationRequiredRegion,
+        event.BatchInput.bucketDefinitions,
+      );
+      const isOutsideAws = checkOutsideAws(
+        event.BatchInput.destinationBucket,
+        event.BatchInput.bucketDefinitions,
+      );
 
       const { retrievalSpeed, restoreWindowDays } = getThawParams(
         storageClass,
@@ -420,10 +445,11 @@ export async function handler(
         // Cost estimation for non-wildcard items
         costEstimate: {
           crossRegionCostUSD: estimateCrossRegionCost(
-            iscrossRegion,
+            isCrossRegion,
             crossRegionCosts,
             size,
           ),
+          egressCostUSD: estimateEgressCost(isOutsideAws, egressCosts, size),
           coldStorageRetrievalCostUSD: estimateColdStorageRetrievalCost(
             isColdStorage,
             size,
