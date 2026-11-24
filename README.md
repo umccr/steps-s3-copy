@@ -518,9 +518,10 @@ and the workflow can fail while the restore is still in progress.
 
 The workflow assigns each object a `costEstimate` during the `HeadObjects` step. These estimates are then included in the copy report both, per object and in total.
 
-Each estimate has three components:
+Each estimate has four components:
 
 - **`crossRegionCostUSD`**: estimated cross-region transfer cost
+- **`egressCostUSD`**: estimated cost of sending data out of AWS, for destination buckets outside AWS
 - **`coldStorageRetrievalCostUSD`**: estimated restore/retrieval cost for cold or archival objects
 - **`computeCostUSD`**: estimated compute cost for processing and copying the object
 
@@ -529,7 +530,10 @@ Each estimate has three components:
 Costs are estimated using pricing data fetched from the [AWS Price List API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/price-changes.html) earlier in the workflow and are based on object size, storage class, and copy characteristics.
 
 - **Cross-region transfer**
-  Applied when the source and destination are in different AWS regions. This includes transfer charges and destination write request costs. (In-region S3 copies are treated as having no transfer cost.)
+  Applied when the source and destination are in different AWS regions. This uses the AWS transfer price for that pair of regions (a flat price per GB) plus the S3 PUT request costs in the destination region. A `region` set for a bucket in `bucketDefinitions` takes precedence over `sourceRequiredRegion` and `destinationRequiredRegion`. (In-region S3 copies are treated as having no transfer cost.)
+
+- **Egress**
+  Applied when the destination bucket is outside AWS, i.e. its entry in `bucketDefinitions` has an `endpointUrl` that is not an `amazonaws.com` address. This uses the AWS tiered price for data transferred out to the internet. Request charges from the other storage provider are not included, and the AWS free monthly allowance is ignored.
 
 - **Cold storage retrieval**
   Applied when an object is in a cold or archival storage class and must be restored before copy. The estimate depends on the storage class, object size, and thaw speed.
