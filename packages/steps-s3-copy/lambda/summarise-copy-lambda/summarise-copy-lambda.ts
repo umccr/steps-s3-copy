@@ -29,10 +29,14 @@ interface InvokeEvent {
   rcloneResultsSmall: MapResult;
   rcloneResultsNeedThawSmall: MapResult;
   rcloneResultsNeedThawLarge: MapResult;
+  rcloneResultsMedium: MapResult;
+  rcloneResultsNeedThawMedium: MapResult;
   inputCopySets: {
     small: { bucket: string; key: string };
+    medium: { bucket: string; key: string };
     large: { bucket: string; key: string };
     smallThaw: { bucket: string; key: string };
+    mediumThaw: { bucket: string; key: string };
     largeThaw: { bucket: string; key: string };
   };
 }
@@ -107,8 +111,10 @@ export async function handler(event: InvokeEvent) {
 
   const copySetsKeys = [
     event.inputCopySets.small.key,
+    event.inputCopySets.medium.key,
     event.inputCopySets.large.key,
     event.inputCopySets.smallThaw.key,
+    event.inputCopySets.mediumThaw.key,
     event.inputCopySets.largeThaw.key,
   ];
 
@@ -143,7 +149,9 @@ export async function handler(event: InvokeEvent) {
     const manifestKeys = [
       event.rcloneResultsLarge.manifestKey,
       event.rcloneResultsSmall.manifestKey,
+      event.rcloneResultsMedium.manifestKey,
       event.rcloneResultsNeedThawSmall.manifestKey,
+      event.rcloneResultsNeedThawMedium.manifestKey,
       event.rcloneResultsNeedThawLarge.manifestKey,
     ];
 

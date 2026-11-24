@@ -81,6 +81,10 @@ export class SummariseCopyLambdaStepConstruct extends Construct {
           "{% $exists($states.input[type='Large']) ? $states.input[type='Large'] : null %}",
         rcloneResultsNeedThawSmall:
           "{% $exists($states.input[type='NeedThawSmall']) ? $states.input[type='NeedThawSmall'] : null %}",
+        rcloneResultsMedium:
+          "{% $exists($states.input[type='Medium']) ? $states.input[type='Medium'] : null %}",
+        rcloneResultsNeedThawMedium:
+          "{% $exists($states.input[type='NeedThawMedium']) ? $states.input[type='NeedThawMedium'] : null %}",
         rcloneResultsNeedThawLarge:
           "{% $exists($states.input[type='NeedThawLarge']) ? $states.input[type='NeedThawLarge'] : null %}",
         inputCopySets: "{% $coordinateCopyResults.copySets %}",
