@@ -63,4 +63,12 @@ export interface StepsS3CopyConstructProps {
    * Defaults to 128.
    */
   readonly smallCopyMemorySize?: number;
+
+  /**
+   * The memory, in MiB, given to the Lambda that copies medium objects. Network bandwidth
+   * for Lambdas outside a VPC scales with memory (from 2 GB upwards, once enabled in
+   * Service Quotas), so keep this high.
+   * Defaults to 10240.
+   */
+  readonly mediumCopyMemorySize?: number;
 }

@@ -10,6 +10,9 @@
  * - the "small" stage copies objects using a Lambda. Many small objects are batched into
  *   a single Lambda invocation to amortise start-up overhead, and parallelism comes from
  *   running many invocations at once.
+ * - the "medium" stage copies mid-sized objects (above SMALL_SIZE_THRESHOLD_BYTES, up to
+ *   MEDIUM_SIZE_THRESHOLD_BYTES) using a high memory Lambda (which also gets the highest
+ *   network bandwidth). Batches default to one object per invocation.
  * - the "large" stage copies objects using a Fargate task, one object per task. Parallelism
  *   comes entirely from running many tasks at once, so there is deliberately no batch-size
  *   control for this stage (it is always one object per task).
@@ -39,6 +42,18 @@ export type Performance = {
    * Larger batches amortise Lambda start-up cost across more objects.
    */
   readonly smallCopyBatchSize?: number;
+
+  /**
+   * The maximum number of medium-object copy Lambdas to run concurrently.
+   */
+  readonly mediumCopyConcurrency?: number;
+
+  /**
+   * The maximum number of medium objects handed to a single medium-object copy Lambda
+   * invocation. Defaults to 1 so that each (gigabyte range) copy gets its own Lambda and
+   * 15 minute timeout.
+   */
+  readonly mediumCopyBatchSize?: number;
 
   /**
    * The maximum number of large-object copy Fargate tasks to run concurrently.
