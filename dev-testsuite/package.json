@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "e2e-ceph": "bun test ./test-e2e-ceph.ts",
+    "e2e-copy-size-tiers": "bun test ./test-e2e-copy-size-tiers.ts",
     "e2e-dryrun": "bun test ./test-e2e-dryrun.ts",
     "e2e-koalas": "bun test ./test-e2e-koalas.ts",
     "e2e-realistic": "bun test ./test-e2e-realistic.ts",
