@@ -2,7 +2,7 @@ import { writeFile, readFile } from "node:fs/promises";
 import * as fs from "fs";
 import * as path from "path";
 import {
-  SIZE_THRESHOLD_BYTES,
+  SMALL_SIZE_THRESHOLD_BYTES,
   checkColdStorage,
 } from "../packages/steps-s3-copy/lambda/common/constants";
 
@@ -220,7 +220,7 @@ const testCases: TestCase[] = [
   },
   {
     name: "Lambda threshold - just below",
-    sizeBytes: SIZE_THRESHOLD_BYTES - 1,
+    sizeBytes: SMALL_SIZE_THRESHOLD_BYTES - 1,
     isCrossRegion: false,
     storageClass: "STANDARD",
     retrievalSpeed: "Standard",
