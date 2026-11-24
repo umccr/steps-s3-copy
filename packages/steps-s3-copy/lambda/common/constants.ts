@@ -1,10 +1,18 @@
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 
 /**
- * Size threshold for determining small vs large object.
- * Set to 5 MiB as that is the definitional minimum size of a multipart part.
+ * Size thresholds that split objects into copy tiers (each bound is inclusive):
+ *
+ * - small:  up to SMALL_SIZE_THRESHOLD_BYTES, copied by a low memory Lambda (many per invocation).
+ * - medium: above small, up to MEDIUM_SIZE_THRESHOLD_BYTES, copied by a high memory Lambda.
+ * - large:  above medium, copied by Fargate.
+ *
+ * SMALL is 5 MiB as that is the definitional minimum size of a multipart part.
+ * MEDIUM is a starting value expected to be tuned from real runs. It is bound by the
+ * 15 minute Lambda timeout together with the network bandwidth available to the Lambda.
  */
-export const SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
+export const SMALL_SIZE_THRESHOLD_BYTES = 5 * 1024 * 1024;
+export const MEDIUM_SIZE_THRESHOLD_BYTES = 10 * 1024 * 1024 * 1024;
 
 /**
  * Chunk size (in bytes) used for S3 multipart upload "partSize".
@@ -75,19 +83,22 @@ export function checkOutsideAws(
 export const PRICING_DATA_FILENAME = "pricing-data.json";
 
 // -------------
-// Read from packages/steps-s3-copy/src/steps-s3-copy-construct.ts
-// TODO: cosider to use theses constans here defined
-// in packages/steps-s3-copy/src/steps-s3-copy-construct.ts
+// The compute values below are copies of the real deployed settings, used only for cost
+// estimation. Keep them in sync with their source (TODO: import them instead).
+
+// Fargate: src/steps-s3-copy-construct.ts
 export const FARGATE_MIN_BILLING_SECONDS = 60;
 export const FARGATE_MEMORY_MB = 512;
 export const FARGATE_CPU_VCPU = 0.25;
 export const DEFAULT_FARGATE_OVERHEAD_SEC = 8;
 
-// Read from packages/steps-s3-copy/src/lib/small-copy-map-construct.ts
-// TODO: cosider to use theses constans here defined
-// in packages/steps-s3-copy/src/lib/small-copy-map-construct.ts
-export const LAMBDA_MEMORY_MB = 128;
-// Typical assumed copy speed for compute cost estimation (MiB/s)
+// Small Lambda memory: DEFAULT_SMALL_COPY_MEMORY_SIZE_MIB in src/lib/small-copy-map-construct.ts
+export const SMALL_LAMBDA_MEMORY_MB = 128;
+
+// Medium Lambda memory: DEFAULT_MEDIUM_COPY_MEMORY_SIZE_MIB in src/lib/medium-copy-map-construct.ts
+export const MEDIUM_LAMBDA_MEMORY_MB = 10240;
+
+// Assumed copy speed (MiB/s) and Lambda start-up overhead for compute cost estimation
 export const DEFAULT_COPY_SPEED_MIBPS = 40;
 export const DEFAULT_LAMBDA_OVERHEAD_SEC = 20;
 
