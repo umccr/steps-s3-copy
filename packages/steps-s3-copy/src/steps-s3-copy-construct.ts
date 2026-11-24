@@ -41,6 +41,7 @@ import { HeadObjectsMapConstruct } from "./lib/head-objects-map-construct";
 import { CoordinateCopyLambdaStepConstruct } from "./lib/coordinate-copy-lambda-step-construct";
 import { SummariseCopyLambdaStepConstruct } from "./lib/summarise-copy-lambda-step-construct";
 import { SmallObjectsCopyMapConstruct } from "./lib/small-copy-map-construct";
+import { MediumObjectsCopyMapConstruct } from "./lib/medium-copy-map-construct";
 import {
   AssetImage,
   AwsLogDriverMode,
@@ -207,6 +208,8 @@ export class StepsS3CopyConstruct extends Construct {
           "headConcurrency": [ $p.headConcurrency, 10000 ][0],
           "smallCopyConcurrency": [ $p.smallCopyConcurrency, 10000 ][0],
           "smallCopyBatchSize": [ $p.smallCopyBatchSize, 128 ][0],
+          "mediumCopyConcurrency": [ $p.mediumCopyConcurrency, 100 ][0],
+          "mediumCopyBatchSize": [ $p.mediumCopyBatchSize, 1 ][0],
           "largeCopyConcurrency": [ $p.largeCopyConcurrency, 96 ][0]
         }
       ) %}`,
@@ -327,6 +330,26 @@ export class StepsS3CopyConstruct extends Construct {
       memorySize: props.smallCopyMemorySize,
     });
 
+    // Mid sized objects are copied by a high memory (hence high bandwidth) Lambda, usually
+    // one object per invocation
+    const mediumCopierMap = new MediumObjectsCopyMapConstruct(this, "Medium", {
+      writerRole: this._workingRole,
+      inputPath: "$coordinateCopyResults.copySets.medium",
+      memorySize: props.mediumCopyMemorySize,
+    });
+
+    const thawMediumCopierMap = new MediumObjectsCopyMapConstruct(
+      this,
+      "NeedThawMedium",
+      {
+        addThawStep: true,
+        aggressiveTimes: props.aggressiveTimes,
+        writerRole: this._workingRole,
+        inputPath: "$coordinateCopyResults.copySets.mediumThaw",
+        memorySize: props.mediumCopyMemorySize,
+      },
+    );
+
     const largeCopierMap = new CopyMapConstruct(this, "Large", {
       // for larger items - designate a single copy at a time - gaining concurrency
       // via the distributed map itself. concurrency comes from the per-execution
@@ -371,8 +394,10 @@ export class StepsS3CopyConstruct extends Construct {
     // we can tune the copiers for their object types
     const copiers = new Parallel(this, "CopyParallel", {}).branch(
       smallCopierMap.distributedMap,
+      mediumCopierMap.distributedMap,
       largeCopierMap.distributedMap,
       thawSmallCopierMap.distributedMap,
+      thawMediumCopierMap.distributedMap,
       thawLargeCopierMap.distributedMap,
     );
 
@@ -428,6 +453,10 @@ export class StepsS3CopyConstruct extends Construct {
       this._stateMachine,
     );
     smallCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    mediumCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
+    thawMediumCopierMap.distributedMap.grantNestedPermissions(
+      this._stateMachine,
+    );
     largeCopierMap.distributedMap.grantNestedPermissions(this._stateMachine);
     thawLargeCopierMap.distributedMap.grantNestedPermissions(
       this._stateMachine,
