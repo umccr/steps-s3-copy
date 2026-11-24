@@ -6,7 +6,8 @@ import { chdir } from "node:process";
 import { StepsS3CopyInvokeSettings } from "../../src/steps-s3-copy-construct";
 import { StepsS3CopyInvokeArguments } from "../../src/steps-s3-copy-input";
 import {
-  SIZE_THRESHOLD_BYTES,
+  SMALL_SIZE_THRESHOLD_BYTES,
+  MEDIUM_SIZE_THRESHOLD_BYTES,
   MULTIPART_CHUNK_SIZE,
 } from "../common/constants";
 import { tmpNameSync } from "tmp";
@@ -145,22 +146,34 @@ export async function handler(event: LambdaEvent) {
 
   // Small objects that do not need thawing
   const smallDf = df
-    .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("size").ltEq(SMALL_SIZE_THRESHOLD_BYTES))
     .filter(pl.col("isColdStorage").not());
 
   // Small objects that require thawing
   const smallThawDf = df
-    .filter(pl.col("size").ltEq(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("size").ltEq(SMALL_SIZE_THRESHOLD_BYTES))
     .filter(pl.col("isColdStorage"));
 
-  // Large objects that do not need thawing
+  // Medium objects (Lambda copy, larger than small) that do not need thawing
+  const mediumDf = df
+    .filter(pl.col("size").gt(SMALL_SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("size").ltEq(MEDIUM_SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("isColdStorage").not());
+
+  // Medium objects that require thawing
+  const mediumThawDf = df
+    .filter(pl.col("size").gt(SMALL_SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("size").ltEq(MEDIUM_SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("isColdStorage"));
+
+  // Large objects (Fargate copy) that do not need thawing
   const largeDf = df
-    .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("size").gt(MEDIUM_SIZE_THRESHOLD_BYTES))
     .filter(pl.col("isColdStorage").not());
 
   // Large objects that require thawing
   const largeThawDf = df
-    .filter(pl.col("size").gt(SIZE_THRESHOLD_BYTES))
+    .filter(pl.col("size").gt(MEDIUM_SIZE_THRESHOLD_BYTES))
     .filter(pl.col("isColdStorage"));
 
   return {
@@ -173,11 +186,23 @@ export async function handler(event: LambdaEvent) {
         smallDf,
         "small",
       ),
+      medium: await createJsonlFromDataFrame(
+        event.headObjectsResults.manifestBucket,
+        event.headObjectsResults.manifestAbsoluteKey,
+        mediumDf,
+        "medium",
+      ),
       large: await createJsonlFromDataFrame(
         event.headObjectsResults.manifestBucket,
         event.headObjectsResults.manifestAbsoluteKey,
         largeDf,
         "large",
+      ),
+      mediumThaw: await createJsonlFromDataFrame(
+        event.headObjectsResults.manifestBucket,
+        event.headObjectsResults.manifestAbsoluteKey,
+        mediumThawDf,
+        "mediumThaw",
       ),
       smallThaw: await createJsonlFromDataFrame(
         event.headObjectsResults.manifestBucket,
