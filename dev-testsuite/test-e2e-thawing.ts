@@ -258,6 +258,14 @@ test(
       state.workingBucket,
       longKey,
     );
+    console.info(
+      `Long window object (restored ${LONG_WINDOW_DAYS}d, copy thaw days ${COPY_THAW_DAYS}): ` +
+        `expiry before=${new Date(longExpiryBefore).toISOString()} ` +
+        `after=${
+          longExpiryAfter ? new Date(longExpiryAfter).toISOString() : "none"
+        } ` +
+        `(expected: unchanged)`,
+    );
     assert.strictEqual(
       longExpiryAfter,
       longExpiryBefore,
@@ -270,9 +278,24 @@ test(
       state.workingBucket,
       shortKey,
     );
+    console.info(
+      `Short window object (restored ${SHORT_WINDOW_DAYS}d, copy thaw days ${COPY_THAW_DAYS}): ` +
+        `expiry before=${new Date(shortExpiryBefore).toISOString()} ` +
+        `after=${
+          shortExpiryAfter ? new Date(shortExpiryAfter).toISOString() : "none"
+        } ` +
+        `(expected: extended)`,
+    );
     assert(
       shortExpiryAfter !== undefined && shortExpiryAfter > shortExpiryBefore,
       "Object thawed for less than the thaw days should have had its thaw extended",
+    );
+    // the new expiry should be about COPY_THAW_DAYS from when the copy ran (S3 rounds to midnight UTC,
+    // and the copy started some minutes ago, so allow a day of slack)
+    assert(
+      shortExpiryAfter >=
+        Date.now() + (COPY_THAW_DAYS - 1) * 24 * 60 * 60 * 1000,
+      "Extended thaw should last about the copy thaw days",
     );
   },
   (TEST_EXPECTED_SECONDS + PRE_THAW_EXPECTED_SECONDS) * 1000,
