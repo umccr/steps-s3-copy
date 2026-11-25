@@ -1,6 +1,15 @@
 import { Construct } from "constructs";
 import { Effect, IRole, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import { Duration } from "aws-cdk-lib";
+import {
+  Choice,
+  Condition,
+  Fail,
+  IChainable,
+  State,
+  Wait,
+  WaitTime,
+} from "aws-cdk-lib/aws-stepfunctions";
 import { LambdaInvoke } from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
@@ -13,16 +22,43 @@ type Props = {
 /**
  * A construct for a Steps function that tests if a set
  * of input files are available for copying (i.e. in active
- * storage) and if not, triggers a restore on them. Whenever
- * any input file is not available - this lambda throws a
- * IsThawingError (at the end of processing all of them).
+ * storage) and if not, triggers a restore on them. It returns
+ * the number of files still thawing as ThawingCount.
  *
- * It can then be used in a loop waiting
- * for thawing to finish - by Retry/Catching this error.
+ * Use buildWaitLoop() to wait for thawing to finish, by looping
+ * (Wait then call again) while ThawingCount is above zero.
  */
 export class ThawObjectsLambdaStepConstruct extends Construct {
   public readonly invocableLambda;
   public readonly lambdaFunction;
+
+  /**
+   * Chains this step to `next`, looping with a Wait while any objects are
+   * still thawing. Fails the batch if it is still thawing after too many passes.
+   *
+   * @returns the state to use as the entry point
+   */
+  public buildWaitLoop(next: IChainable, aggressiveTimes?: boolean): State {
+    const interval = aggressiveTimes ? Duration.minutes(1) : Duration.hours(1);
+    // no thaw should take more than 2 days; this guards against looping forever
+    const maxPasses = aggressiveTimes ? 3 : 50;
+
+    const wait = new Wait(this, this.node.id + "WaitForThaw", {
+      time: WaitTime.duration(interval),
+    });
+    const tooLong = new Fail(this, this.node.id + "ThawTimedOut", {
+      error: "ThawTimedOut",
+      cause: `Objects were still thawing after ${maxPasses} checks`,
+    });
+    const choice = new Choice(this, this.node.id + "StillThawing")
+      .when(Condition.numberEquals("$.ThawingCount", 0), next)
+      .when(Condition.numberGreaterThanEquals("$.ThawPass", maxPasses), tooLong)
+      .otherwise(wait);
+
+    wait.next(this.invocableLambda);
+    this.invocableLambda.next(choice);
+    return this.invocableLambda;
+  }
 
   constructor(scope: Construct, id: string, _props: Props) {
     super(scope, id);
