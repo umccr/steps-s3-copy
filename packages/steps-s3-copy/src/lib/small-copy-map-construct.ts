@@ -49,7 +49,7 @@ export class SmallObjectsCopyMapConstruct extends Construct {
     );
 
     /**
-     * Adds a thawing step if needed, with retries on IsThawingError.
+     * Adds a thawing step if needed, looping while objects are thawing.
      * Otherwise, skips straight to the delay step before copying.
      */
 
@@ -64,21 +64,10 @@ export class SmallObjectsCopyMapConstruct extends Construct {
         },
       );
 
-      const interval = props.aggressiveTimes
-        ? Duration.minutes(1)
-        : Duration.hours(1);
-      const maxAttempts = props.aggressiveTimes ? 3 : 50;
-
-      thawStep.invocableLambda.addRetry({
-        errors: ["IsThawingError"],
-        interval: interval,
-        backoffRate: 1,
-        maxAttempts: maxAttempts,
-      });
-
-      thawStep.invocableLambda.next(copyStep.invocableLambda);
-
-      entryState = thawStep.invocableLambda;
+      entryState = thawStep.buildWaitLoop(
+        copyStep.invocableLambda,
+        props.aggressiveTimes,
+      );
     } else {
       entryState = copyStep.invocableLambda;
     }
