@@ -8,6 +8,18 @@ transferring terabytes of large (10 GiB+) objects between object stores.
 However, there is nothing inherently restricting the service from working
 with all types of objects, big or small.
 
+A quick summary of features:
+* Source objects from S3-compatible object stores
+* Send objects to S3-compatible object stores
+* Credentials for non-AWS endpoints can be sourced from secrets
+* Scales to millions of objects
+* Handles large objects (100 GiB+)
+* Reorganise directory structure on copy
+* Thaw source objects as part of copy (will wait for thaw)
+* Parametrisable concurrency
+* Estimate copy cost (egress etc) before actual-copying
+* Generate reports on copy completion
+
 ## Development
 
 See [DEV](./DEV.md).
