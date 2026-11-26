@@ -472,6 +472,10 @@ single Lambda step (implemented by `ThawObjectsLambdaStepConstruct` and reused b
 1. checks whether the object is currently readable / available in active storage
 2. if not available, triggers an S3 restore request (`RestoreObject`)
 3. if the object is still thawing, the Lambda throws `IsThawingError`
+4. if the object is already thawed, compares its restore `expiry-date` with `now + ThawDays` (the
+   thaw days for its storage class). If it expires sooner, it re-issues `RestoreObject` to extend the
+   restore window. Otherwise it leaves the object untouched. An extension does not throw
+   `IsThawingError`, as the object is readable straight away.
 
 Step Functions is configured to **retry** on `IsThawingError`, which effectively turns this into
 a polling loop until the object becomes available.

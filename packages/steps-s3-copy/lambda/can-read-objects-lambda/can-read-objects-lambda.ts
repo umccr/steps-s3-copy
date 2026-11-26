@@ -65,15 +65,21 @@ export async function handler(event: ThawObjectsEvent) {
 
       const headResult = await client.send(headCommand);
 
+      // true if the object has already been thawed (and is readable right now)
+      let alreadyRestored = false;
+
       if (headResult.Restore) {
         // the object is still being thawed
-        if (headResult.Restore.includes('ongoing-request="true"')) isThawing++;
+        if (headResult.Restore.includes('ongoing-request="true"')) {
+          isThawing++;
+          continue;
+        }
 
-        // otherwise it may successfully have been restored - in which case we can just continue
-        // as if the file was in S3 active
-        // TODO are there other states we should check here?
-        // the only one I've found is ongoing-request=\"false\", expiry-date=\"Sat, 02 Dec 2023 00:00:00 GMT\"
-        continue;
+        // otherwise it has been restored (ongoing-request="false", expiry-date="...").
+        // It is readable now, but the restored copy may expire before the copy finishes
+        // (e.g. thawed days ago). So we fall through and re-issue the restore with the
+        // normal thaw days, which resets the expiry. We do not count it as thawing.
+        alreadyRestored = true;
       }
 
       // now deal with the objects we have detected that are in storage classes needing restoring but where it
@@ -131,6 +137,33 @@ export async function handler(event: ThawObjectsEvent) {
           }),
         );
 
+        if (alreadyRestored) {
+          // Only extend if the restored copy will expire sooner than a fresh restore
+          // with our thaw days would. This avoids pointless requests and never shortens
+          // an existing (longer) restore window.
+          // Restore header example: ongoing-request="false", expiry-date="Sat, 02 Dec 2023 00:00:00 GMT"
+          const expiryMatch = headResult.Restore?.match(
+            /expiry-date="([^"]+)"/,
+          );
+          const expiryMs = expiryMatch ? Date.parse(expiryMatch[1]) : NaN;
+          // expiry (in ms) a fresh restore would give: now + days (days * 24h * 60min * 60s * 1000ms)
+          const newExpiryMs = Date.now() + days * 24 * 60 * 60 * 1000;
+
+          // if we cannot parse the expiry we extend, to be safe
+          if (!Number.isNaN(expiryMs) && expiryMs >= newExpiryMs) {
+            console.log(
+              JSON.stringify({
+                msg: "Already restored with long enough expiry, not extending",
+                bucket: o.bucket,
+                key: o.key,
+                expiry: expiryMatch?.[1],
+                days,
+              }),
+            );
+            continue;
+          }
+        }
+
         const restoreObjectCommand = new RestoreObjectCommand({
           Bucket: o.bucket,
           Key: o.key,
@@ -150,7 +183,9 @@ export async function handler(event: ThawObjectsEvent) {
         // fall throughout of this and the rclone will fail (at which point we will get an error and
         // we can investigate)
 
-        isThawing++;
+        // an extension of an already restored object is readable now, so it must not
+        // trigger an IsThawingError retry (which would extend it again on every retry)
+        if (!alreadyRestored) isThawing++;
       }
     } catch (e: any) {
       // we actually gobble up any errors here (with just a print)

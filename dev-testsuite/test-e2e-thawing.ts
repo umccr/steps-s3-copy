@@ -1,4 +1,9 @@
 import { SFNClient, StartExecutionCommand } from "@aws-sdk/client-sfn";
+import {
+  HeadObjectCommand,
+  RestoreObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { makeObjectDictionaryJsonl } from "./util.mjs";
 import { waitUntilStateMachineFinishes } from "./lib/steps-waiter.mjs";
 import { WaiterState } from "@smithy/util-waiter";
@@ -18,7 +23,70 @@ import {
 // so give ourselves 5 minutes before we abort
 const TEST_EXPECTED_SECONDS = 7 * 60;
 
+// extra time (before the copy starts) to pre-thaw the objects used for the
+// "already thawed" cases, as even Expedited restores can take up to 5 minutes
+const PRE_THAW_EXPECTED_SECONDS = 10 * 60;
+
+// the thaw days the copy will use for GLACIER objects
+const COPY_THAW_DAYS = 3;
+
+// pre-thaw windows for the "already thawed" objects. S3 rounds the expiry to midnight UTC
+// so a 1 day restore expires between ~1 and ~2 days from now: always less than COPY_THAW_DAYS
+const SHORT_WINDOW_DAYS = 1;
+// a long window is always more than COPY_THAW_DAYS from now
+const LONG_WINDOW_DAYS = 7;
+
 let state: TestSetupState;
+
+/**
+ * Restores (thaws) an object and waits until the restore is finished.
+ * Returns the expiry of the restored copy.
+ */
+async function preThaw(
+  s3: S3Client,
+  bucket: string,
+  key: string,
+  days: number,
+): Promise<number> {
+  await s3.send(
+    new RestoreObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      RestoreRequest: {
+        Days: days,
+        GlacierJobParameters: { Tier: "Expedited" },
+      },
+    }),
+  );
+
+  const deadline = Date.now() + PRE_THAW_EXPECTED_SECONDS * 1000;
+
+  while (Date.now() < deadline) {
+    const expiry = await getRestoreExpiryMs(s3, bucket, key);
+    if (expiry !== undefined) return expiry;
+    await new Promise((r) => setTimeout(r, 15 * 1000));
+  }
+
+  throw new Error(`Pre-thaw of ${key} did not finish in time`);
+}
+
+/**
+ * Returns the expiry (ms since epoch) of a finished restore, or undefined
+ * if the object is not restored (yet).
+ */
+async function getRestoreExpiryMs(
+  s3: S3Client,
+  bucket: string,
+  key: string,
+): Promise<number | undefined> {
+  const head = await s3.send(
+    new HeadObjectCommand({ Bucket: bucket, Key: key }),
+  );
+  const match = head.Restore?.match(
+    /ongoing-request="false", expiry-date="([^"]+)"/,
+  );
+  return match ? Date.parse(match[1]!) : undefined;
+}
 
 beforeAll(async () => {
   state = await testSetup();
@@ -41,6 +109,19 @@ test(
         partSizeInBytes: 5 * MiB,
         storageClass:
           "GLACIER" /* this is now Glacier Flexible Retrieval - the enum name is still the original name */,
+      },
+      //
+      // these are thawed by the test *before* the copy starts, to test the case of
+      // already thawed objects: one with a window longer than the copy thaw days (must not be
+      // touched) and one shorter (must be extended)
+      //
+      [`glacier-already-thawed-long-window.bin`]: {
+        sizeInBytes: 256 * KiB,
+        storageClass: "GLACIER",
+      },
+      [`glacier-already-thawed-short-window.bin`]: {
+        sizeInBytes: 256 * KiB,
+        storageClass: "GLACIER",
       },
       //
       // the following 3 *will* work even without any actual thawing code - as IR is just like regular S3
@@ -90,6 +171,17 @@ test(
       );
     }
 
+    console.info("Pre-thawing the already thawed test objects");
+
+    const s3 = new S3Client({});
+    const longKey = `${state.testSrcPrefix}glacier-already-thawed-long-window.bin`;
+    const shortKey = `${state.testSrcPrefix}glacier-already-thawed-short-window.bin`;
+
+    const [longExpiryBefore, shortExpiryBefore] = await Promise.all([
+      preThaw(s3, state.workingBucket, longKey, LONG_WINDOW_DAYS),
+      preThaw(s3, state.workingBucket, shortKey, SHORT_WINDOW_DAYS),
+    ]);
+
     console.info("Creating copy instruction JSONL");
 
     {
@@ -119,7 +211,7 @@ test(
           destinationPrefix: state.testDestPrefix,
           thawParams: {
             // Glacier Flexible Retrieval  -->  Expedited
-            glacierFlexibleRetrievalThawDays: 1,
+            glacierFlexibleRetrievalThawDays: COPY_THAW_DAYS,
             glacierFlexibleRetrievalThawSpeed: "Expedited",
             // Glacier Deep Archive  -->  Standard
             glacierDeepArchiveThawDays: 1,
@@ -159,6 +251,52 @@ test(
       state.testDestPrefix,
       sourceObjectParams,
     );
+
+    // already thawed with a long window: must be left untouched
+    const longExpiryAfter = await getRestoreExpiryMs(
+      s3,
+      state.workingBucket,
+      longKey,
+    );
+    console.info(
+      `Long window object (restored ${LONG_WINDOW_DAYS}d, copy thaw days ${COPY_THAW_DAYS}): ` +
+        `expiry before=${new Date(longExpiryBefore).toISOString()} ` +
+        `after=${
+          longExpiryAfter ? new Date(longExpiryAfter).toISOString() : "none"
+        } ` +
+        `(expected: unchanged)`,
+    );
+    assert.strictEqual(
+      longExpiryAfter,
+      longExpiryBefore,
+      "Object thawed for longer than the thaw days should not have been re-thawed",
+    );
+
+    // already thawed with a short window: must have been extended
+    const shortExpiryAfter = await getRestoreExpiryMs(
+      s3,
+      state.workingBucket,
+      shortKey,
+    );
+    console.info(
+      `Short window object (restored ${SHORT_WINDOW_DAYS}d, copy thaw days ${COPY_THAW_DAYS}): ` +
+        `expiry before=${new Date(shortExpiryBefore).toISOString()} ` +
+        `after=${
+          shortExpiryAfter ? new Date(shortExpiryAfter).toISOString() : "none"
+        } ` +
+        `(expected: extended)`,
+    );
+    assert(
+      shortExpiryAfter !== undefined && shortExpiryAfter > shortExpiryBefore,
+      "Object thawed for less than the thaw days should have had its thaw extended",
+    );
+    // the new expiry should be about COPY_THAW_DAYS from when the copy ran (S3 rounds to midnight UTC,
+    // and the copy started some minutes ago, so allow a day of slack)
+    assert(
+      shortExpiryAfter >=
+        Date.now() + (COPY_THAW_DAYS - 1) * 24 * 60 * 60 * 1000,
+      "Extended thaw should last about the copy thaw days",
+    );
   },
-  TEST_EXPECTED_SECONDS * 1000,
+  (TEST_EXPECTED_SECONDS + PRE_THAW_EXPECTED_SECONDS) * 1000,
 );
