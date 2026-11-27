@@ -390,9 +390,9 @@ export class StepsS3CopyConstruct extends Construct {
       { writerRole: this._workingRole },
     );
 
-    const dryRunChoice = new Choice(this, "Is DryRun?")
+    const dryRunChoice = Choice.jsonata(this, "Is DryRun?")
       .when(
-        Condition.booleanEquals("$.dryRun", true),
+        Condition.jsonata("{% $states.input.dryRun = true %}"),
         summariseCopyDryRun.invocableLambda.next(success),
       )
       .otherwise(
