@@ -50,9 +50,12 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
       error: "ThawTimedOut",
       cause: `Objects were still thawing after ${maxPasses} checks`,
     });
-    const choice = new Choice(this, this.node.id + "StillThawing")
-      .when(Condition.numberEquals("$.ThawingCount", 0), next)
-      .when(Condition.numberGreaterThanEquals("$.ThawPass", maxPasses), tooLong)
+    const choice = Choice.jsonata(this, this.node.id + "StillThawing")
+      .when(Condition.jsonata("{% $states.input.ThawingCount = 0 %}"), next)
+      .when(
+        Condition.jsonata(`{% $states.input.ThawPass >= ${maxPasses} %}`),
+        tooLong,
+      )
       .otherwise(wait);
 
     wait.next(this.invocableLambda);
