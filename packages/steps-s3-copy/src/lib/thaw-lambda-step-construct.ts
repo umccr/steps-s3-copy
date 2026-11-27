@@ -40,7 +40,9 @@ export class ThawObjectsLambdaStepConstruct extends Construct {
    */
   public buildWaitLoop(next: IChainable, aggressiveTimes?: boolean): State {
     const interval = aggressiveTimes ? Duration.minutes(1) : Duration.hours(1);
-    // no thaw should take more than 2 days; this guards against looping forever
+    // The slowest documented restore is Bulk on Deep Archive, within 48 hours (AWS S3 docs).
+    // Objects over 5 TB restore more slowly, but S3 objects are limited to 5 TB, so we ignore that.
+    // The cap is just over that, and it also guards against looping forever.
     const maxPasses = aggressiveTimes ? 3 : 50;
 
     const wait = new Wait(this, this.node.id + "WaitForThaw", {
