@@ -4,7 +4,6 @@ import {
   Tier,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
-import { IsThawingError } from "./errors";
 import type { BucketDefinition } from "../../src/steps-s3-copy-input";
 import { createS3ClientCache } from "../common/s3-client-builder";
 import { checkColdStorage } from "../common/constants";
@@ -30,6 +29,8 @@ interface ThawObjectsEvent {
     aggressiveTimes: boolean;
     bucketDefinitions?: Record<string, BucketDefinition>;
   };
+  // number of times this step has already run for this batch (set by this lambda)
+  ThawPass?: number;
 }
 
 /**
@@ -38,8 +39,9 @@ interface ThawObjectsEvent {
  * classes that do not allow immediate access.
  *
  * It attempts to find any objects that need thawing and initiates a restore.
- * And it detects if any of in the process of thawing. In those cases it
- * throws an IsThawingError which should be retried by the outer Steps.
+ * And it detects if any of in the process of thawing. It reports how many
+ * are in that state in ThawingCount, which the outer Steps uses to decide
+ * whether to wait and call this again.
  *
  * @param event
  */
@@ -206,14 +208,17 @@ export async function handler(event: ThawObjectsEvent) {
     }
   }
 
-  // the *only* way this method can fail via error is this path
-  // where we tell the Steps we are in the process of thawing
-  // *all* other paths should continue on (where they can fail in the rclone)
   if (isThawing > 0) {
-    throw new IsThawingError(
+    console.log(
       `${isThawing}/${event.Items.length} are in the process of thawing`,
     );
   }
-  // Return original input so downstream steps (e.g. ECS copy) get expected fields
-  return event;
+
+  // Return original input (so downstream steps get the expected fields) plus
+  // the thawing count and the pass number, which the Steps loop reads
+  return {
+    ...event,
+    ThawingCount: isThawing,
+    ThawPass: (event.ThawPass ?? 0) + 1,
+  };
 }

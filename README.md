@@ -9,16 +9,17 @@ However, there is nothing inherently restricting the service from working
 with all types of objects, big or small.
 
 A quick summary of features:
-* Source objects from S3-compatible object stores
-* Send objects to S3-compatible object stores
-* Credentials for non-AWS endpoints can be sourced from secrets
-* Scales to millions of objects
-* Handles large objects (100 GiB+)
-* Reorganise directory structure on copy
-* Thaw source objects as part of copy (will wait for thaw)
-* Parametrisable concurrency
-* Estimate copy cost (egress etc) before actual-copying
-* Generate reports on copy completion
+
+- Source objects from S3-compatible object stores
+- Send objects to S3-compatible object stores
+- Credentials for non-AWS endpoints can be sourced from secrets
+- Scales to millions of objects
+- Handles large objects (100 GiB+)
+- Reorganise directory structure on copy
+- Thaw source objects as part of copy (will wait for thaw)
+- Parametrisable concurrency
+- Estimate copy cost (egress etc) before actual-copying
+- Generate reports on copy completion
 
 ## Development
 
@@ -483,16 +484,17 @@ single Lambda step (implemented by `ThawObjectsLambdaStepConstruct` and reused b
 
 1. checks whether the object is currently readable / available in active storage
 2. if not available, triggers an S3 restore request (`RestoreObject`)
-3. if the object is still thawing, the Lambda throws `IsThawingError`
+3. counts the objects still thawing and returns the count (`ThawingCount`) with the original input
+
+Step Functions then checks `ThawingCount`. If any objects are still thawing, it waits and calls the
+Lambda again, which makes a polling loop until all objects in the batch are available. If they are
+still thawing after the maximum number of checks, the batch fails with `ThawTimedOut`. Any other
+error from the Lambda fails the batch straight away.
+
 4. if the object is already thawed, compares its restore `expiry-date` with `now + ThawDays` (the
    thaw days for its storage class). If it expires sooner, it re-issues `RestoreObject` to extend the
-   restore window. Otherwise it leaves the object untouched. An extension does not throw
-   `IsThawingError`, as the object is readable straight away.
-
-Step Functions is configured to **retry** on `IsThawingError`, which effectively turns this into
-a polling loop until the object becomes available.
-
-See [Restore settings](#restore-settings) for `thawParams`.
+   restore window. Otherwise it leaves the object untouched.
+   See [Restore settings](#restore-settings) for `thawParams`.
 
 ### Restore settings
 
@@ -518,16 +520,16 @@ If a field is not provided in `thawParams`, the thaw step Lambda applies default
 If `thawParams` itself is omitted, it is normalised to `{}` by the state machine and all restore
 settings fall back to these defaults.
 
-**Retry / polling behaviour**
+**Polling behaviour**
 
-Retry cadence when handling `IsThawingError` is controlled by the `aggressiveTimes` construct property:
+The wait between thaw checks and the maximum number of checks are controlled by the `aggressiveTimes` construct property:
 
-- `aggressiveTimes = false` (default): retry every **1 hour**, up to **50** attempts (≈ 50 hours)
-- `aggressiveTimes = true`: retry every **1 minute**, up to **3** attempts
+- `aggressiveTimes = false` (default): wait **1 hour** between checks, up to **50** checks (≈ 49 hours)
+- `aggressiveTimes = true`: wait **1 minute** between checks, up to **3** checks
 
 Note that `aggressiveTimes` is enabled for **development and testing only**, where restores are
 expected to complete quickly and faster feedback is desirable. However, if `aggressiveTimes: true` and
-a caller selects a slow retrieval tier (e.g. `Bulk`) via `thawParams`, retries may be exhausted
+a caller selects a slow retrieval tier (e.g. `Bulk`) via `thawParams`, the checks may be used up
 and the workflow can fail while the restore is still in progress.
 
 ## Cost estimation
